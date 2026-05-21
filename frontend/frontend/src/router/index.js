@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import authService from '@/services/auth'
 import Home from '../views/Home.vue'
 import About from '../views/About.vue'
 import Products from '../views/Products.vue'
@@ -110,7 +111,46 @@ const routes = [
       title: 'Admin Dashboard | Manage Content',
       description: 'Administrative dashboard for managing products and blog content.'
     }
-  }
+  },
+  // Add these to your routes array
+{
+  path: '/admin/login',
+  name: 'AdminLogin',
+  component: () => import('@/views/admin/Login.vue')
+},
+{
+  path: '/admin/register',
+  name: 'AdminRegister',
+  component: () => import('@/views/admin/Register.vue')
+},
+{
+  path: '/admin/forgot-password',
+  name: 'ForgotPassword',
+  component: () => import('@/views/admin/ForgotPassword.vue')
+},
+{
+  path: '/admin/reset-password',
+  name: 'ResetPassword',
+  component: () => import('@/views/admin/ResetPassword.vue')
+},
+{
+  path: '/admin/dashboard',
+  name: 'AdminDashboard',
+  component: () => import('@/views/admin/Dashboard.vue'),
+  meta: { requiresAuth: true }
+},
+{
+  path: '/admin/users',
+  name: 'UserManagement',
+  component: () => import('@/views/admin/UserManagement.vue'),
+  meta: { requiresAuth: true }
+},
+{
+  path: '/verify-email',
+  name: 'VerifyEmail',
+  component: () => import('@/views/admin/VerifyEmail.vue')
+}
+
 ]
 
 const router = createRouter({
@@ -162,5 +202,24 @@ router.beforeEach(async (to, from, next) => {
   
   next()
 })
+
+
+
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth) {
+    if (!authService.isAuthenticated()) {
+      next('/admin/login')
+    } else {
+      next()
+    }
+  } else {
+    next()
+  }
+})
+
+
+
+
+
 
 export default router

@@ -21,9 +21,15 @@
           <div class="dropdown-content" v-show="dropdownOpen">
             <router-link to="/careers" @click="closeMenu">Job Opportunities</router-link>
             <router-link to="/csr" @click="closeMenu">CSR</router-link>
-            <button @click="showAdminLogin = true" class="admin-link">
-              Admin Login
-            </button>
+            <template v-if="isAuthenticated">
+              <router-link to="/admin/dashboard" @click="closeMenu">Dashboard</router-link>
+              <button @click="handleLogout" class="admin-link">Logout</button>
+            </template>
+            <template v-else>
+              <button @click="showAdminLogin = true" class="admin-link">
+                Admin Login
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -40,15 +46,80 @@
     </div>
     
     <!-- Admin Login Modal -->
-    <div class="modal" v-if="showAdminLogin" @click.self="showAdminLogin = false">
+    <div class="modal" v-if="showAdminLogin" @click.self="closeLoginModal">
       <div class="modal-content">
-        <h3>Admin Login</h3>
-        <form @submit.prevent="handleLogin">
-          <input type="text" v-model="loginForm.username" placeholder="Username" required>
-          <input type="password" v-model="loginForm.password" placeholder="Password" required>
-          <button type="submit" class="btn btn-primary">Login</button>
-        </form>
-        <button class="close-btn" @click="showAdminLogin = false">×</button>
+        <button class="close-btn" @click="closeLoginModal">×</button>
+        
+        <!-- Step 1: Email & Password -->
+        <div v-if="loginStep === 1">
+          <h3>Admin Login</h3>
+          <form @submit.prevent="handleStep1">
+            <input 
+              type="email" 
+              v-model="loginForm.email" 
+              placeholder="Email Address" 
+              required
+              autocomplete="email"
+            >
+            <input 
+              type="password" 
+              v-model="loginForm.password" 
+              placeholder="Password" 
+              required
+              autocomplete="current-password"
+            >
+            <button type="submit" class="btn btn-primary" :disabled="loading">
+              {{ loading ? 'Verifying...' : 'Continue' }}
+            </button>
+          </form>
+          <div class="modal-footer">
+            <router-link to="/admin/forgot-password" @click="closeLoginModal">
+              Forgot Password?
+            </router-link>
+            <router-link to="/admin/register" @click="closeLoginModal">
+              Register
+            </router-link>
+          </div>
+        </div>
+        
+        <!-- Step 2: OTP Verification -->
+        <div v-else-if="loginStep === 2">
+          <h3>Two-Factor Authentication</h3>
+          <p class="otp-instruction">Enter the 6-digit code sent to your email</p>
+          <form @submit.prevent="handleStep2">
+            <div class="otp-inputs">
+              <input 
+                v-for="i in 6" 
+                :key="i"
+                type="text"
+                maxlength="1"
+                class="otp-input"
+                v-model="otpCodes[i-1]"
+                @input="handleOtpInput(i-1, $event)"
+                @keyup="handleOtpKeyup(i-1, $event)"
+                ref="otpInputs"
+                autofocus
+              >
+            </div>
+            <button type="submit" class="btn btn-primary" :disabled="loading">
+              {{ loading ? 'Verifying...' : 'Verify & Login' }}
+            </button>
+          </form>
+          <button 
+            class="btn-resend" 
+            @click="resendOtp" 
+            :disabled="resendCooldown"
+          >
+            {{ resendCooldown ? `Resend in ${resendTimer}s` : 'Resend Code' }}
+          </button>
+          <button class="btn-back" @click="loginStep = 1">
+            ← Back
+          </button>
+        </div>
+        
+        <div v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </div>
       </div>
     </div>
   </nav>
@@ -56,6 +127,7 @@
 
 <script>
 import axios from 'axios'
+import authService from '@/services/auth'
 
 export default {
   name: 'Navbar',
@@ -64,10 +136,22 @@ export default {
       mobileMenuOpen: false,
       dropdownOpen: false,
       showAdminLogin: false,
+      loginStep: 1,
       loginForm: {
-        username: '',
+        email: '',
         password: ''
-      }
+      },
+      otpCodes: ['', '', '', '', '', ''],
+      loading: false,
+      errorMessage: '',
+      resendCooldown: false,
+      resendTimer: 0,
+      loginEmail: null
+    }
+  },
+  computed: {
+    isAuthenticated() {
+      return authService.isAuthenticated()
     }
   },
   methods: {
@@ -82,27 +166,175 @@ export default {
       this.dropdownOpen = !this.dropdownOpen
     },
     handleImageError(e) {
-      // If logo fails to load, show a text-based logo
       e.target.style.display = 'none'
     },
-    async handleLogin() {
+    closeLoginModal() {
+      this.showAdminLogin = false
+      this.loginStep = 1
+      this.loginForm = { email: '', password: '' }
+      this.otpCodes = ['', '', '', '', '', '']
+      this.errorMessage = ''
+    },
+    
+    async handleStep1() {
+      this.loading = true
+      this.errorMessage = ''
+      
       try {
-        const response = await axios.post('/api/admin/login', this.loginForm)
-        if (response.data.is_admin) {
-          localStorage.setItem('isAdmin', 'true')
-          this.showAdminLogin = false
-          this.$router.push('/admin/dashboard')
-          this.loginForm = { username: '', password: '' }
+        const response = await authService.loginStep1(
+          this.loginForm.email,
+          this.loginForm.password
+        )
+        
+        if (response.requires_otp) {
+          this.loginEmail = this.loginForm.email
+          this.loginStep = 2
+          this.$nextTick(() => {
+            if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {
+              this.$refs.otpInputs[0].focus()
+            }
+          })
         }
       } catch (error) {
-        alert('Invalid credentials')
+        this.errorMessage = error.response?.data?.error || 'Login failed. Please try again.'
+      } finally {
+        this.loading = false
       }
+    },
+    
+    async handleStep2() {
+      const otpCode = this.otpCodes.join('')
+      if (otpCode.length !== 6) {
+        this.errorMessage = 'Please enter the 6-digit verification code'
+        return
+      }
+      
+      this.loading = true
+      this.errorMessage = ''
+      
+      try {
+        const response = await authService.loginStep2(otpCode)
+        this.closeLoginModal()
+        this.$router.push('/admin/dashboard')
+      } catch (error) {
+        this.errorMessage = error.response?.data?.error || 'Invalid verification code'
+        this.otpCodes = ['', '', '', '', '', '']
+        if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {
+          this.$refs.otpInputs[0].focus()
+        }
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    handleOtpInput(index, event) {
+      const value = event.target.value.replace(/[^0-9]/g, '')
+      this.otpCodes[index] = value
+      
+      if (value && index < 5) {
+        this.$refs.otpInputs[index + 1].focus()
+      }
+      
+      if (this.otpCodes.join('').length === 6) {
+        this.handleStep2()
+      }
+    },
+    
+    handleOtpKeyup(index, event) {
+      if (event.key === 'Backspace' && !this.otpCodes[index] && index > 0) {
+        this.$refs.otpInputs[index - 1].focus()
+      }
+    },
+    
+    async resendOtp() {
+      if (this.resendCooldown) return
+      
+      try {
+        await authService.loginStep1(this.loginForm.email, this.loginForm.password)
+        this.resendCooldown = true
+        this.resendTimer = 60
+        const interval = setInterval(() => {
+          this.resendTimer--
+          if (this.resendTimer <= 0) {
+            clearInterval(interval)
+            this.resendCooldown = false
+          }
+        }, 1000)
+        this.errorMessage = ''
+      } catch (error) {
+        this.errorMessage = error.response?.data?.error || 'Failed to resend code'
+      }
+    },
+    
+    async handleLogout() {
+      await authService.logout()
+      this.$router.push('/')
     }
   }
 }
 </script>
 
 <style scoped>
+/* Add OTP styles */
+.modal .otp-inputs {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.modal .otp-input {
+  width: 50px;
+  height: 50px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+}
+
+.modal .otp-input:focus {
+  border-color: var(--primary-blue);
+  outline: none;
+}
+
+.modal .otp-instruction {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0.5rem 0;
+}
+
+.modal .btn-resend,
+.modal .btn-back {
+  width: 100%;
+  padding: 8px;
+  margin-top: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--primary-blue);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.modal .btn-resend:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal .modal-footer {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.modal .modal-footer a {
+  color: var(--primary-blue);
+  text-decoration: none;
+}
+
+/* Keep your existing navbar styles */
 .navbar {
   background: var(--white);
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -129,13 +361,6 @@ export default {
   width: auto;
 }
 
-/* If logo fails to load, show a fallback */
-.navbar-brand::before {
-  content: '🥛';
-  font-size: 2rem;
-  display: none;
-}
-
 .brand-name {
   font-size: 1.2rem;
   font-weight: 700;
@@ -157,7 +382,7 @@ export default {
 
 .navbar-menu a:hover,
 .navbar-menu .router-link-active {
-  color:  rgb(177, 177, 244);
+  color: var(--primary-blue);
 }
 
 .dropdown {
@@ -171,15 +396,7 @@ export default {
   cursor: pointer;
   font-size: 1rem;
   padding: 0;
-
-
 }
-
-
-
-
-
-
 
 .dropdown-content {
   position: absolute;
@@ -208,8 +425,7 @@ export default {
 
 .dropdown-content a:hover,
 .dropdown-content button:hover {
-  background: rgb(174, 174, 229);
-  color: black;
+  background: var(--gray-light);
 }
 
 .admin-link {
@@ -228,10 +444,6 @@ export default {
   transition: transform 0.3s;
 }
 
-.social-links a:hover {
-  transform: translateY(-2px);
-}
-
 .mobile-toggle {
   display: none;
   flex-direction: column;
@@ -243,7 +455,6 @@ export default {
   height: 3px;
   background: var(--primary-blue);
   margin: 3px 0;
-  transition: 0.3s;
 }
 
 .modal {
@@ -261,16 +472,11 @@ export default {
 
 .modal-content {
   background: white;
-  padding: 2rem;
   border-radius: 12px;
+  padding: 2rem;
   width: 90%;
   max-width: 400px;
   position: relative;
-}
-
-.modal-content h3 {
-  margin-bottom: 1rem;
-  color: var(--primary-blue);
 }
 
 .modal-content input {
@@ -281,6 +487,11 @@ export default {
   border-radius: 4px;
 }
 
+.modal-content h3 {
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
 .close-btn {
   position: absolute;
   top: 10px;
@@ -289,6 +500,16 @@ export default {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
+}
+
+.error-message {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: #fee;
+  color: #c00;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-align: center;
 }
 
 @media (max-width: 768px) {

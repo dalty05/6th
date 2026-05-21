@@ -32,8 +32,34 @@
         
         <div class="food-safety">
           <h3>Food Safety Policy Statement</h3>
+
+          <div class="safety-points">
           <p>We are committed to producing safe, high-quality dairy products that meet all regulatory standards. Our food safety management system ensures traceability from farm to table.</p>
+          
+          
+          
+          
+          <p>Meru Central Dairy Co-operative Union Ltd (MCDCU) is committed to producing safe, wholesome and high-quality dairy products.</p>
+
+          <p>MCDCU top management is committed to ensure that this policy is effectively communicated, implemented and maintained at all levels of the organization and supported by measurable objectives.</p>
+
+          <p> In pursuit of this commitment, MCDCU is dedicated to full compliance with all applicable food safety requirements including statutory, regulatory and mutually agreed customer food safety requirements and maintaining KS ISO 22000:2018 compliant food safety system.</p>
+
+          <p> MCDCU ensures effective communication of food safety information internally across all departments and externally with suppliers, customers, regulators and other relevant stakeholders to ensure alignment and transparency in the food safety chain at all times.</p>
+
+          <p>MCDCU ensures that adequate resources, training and support are provided to enhance employee competence and awareness of their roles in maintaining food safety. </p>
+          <p>MCDCU ensures continual improvement of an effective Food Safety Management System (FSMS). To maintain its suitability, this food safety policy will be reviewed from time to time.</p>
+
+          </div>
+
+
+
+
+
+
+
           <button class="btn btn-outline" @click="downloadPolicy">Download Policy Statement</button>
+
         </div>
       </div>
     </section>
@@ -41,6 +67,11 @@
 </template>
 
 <script>
+
+
+
+
+
 export default {
   name: 'About',
   methods: {
@@ -52,6 +83,16 @@ export default {
 </script>
 
 <style scoped>
+
+.safety-points p {
+  margin-bottom: 1rem;
+  color: #555;
+  text-align: justify;
+}
+
+
+
+
 .about-page {
   padding: 4rem 0;
   min-height: 70vh;
@@ -92,6 +133,9 @@ export default {
   padding: 2rem;
   border-radius: 12px;
   text-align: center;
+  max-width: 80%;
+ align-self: center;
+  margin: 0 auto;
 }
 
 .food-safety h3 {

@@ -9,6 +9,9 @@
         <button @click="activeTab = 'blog'" :class="{ active: activeTab === 'blog' }">
           Manage Blog
         </button>
+        <button @click="goToUserManagement" :class="{ active: activeTab === 'users' }">
+          Manage Users
+        </button>
         <button @click="handleLogout" class="logout-btn">Logout</button>
       </nav>
     </div>
@@ -194,7 +197,7 @@ export default {
   methods: {
     async checkAuth() {
       try {
-        const response = await axios.get('/api/admin/check')
+        const response = await axios.get('/api/admin/check-auth')
         if (!response.data.is_admin) {
           router.push('/')
         }
@@ -273,9 +276,12 @@ export default {
       this.editingPost = null
     },
     async handleLogout() {
-      await axios.post('/api/admin/logout')
-      localStorage.removeItem('isAdmin')
+      await axios.post('/api/auth/logout')
+      localStorage.removeItem('user')
       router.push('/')
+    },
+    goToUserManagement() {
+      router.push('/admin/users')
     }
   }
 }
