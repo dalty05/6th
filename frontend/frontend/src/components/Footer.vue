@@ -209,6 +209,7 @@ export default {
   color: #e2e8f0;
   position: relative;
   overflow: hidden;
+  /* height:20%; */
 }
 
 .footer::before {
