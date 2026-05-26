@@ -76,6 +76,17 @@ const routes = [
       dynamicTitle: true
     }
   },
+
+//   {
+//   path: '/blog/:slug',
+//   name: 'BlogDetail',
+//   component: BlogDetail
+// },
+
+
+
+
+
   { 
     path: '/contact', 
     name: 'Contact', 

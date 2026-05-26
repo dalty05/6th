@@ -14,11 +14,11 @@
               Kenya's biggest dairy co-operative, providing quality dairy products 
               from the pristine slopes of Mount Kenya.
             </p>
-            <div class="certification-badges">
+            <!-- <div class="certification-badges">
               <span class="cert-badge">⭐ ISO 22000</span>
               <span class="cert-badge">✓ HACCP</span>
               <span class="cert-badge">🏆 KEBS</span>
-            </div>
+            </div> -->
           </div>
 
           <!-- Quick Links -->
@@ -27,9 +27,9 @@
             <ul class="footer-links">
               <li><router-link to="/">Home</router-link></li>
               <li><router-link to="/about">About Us</router-link></li>
-              <li><router-link to="/products">Products</router-link></li>
-              <li><router-link to="/shop">Shop Online</router-link></li>
-              <li><router-link to="/blog">Blog</router-link></li>
+              <!-- <li><router-link to="/products">Products</router-link></li> -->
+              <!-- <li><router-link to="/shop">Shop Online</router-link></li> -->
+              <!-- <li><router-link to="/blog">Blog</router-link></li> -->
             </ul>
           </div>
 
@@ -39,9 +39,9 @@
             <ul class="footer-links">
               <li><router-link to="/contact">Contact Us</router-link></li>
               <li><router-link to="/careers">Careers</router-link></li>
-              <li><router-link to="/csr">CSR Initiatives</router-link></li>
-              <li><a href="#">Privacy Policy</a></li>
-              <li><a href="#">Terms & Conditions</a></li>
+              <!-- <li><router-link to="/csr">CSR Initiatives</router-link></li> -->
+              <!-- <li><a href="#">Privacy Policy</a></li> -->
+              <!-- <li><a href="#">Terms & Conditions</a></li> -->
             </ul>
           </div>
 
@@ -60,17 +60,17 @@
                   <a href="tel:+254719111444">+254 719 111 444</a>
                 </div>
               </div>
-              <div class="contact-item">
+              <!-- <div class="contact-item">
                 <span class="contact-icon">✉️</span>
                 <div>
                   <a href="mailto:maziwa@merudairy.co.ke">maziwa@merudairy.co.ke</a><br>
                   <a href="mailto:sales@merudairy.co.ke">sales@merudairy.co.ke</a>
                 </div>
-              </div>
-              <div class="contact-item">
+              </div> -->
+              <!-- <div class="contact-item">
                 <span class="contact-icon">🕒</span>
                 <span>Mon-Fri: 8AM - 5PM<br>Sat: 9AM - 1PM</span>
-              </div>
+              </div> -->
             </div>
           </div>
         </div>
@@ -78,7 +78,7 @@
     </div>
 
     <!-- Newsletter Section -->
-    <div class="footer-newsletter">
+    <!-- <div class="footer-newsletter">
       <div class="container">
         <div class="newsletter-wrapper glass-card">
           <div class="newsletter-content">
@@ -102,7 +102,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <!-- Footer Bottom -->
     <div class="footer-bottom">
@@ -238,7 +238,8 @@ export default {
 .footer-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1.5fr;
-  gap: 40px;
+  gap: 20px;
+  margin: top 0px; ;
 }
 
 /* Brand Section */

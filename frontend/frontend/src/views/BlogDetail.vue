@@ -34,58 +34,54 @@ import { useTitle } from '../composables/useTitle'
 
 export default {
   name: 'BlogDetail',
+
   data() {
     return {
       post: null
     }
   },
+
   setup() {
     const { setTitle } = useTitle()
     return { setTitle }
   },
+
+  computed: {
+    formattedContent() {
+      return this.post?.content || ''
+    }
+  },
+
   mounted() {
     this.fetchPost()
   },
+
   methods: {
     async fetchPost() {
       try {
-        
-        // const slug = this.$route.params.slug
-
         const slug = this.$route.params.slug
-            console.log("SLUG:", slug)
-
-
-
-
         const response = await axios.get(`/api/blog/${slug}`)
-          console.log("POST RESPONSE:", response.data)
 
-          this.post =
-            response.data.item ||
-            response.data.post ||
-            response.data
-        
+        this.post = response.data
 
-
-        // Set dynamic title with blog post title
-        if (this.post && this.post.title) {
+        if (this.post?.title) {
           this.setTitle(this.post.title)
         }
+
       } catch (error) {
         console.error('Error fetching blog post:', error)
         this.$router.push('/blog')
       }
-    }
-  },
-  watch: {
-    post: {
-      handler(newPost) {
-        if (newPost && newPost.title) {
-          this.setTitle(newPost.title)
-        }
-      },
-      deep: true
+    },
+
+    formatDate(dateString) {
+      const date = new Date(dateString)
+
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
     }
   }
 }
