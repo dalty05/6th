@@ -7,6 +7,8 @@ import router from './router'
 
 import axios from 'axios'
 
+axios.defaults.withCredentials = true
+
 
 
 // Add auth token to all requests

@@ -5,7 +5,6 @@
         <img src="/logo.png" alt="Mount Kenya Milk" class="logo" @error="handleImageError">
         <span class="brand-name">Mount Kenya Milk</span>
       </div>
-      
       <div class="navbar-menu" :class="{ 'is-active': mobileMenuOpen }">
         <router-link to="/" @click="closeMenu">Home</router-link>
         <router-link to="/about" @click="closeMenu">About Us</router-link>
@@ -26,18 +25,23 @@
               <button @click="handleLogout" class="admin-link">Logout</button>
             </template>
             <template v-else>
-              <button @click="showAdminLogin = true" class="admin-link">
-                Admin Login
-              </button>
+              
+
+              <router-link to="/admin/login" @click="closeLoginModal">
+              Admin Login
+            </router-link>
+                
+              
+            
             </template>
           </div>
         </div>
       </div>
       
       <div class="social-links">
-        <a href="#" target="_blank"><i class="fab fa-facebook"></i></a>
-        <a href="#" target="_blank"><i class="fab fa-twitter"></i></a>
-        <a href="#" target="_blank"><i class="fab fa-instagram"></i></a>
+        <a href="#" target="_blank"><i class="fab fa-facebook "><img src="/facebook.png" alt="Mount Kenya Milk" class="logo2" @error="handleImageError"></i></a>
+        <a href="#" target="_blank"><i class="fab fa-twitter"><img src="/x.png" alt="Mount Kenya Milk" class="logo2" @error="handleImageError"></i></a>
+        <a href="#" target="_blank"><i class="fab fab-instagram"><img src="/instagram.jpg" alt="Mount Kenya Milk" class="logo2" @error="handleImageError"></i></a>
       </div>
       
       <div class="mobile-toggle" @click="toggleMobileMenu">
@@ -154,14 +158,56 @@ export default {
       return authService.isAuthenticated()
     }
   },
+
+  mounted() {
+  document.addEventListener('click', this.handleOutsideClick)
+},
+
+beforeUnmount() {
+  document.removeEventListener('click', this.handleOutsideClick)
+},
+
+
+
+
   methods: {
     toggleMobileMenu() {
       this.mobileMenuOpen = !this.mobileMenuOpen
     },
+
+    
+
+
+
+
+    handleOutsideClick(event) {
+      const dropdown = this.$el.querySelector('.dropdown')
+
+      if (dropdown && !dropdown.contains(event.target)) {
+        this.dropdownOpen = false
+      }
+    },
+
+
+
+
+
+
+
+
+    
+
     closeMenu() {
       this.mobileMenuOpen = false
       this.dropdownOpen = false
+      this.showAdminLogin = false
     },
+
+    
+
+
+
+
     toggleDropdown() {
       this.dropdownOpen = !this.dropdownOpen
     },
@@ -274,196 +320,255 @@ export default {
 }
 </script>
 
+
 <style scoped>
-/* Add OTP styles */
-.modal .otp-inputs {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  margin: 1rem 0;
+:root {
+  --nav-bg: rgba(255,255,255,0.95);
 }
 
-.modal .otp-input {
-  width: 50px;
-  height: 50px;
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-}
-
-.modal .otp-input:focus {
-  border-color: var(--primary-blue);
-  outline: none;
-}
-
-.modal .otp-instruction {
-  text-align: center;
-  font-size: 0.85rem;
-  color: #666;
-  margin: 0.5rem 0;
-}
-
-.modal .btn-resend,
-.modal .btn-back {
-  width: 100%;
-  padding: 8px;
-  margin-top: 0.5rem;
-  background: none;
-  border: none;
-  color: var(--primary-blue);
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.modal .btn-resend:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modal .modal-footer {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-}
-
-.modal .modal-footer a {
-  color: var(--primary-blue);
-  text-decoration: none;
-}
-
-/* Keep your existing navbar styles */
+/* NAVBAR */
 .navbar {
-  background: var(--white);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   position: sticky;
   top: 0;
   z-index: 1000;
+  backdrop-filter: blur(12px);
+  background: var(--nav-bg);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  transition: all 0.3s ease;
 }
 
 .navbar .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 20px;
+  padding: 0.9rem 24px;
 }
 
+/* BRAND */
 .navbar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .logo {
-  height: 50px;
+  height: 52px;
   width: auto;
+  transition: transform 0.3s ease;
+}
+.logo2 {
+  max-height: 40px;
+  width: auto;
+  transition: transform 0.3s ease;
+  border-radius: 15px;
+  position: relative;
+  margin-right: 20px;
+}
+
+
+.glass-card {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  background: white;
+  text-decoration: none;
+  color: #1e3a8a;
+  font-weight: 500;
+  transition: all 0.3s;
+  border-radius: 12px;
+}
+
+
+
+
+
+.logo:hover {
+  transform: scale(1.05);
 }
 
 .brand-name {
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
   color: var(--primary-blue);
+  letter-spacing: 0.4px;
 }
 
+/* MENU */
 .navbar-menu {
   display: flex;
-  gap: 2rem;
   align-items: center;
+  gap: 1.5rem;
 }
 
-.navbar-menu a {
+.navbar-menu a,
+.dropdown-btn {
+  position: relative;
   text-decoration: none;
   color: #333;
-  font-weight: 500;
-  transition: color 0.3s;
+  font-weight: 600;
+  font-size: 0.96rem;
+  transition: all 0.3s ease;
+}
+
+.navbar-menu a::after,
+.dropdown-btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -6px;
+  width: 0%;
+  height: 2px;
+  background: var(--primary-blue);
+  transition: width 0.3s ease;
+}
+
+.navbar-menu a:hover::after,
+.dropdown-btn:hover::after,
+.router-link-active::after {
+  width: 100%;
 }
 
 .navbar-menu a:hover,
-.navbar-menu .router-link-active {
+.dropdown-btn:hover,
+.router-link-active {
   color: var(--primary-blue);
 }
 
+/* DROPDOWN */
 .dropdown {
   position: relative;
 }
 
 .dropdown-btn {
-  background: none;
+  background: transparent;
   border: none;
-  font-weight: 500;
   cursor: pointer;
-  font-size: 1rem;
-  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dropdown-btn span {
+  font-size: 0.7rem;
+  transition: transform 0.3s ease;
+}
+
+.dropdown:hover .dropdown-btn span {
+  transform: rotate(180deg);
 }
 
 .dropdown-content {
   position: absolute;
-  top: 100%;
+  top: 130%;
   left: 0;
-  background: white;
-  min-width: 180px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-  border-radius: 8px;
+  min-width: 220px;
+  background: rgba(255,255,255,0.98);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
   overflow: hidden;
-  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+  animation: fadeDropdown 0.25s ease;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+
+@keyframes fadeDropdown {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dropdown-content a,
 .dropdown-content button {
   display: block;
-  padding: 12px 16px;
-  text-decoration: none;
-  color: #333;
   width: 100%;
-  text-align: left;
-  background: none;
+  padding: 14px 18px;
   border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.92rem;
+  font-weight: 500;
   cursor: pointer;
+  color: #333;
+  transition: all 0.25s ease;
 }
 
 .dropdown-content a:hover,
 .dropdown-content button:hover {
-  background: var(--gray-light);
+  background: rgba(0, 102, 255, 0.08);
+  color: var(--primary-blue);
+  padding-left: 24px;
 }
 
 .admin-link {
   color: var(--primary-blue);
-  font-weight: 600;
+  font-weight: 700;
 }
 
+/* SOCIAL */
 .social-links {
   display: flex;
   gap: 1rem;
+  padding-right: 10px;
+  
 }
+
 
 .social-links a {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0,0,0,0.04);
   color: var(--primary-blue);
-  font-size: 1.2rem;
-  transition: transform 0.3s;
+  transition: all 0.3s ease;
 }
 
+.social-links a:hover {
+  transform: translateY(-3px);
+  background: var(--primary-blue);
+  color: white;
+}
+
+/* MOBILE TOGGLE */
 .mobile-toggle {
   display: none;
   flex-direction: column;
+  gap: 5px;
   cursor: pointer;
 }
 
 .mobile-toggle span {
-  width: 25px;
+  width: 26px;
   height: 3px;
+  border-radius: 10px;
   background: var(--primary-blue);
-  margin: 3px 0;
+  transition: all 0.3s ease;
 }
 
+/* MODAL */
 .modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
+  position: relative;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -472,75 +577,148 @@ export default {
 
 .modal-content {
   background: white;
-  border-radius: 12px;
+  border-radius: 22px;
   padding: 2rem;
   width: 90%;
-  max-width: 400px;
+  max-width: 420px;
   position: relative;
+  animation: modalFade 0.3s ease;
+}
+
+@keyframes modalFade {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-content h3 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #222;
 }
 
 .modal-content input {
   width: 100%;
-  padding: 10px;
+  padding: 14px;
   margin: 10px 0;
+  border-radius: 12px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  transition: all 0.25s ease;
 }
 
-.modal-content h3 {
-  margin-bottom: 1rem;
-  text-align: center;
+.modal-content input:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 4px rgba(0,102,255,0.08);
+  outline: none;
 }
 
-.close-btn {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  background: none;
+.btn {
+  width: 100%;
+  padding: 13px;
   border: none;
-  font-size: 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
+.btn-primary {
+  background: var(--primary-blue);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+/* OTP */
+.modal .otp-inputs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 1.2rem 0;
+}
+
+.modal .otp-input {
+  width: 52px;
+  height: 55px;
+  font-size: 1.4rem;
+  font-weight: bold;
+  text-align: center;
+  border-radius: 12px;
+}
+
+/* ERROR */
 .error-message {
   margin-top: 1rem;
-  padding: 0.5rem;
-  background: #fee;
-  color: #c00;
-  border-radius: 4px;
-  font-size: 0.85rem;
+  background: #ffe5e5;
+  color: #d60000;
+  padding: 12px;
+  border-radius: 10px;
   text-align: center;
+  font-size: 0.9rem;
 }
 
+/* MOBILE */
 @media (max-width: 768px) {
+  .navbar .container {
+    padding: 1rem 18px;
+  }
+
   .navbar-menu {
-    display: none;
     position: absolute;
     top: 100%;
     left: 0;
     right: 0;
-    background: white;
+    display: none;
     flex-direction: column;
-    padding: 1rem;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    align-items: flex-start;
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.98);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    animation: fadeDropdown 0.25s ease;
   }
-  
+
   .navbar-menu.is-active {
     display: flex;
   }
-  
+
+  .navbar-menu a,
+  .dropdown-btn {
+    width: 100%;
+    padding: 10px 0;
+  }
+
+  .dropdown-content {
+    position: static;
+    width: 100%;
+    margin-top: 10px;
+    box-shadow: none;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.03);
+  }
+
   .mobile-toggle {
     display: flex;
   }
-  
+
   .social-links {
     display: none;
   }
-  
-  .dropdown-content {
-    position: static;
-    box-shadow: none;
-    padding-left: 1rem;
+
+  .brand-name {
+    font-size: 1rem;
+  }
+
+  .logo {
+    height: 45px;
   }
 }
 </style>

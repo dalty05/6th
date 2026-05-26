@@ -126,7 +126,9 @@ def register():
     
     # Send verification email
     frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
-    email_service.send_verification_email(user, token_obj.token, frontend_url)
+    if not email_service.send_verification_email(user, token_obj.token, frontend_url):
+        print(f"Failed to send registration verification email to {user.email}")
+        return jsonify({'error': 'Registration succeeded, but verification email could not be sent. Please check SMTP settings.'}), 500
     
     return jsonify({
         'message': 'Registration successful. Please verify your email.',
@@ -201,9 +203,9 @@ def login_step1():
     db.session.commit()
     
     # Send OTP email
-    if not email_service.send_otp_email(user, otp_code):
-        print(f"Failed to send OTP email for {email}")
-        return jsonify({'error': 'Unable to send OTP email. Please contact support.'}), 500
+    # if not email_service.send_otp_email(user, otp_code):
+    #     print(f"Failed to send OTP email for {email}")
+    #     return jsonify({'error': 'Unable to send OTP email. Please contact support.'}), 500
 
     print(f"\n{'='*50}")
     print(f"🔐 OTP LOGIN CODE FOR {email}")

@@ -211,7 +211,8 @@ export default {
     },
     async fetchBlogPosts() {
       const response = await axios.get('/api/blog')
-      this.blogPosts = response.data
+      // GET /api/blog returns pagination payload { items, total, page, page_size }
+      this.blogPosts = response.data.items || []
     },
     editProduct(product) {
       this.editingProduct = product

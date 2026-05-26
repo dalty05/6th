@@ -127,6 +127,20 @@ class Product(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+# class BlogPost(db.Model):
+#     __tablename__ = 'blog_posts'
+    
+#     id = db.Column(db.Integer, primary_key=True)
+#     title = db.Column(db.String(200), nullable=False)
+#     slug = db.Column(db.String(200), unique=True, nullable=False)
+#     excerpt = db.Column(db.String(300))
+#     content = db.Column(db.Text, nullable=False)
+#     featured_image = db.Column(db.String(300))
+#     author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+#     views = db.Column(db.Integer, default=0)
+#     status = db.Column(db.String(20), default='published')
+#     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+#     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 class BlogPost(db.Model):
     __tablename__ = 'blog_posts'
     
@@ -141,6 +155,25 @@ class BlogPost(db.Model):
     status = db.Column(db.String(20), default='published')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'slug': self.slug,
+            'excerpt': self.excerpt,
+            'content': self.content,
+            'featured_image': self.featured_image,
+            'author': self.author.full_name if self.author else 'Admin',
+            'views': self.views,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+
+
 
 class Testimonial(db.Model):
     __tablename__ = 'testimonials'

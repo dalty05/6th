@@ -49,10 +49,25 @@ export default {
   methods: {
     async fetchPost() {
       try {
-        const slug = this.$route.params.slug
-        const response = await axios.get(`/api/blog/${slug}`)
-        this.post = response.data
         
+        // const slug = this.$route.params.slug
+
+        const slug = this.$route.params.slug
+            console.log("SLUG:", slug)
+
+
+
+
+        const response = await axios.get(`/api/blog/${slug}`)
+          console.log("POST RESPONSE:", response.data)
+
+          this.post =
+            response.data.item ||
+            response.data.post ||
+            response.data
+        
+
+
         // Set dynamic title with blog post title
         if (this.post && this.post.title) {
           this.setTitle(this.post.title)

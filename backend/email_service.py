@@ -1,52 +1,80 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
+import smtplib
+import ssl
+from email.message import EmailMessage
 from dotenv import load_dotenv
-from flask import render_template_string
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-if not os.path.exists(dotenv_path):
-    dotenv_path = os.path.join(os.path.dirname(__file__), 'dotenv.env')
-load_dotenv(dotenv_path)
+dotenv_candidates = [
+    os.path.join(os.path.dirname(__file__), '.env'),
+    os.path.join(os.path.dirname(__file__), 'dotenv.env'),
+    # repo root .env (one level up from backend/)
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'),
+]
+
+dotenv_loaded_any = False
+for p in dotenv_candidates:
+    if os.path.exists(p):
+        load_dotenv(p, override=False)
+        dotenv_loaded_any = True
+        break
+
 
 class EmailService:
     def __init__(self):
-        self.smtp_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        self.smtp_port = int(os.environ.get('MAIL_PORT', 587))
-        self.smtp_username = os.environ.get('MAIL_USERNAME')
-        self.smtp_password = os.environ.get('MAIL_PASSWORD')
-        self.from_email = os.environ.get('MAIL_DEFAULT_SENDER', 'oyigodalton@gmail.com')
+        self.mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+        self.mail_port = int(os.environ.get('MAIL_PORT', 587))
+        self.mail_use_tls = os.environ.get('MAIL_USE_TLS', 'True').lower() in ('1', 'true', 'yes')
+        self.mail_use_ssl = os.environ.get('MAIL_USE_SSL', 'False').lower() in ('1', 'true', 'yes')
+        self.mail_username = os.environ.get('MAIL_USERNAME')
+        self.mail_password = os.environ.get('MAIL_PASSWORD')
+        self.from_email = os.environ.get('EMAIL_FROM') or os.environ.get('MAIL_DEFAULT_SENDER') or self.mail_username or 'noreply@example.com'
+        self.app_name = os.environ.get('APP_NAME', 'MeruDairy')
+        self.environment = os.environ.get('ENVIRONMENT', 'development')
+
+        self._configured = {
+            'mail_server': self.mail_server,
+            'mail_port': self.mail_port,
+            'mail_use_tls': self.mail_use_tls,
+            'mail_use_ssl': self.mail_use_ssl,
+            'mail_username': bool(self.mail_username),
+            'from_email': self.from_email,
+            'app_name': self.app_name,
+            'environment': self.environment,
+        }
     
+    def _create_message(self, to_email, subject, html_content, text_content=None):
+        message = EmailMessage()
+        message['Subject'] = subject
+        message['From'] = self.from_email
+        message['To'] = to_email
+        if text_content:
+            message.set_content(text_content)
+        message.add_alternative(html_content, subtype='html')
+        return message
+
     def send_email(self, to_email, subject, html_content, text_content=None):
         """Send email using SMTP"""
-        if not self.smtp_username or not self.smtp_password:
-            print("Email credentials not configured")
+        if not self.mail_username or not self.mail_password:
+            print('SMTP credentials missing: MAIL_USERNAME or MAIL_PASSWORD not set')
             return False
-        
+
+        message = self._create_message(to_email, subject, html_content, text_content)
+
         try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = self.from_email
-            msg['To'] = to_email
-            
-            # Plain text version
-            if text_content:
-                part1 = MIMEText(text_content, 'plain')
-                msg.attach(part1)
-            
-            # HTML version
-            part2 = MIMEText(html_content, 'html')
-            msg.attach(part2)
-            
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_username, self.smtp_password)
-                server.send_message(msg)
-            
+            if self.mail_use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(self.mail_server, self.mail_port, context=context) as server:
+                    server.login(self.mail_username, self.mail_password)
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(self.mail_server, self.mail_port) as server:
+                    if self.mail_use_tls:
+                        server.starttls(context=ssl.create_default_context())
+                    server.login(self.mail_username, self.mail_password)
+                    server.send_message(message)
             return True
         except Exception as e:
-            print(f"Email sending failed: {e}")
+            print(f'SMTP send failed: {e}')
             return False
     
     def send_verification_email(self, user, token, frontend_url):
