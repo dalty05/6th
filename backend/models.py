@@ -113,6 +113,11 @@ class EmailVerificationToken(db.Model):
 # Product model (keep your existing one)
 class Product(db.Model):
     __tablename__ = 'products'
+    __table_args__ = (
+        db.Index('idx_products_category', 'category'),
+        db.Index('idx_products_featured', 'featured'),
+        db.Index('idx_products_created', 'created_at'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -143,7 +148,12 @@ class Product(db.Model):
 #     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 class BlogPost(db.Model):
     __tablename__ = 'blog_posts'
-    
+
+    __table_args__ = (
+        db.Index('idx_blog_status', 'status'),
+        db.Index('idx_blog_created', 'created_at'),
+        db.Index('idx_blog_slug', 'slug'),
+    )    
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     slug = db.Column(db.String(200), unique=True, nullable=False)

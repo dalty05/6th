@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.2.0",
     "axios": "^1.4.0",
     "resend": "^6.12.3",
     "vue": "^3.3.0",

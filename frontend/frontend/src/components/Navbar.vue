@@ -1,492 +1,553 @@
 <template>
-  <nav class="navbar">
+  <nav class="navbar" :class="{ scrolled: isScrolled, 'menu-open': mobileMenuOpen }">
     <div class="container">
-      <div class="navbar-brand">
+      <div class="navbar-brand" @click="scrollToHome">
         <img src="/logo.png" alt="Mount Kenya Milk" class="logo" @error="handleImageError">
         <span class="brand-name">Mount Kenya Milk</span>
       </div>
+      
       <div class="navbar-menu" :class="{ 'is-active': mobileMenuOpen }">
-        <router-link to="/" @click="closeMenu">Home</router-link>
-        <router-link to="/about" @click="closeMenu">About Us</router-link>
-        <router-link to="/products" @click="closeMenu">Products</router-link>
-        <router-link to="/shop" @click="closeMenu">Shop Online</router-link>
-        <router-link to="/blog" @click="closeMenu">Blog</router-link>
-        <router-link to="/contact" @click="closeMenu">Contact Us</router-link>
+        <a 
+          @click.prevent="scrollTo('home')" 
+          :class="{ active: activeSection === 'home' }"
+          class="nav-link"
+        >
+          <i class="fas fa-home"></i> Home
+        </a>
+        <a 
+          @click.prevent="scrollTo('about')" 
+          :class="{ active: activeSection === 'about' }"
+          class="nav-link"
+        >
+          <i class="fas fa-info-circle"></i> About Us
+        </a>
+        <a 
+          @click.prevent="scrollTo('products')" 
+          :class="{ active: activeSection === 'products' }"
+          class="nav-link"
+        >
+          <i class="fas fa-box-open"></i> Products
+        </a>
+        <a 
+          @click.prevent="scrollTo('shop')" 
+          :class="{ active: activeSection === 'shop' }"
+          class="nav-link"
+        >
+          <i class="fas fa-shopping-cart"></i> Shop Online
+        </a>
+        <a 
+          @click.prevent="scrollTo('blog')" 
+          :class="{ active: activeSection === 'blog' }"
+          class="nav-link"
+        >
+          <i class="fas fa-newspaper"></i> Blog
+        </a>
+        <a 
+          @click.prevent="scrollTo('contact')" 
+          :class="{ active: activeSection === 'contact' }"
+          class="nav-link"
+        >
+          <i class="fas fa-envelope"></i> Contact Us
+        </a>
         
         <div class="dropdown">
           <button class="dropdown-btn" @click="toggleDropdown">
-            More <span>▼</span>
+            <i class="fas fa-ellipsis-h"></i> More <span>▼</span>
           </button>
-          <div class="dropdown-content" v-show="dropdownOpen">
-            <router-link to="/careers" @click="closeMenu">Job Opportunities</router-link>
-            <router-link to="/csr" @click="closeMenu">CSR</router-link>
+          <div class="dropdown-content" v-show="dropdownOpen" @click.stop>
+            <router-link to="/careers" @click="closeMenu" class="dropdown-item">
+              <i class="fas fa-briefcase"></i> Job Opportunities
+            </router-link>
+            <router-link to="/csr" @click="closeMenu" class="dropdown-item">
+              <i class="fas fa-hand-holding-heart"></i> CSR
+            </router-link>
+            <!-- <div class="dropdown-divider"></div>
             <template v-if="isAuthenticated">
-              <router-link to="/admin/dashboard" @click="closeMenu">Dashboard</router-link>
-              <button @click="handleLogout" class="admin-link">Logout</button>
+              <router-link to="/admin/dashboard" @click="closeMenu" class="dropdown-item">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+              </router-link>
+              <button @click="handleLogout" class="dropdown-item logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Logout
+              </button>
             </template>
             <template v-else>
-              
-
-              <router-link to="/admin/login" @click="closeLoginModal">
-              Admin Login
-            </router-link>
-                
-              
-            
-            </template>
+              <router-link to="/admin/login" class="dropdown-item" @click="closeLoginModal">
+                <i class="fas fa-lock"></i> Admin Login
+              </router-link>
+            </template> -->
           </div>
         </div>
       </div>
       
-      <div class="social-links">
-        <a href="#" target="_blank"><i class="fab fa-facebook "><img src="/facebook.png" alt="Mount Kenya Milk" class="logo2" @error="handleImageError"></i></a>
-        <a href="#" target="_blank"><i class="fab fa-twitter"><img src="/x.png" alt="Mount Kenya Milk" class="logo2" @error="handleImageError"></i></a>
-        <a href="#" target="_blank"><i class="fab fab-instagram"><img src="/instagram.jpg" alt="Mount Kenya Milk" class="logo2" @error="handleImageError"></i></a>
+      <div class="nav-actions">
+        <!-- Search Button -->
+        <button class="search-btn" @click="toggleSearch" aria-label="Search">
+          <i class="fas fa-search"></i>
+        </button>
+        
+        <!-- REMOVED: User Menu Section -->
+        
+        <!-- Mobile Toggle -->
+        <div class="mobile-toggle" @click="toggleMobileMenu">
+          <span></span><span></span><span></span>
+        </div>
       </div>
-      
-      <div class="mobile-toggle" @click="toggleMobileMenu">
-        <span></span><span></span><span></span>
-      </div>
+    </div>
+    
+    <!-- Search Modal -->
+    <div class="search-modal" v-if="showSearch" @click.self="toggleSearch">
+      <!-- ... search modal content ... -->
     </div>
     
     <!-- Admin Login Modal -->
     <div class="modal" v-if="showAdminLogin" @click.self="closeLoginModal">
-      <div class="modal-content">
-        <button class="close-btn" @click="closeLoginModal">×</button>
-        
-        <!-- Step 1: Email & Password -->
-        <div v-if="loginStep === 1">
-          <h3>Admin Login</h3>
-          <form @submit.prevent="handleStep1">
-            <input 
-              type="email" 
-              v-model="loginForm.email" 
-              placeholder="Email Address" 
-              required
-              autocomplete="email"
-            >
-            <input 
-              type="password" 
-              v-model="loginForm.password" 
-              placeholder="Password" 
-              required
-              autocomplete="current-password"
-            >
-            <button type="submit" class="btn btn-primary" :disabled="loading">
-              {{ loading ? 'Verifying...' : 'Continue' }}
-            </button>
-          </form>
-          <div class="modal-footer">
-            <router-link to="/admin/forgot-password" @click="closeLoginModal">
-              Forgot Password?
-            </router-link>
-            <router-link to="/admin/register" @click="closeLoginModal">
-              Register
-            </router-link>
-          </div>
-        </div>
-        
-        <!-- Step 2: OTP Verification -->
-        <div v-else-if="loginStep === 2">
-          <h3>Two-Factor Authentication</h3>
-          <p class="otp-instruction">Enter the 6-digit code sent to your email</p>
-          <form @submit.prevent="handleStep2">
-            <div class="otp-inputs">
-              <input 
-                v-for="i in 6" 
-                :key="i"
-                type="text"
-                maxlength="1"
-                class="otp-input"
-                v-model="otpCodes[i-1]"
-                @input="handleOtpInput(i-1, $event)"
-                @keyup="handleOtpKeyup(i-1, $event)"
-                ref="otpInputs"
-                autofocus
-              >
-            </div>
-            <button type="submit" class="btn btn-primary" :disabled="loading">
-              {{ loading ? 'Verifying...' : 'Verify & Login' }}
-            </button>
-          </form>
-          <button 
-            class="btn-resend" 
-            @click="resendOtp" 
-            :disabled="resendCooldown"
-          >
-            {{ resendCooldown ? `Resend in ${resendTimer}s` : 'Resend Code' }}
-          </button>
-          <button class="btn-back" @click="loginStep = 1">
-            ← Back
-          </button>
-        </div>
-        
-        <div v-if="errorMessage" class="error-message">
-          {{ errorMessage }}
-        </div>
-      </div>
+      <!-- ... login modal content ... -->
     </div>
   </nav>
 </template>
 
 <script>
-import axios from 'axios'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { scrollToSection, handleInitialHash } from '@/utils/scroll'
+import { useSectionObserver } from '@/composables/useSectionObserver'
 import authService from '@/services/auth'
 
 export default {
   name: 'Navbar',
-  data() {
-    return {
-      mobileMenuOpen: false,
-      dropdownOpen: false,
-      showAdminLogin: false,
-      loginStep: 1,
-      loginForm: {
-        email: '',
-        password: ''
-      },
-      otpCodes: ['', '', '', '', '', ''],
-      loading: false,
-      errorMessage: '',
-      resendCooldown: false,
-      resendTimer: 0,
-      loginEmail: null
-    }
-  },
-  computed: {
-    isAuthenticated() {
-      return authService.isAuthenticated()
-    }
-  },
-
-  mounted() {
-  document.addEventListener('click', this.handleOutsideClick)
-},
-
-beforeUnmount() {
-  document.removeEventListener('click', this.handleOutsideClick)
-},
-
-
-
-
-  methods: {
-    toggleMobileMenu() {
-      this.mobileMenuOpen = !this.mobileMenuOpen
-    },
-
+  setup() {
+    const router = useRouter()
+    const mobileMenuOpen = ref(false)
+    const dropdownOpen = ref(false)
+    const userMenuOpen = ref(false)
+    const showAdminLogin = ref(false)
+    const showSearch = ref(false)
+    const searchQuery = ref('')
+    const searchSuggestions = ref([])
+    const cartCount = ref(0) // For future e-commerce
+    const loginStep = ref(1)
+    const loginForm = ref({ email: '', password: '' })
+    const otpCodes = ref(['', '', '', '', '', ''])
+    const loading = ref(false)
+    const errorMessage = ref('')
+    const resendCooldown = ref(false)
+    const resendTimer = ref(0)
+    const isScrolled = ref(false)
     
-
-
-
-
-    handleOutsideClick(event) {
-      const dropdown = this.$el.querySelector('.dropdown')
-
-      if (dropdown && !dropdown.contains(event.target)) {
-        this.dropdownOpen = false
+    const { activeSection } = useSectionObserver(['home', 'about', 'products', 'blog', 'contact'])
+    
+    const isAuthenticated = computed(() => authService.isAuthenticated())
+    const userName = computed(() => {
+      const user = authService.getUser()
+      return user?.full_name?.split(' ')[0] || 'Admin'
+    })
+    
+    // Close dropdowns when clicking outside
+    const handleClickOutside = (event) => {
+      const dropdown = document.querySelector('.dropdown')
+      const userMenu = document.querySelector('.user-menu')
+      
+      if (dropdown && !dropdown.contains(event.target) && dropdownOpen.value) {
+        dropdownOpen.value = false
       }
-    },
-
-
-
-
-
-
-
-
+      if (userMenu && !userMenu.contains(event.target) && userMenuOpen.value) {
+        userMenuOpen.value = false
+      }
+    }
     
-
-    closeMenu() {
-      this.mobileMenuOpen = false
-      this.dropdownOpen = false
-      this.showAdminLogin = false
-    },
-
+    const scrollTo = (sectionId) => {
+      router.push({ hash: `#${sectionId}` })
+      closeMenu()
+    }
     
-
-
-
-
-    toggleDropdown() {
-      this.dropdownOpen = !this.dropdownOpen
-    },
-    handleImageError(e) {
-      e.target.style.display = 'none'
-    },
-    closeLoginModal() {
-      this.showAdminLogin = false
-      this.loginStep = 1
-      this.loginForm = { email: '', password: '' }
-      this.otpCodes = ['', '', '', '', '', '']
-      this.errorMessage = ''
-    },
+    const scrollToHome = () => {
+      scrollToSection('home', 0)
+    }
     
-    async handleStep1() {
-      this.loading = true
-      this.errorMessage = ''
+    const goToShop = () => {
+      router.push('/shop')
+    }
+    
+    const toggleSearch = () => {
+      showSearch.value = !showSearch.value
+      if (!showSearch.value) {
+        searchQuery.value = ''
+        searchSuggestions.value = []
+      }
+    }
+    
+    const handleSearch = async () => {
+      if (!searchQuery.value.trim()) return
+      
+      // Search products and blog posts
+      router.push(`/products?search=${encodeURIComponent(searchQuery.value)}`)
+      showSearch.value = false
+      searchQuery.value = ''
+    }
+    
+    const handleSuggestionClick = (item) => {
+      if (item.type === 'product') {
+        router.push(`/product/${item.id}`)
+      } else if (item.type === 'blog') {
+        router.push(`/blog/${item.slug}`)
+      }
+      showSearch.value = false
+      searchQuery.value = ''
+    }
+    
+    // Watch for search input to show suggestions
+    watch(searchQuery, async (newQuery) => {
+      if (newQuery.length > 2) {
+        try {
+          // Fetch product suggestions
+          const productRes = await fetch(`/api/products?search=${newQuery}&per_page=3`)
+          const productData = await productRes.json()
+          
+          // Fetch blog suggestions
+          const blogRes = await fetch(`/api/blog?simple=true&per_page=3`)
+          const blogData = await blogRes.json()
+          
+          const suggestions = [
+            ...(productData.data || []).map(p => ({ ...p, type: 'product' })),
+            ...(Array.isArray(blogData) ? blogData.slice(0, 3).map(b => ({ ...b, type: 'blog' })) : [])
+          ]
+          searchSuggestions.value = suggestions.slice(0, 5)
+        } catch (error) {
+          console.error('Error fetching suggestions:', error)
+        }
+      } else {
+        searchSuggestions.value = []
+      }
+    })
+    
+    const handleScroll = () => {
+      isScrolled.value = window.scrollY > 50
+    }
+    
+    const handleStep1 = async () => {
+      loading.value = true
+      errorMessage.value = ''
       
       try {
         const response = await authService.loginStep1(
-          this.loginForm.email,
-          this.loginForm.password
+          loginForm.value.email,
+          loginForm.value.password
         )
         
         if (response.requires_otp) {
-          this.loginEmail = this.loginForm.email
-          this.loginStep = 2
-          this.$nextTick(() => {
-            if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {
-              this.$refs.otpInputs[0].focus()
-            }
-          })
+          loginStep.value = 2
         }
       } catch (error) {
-        this.errorMessage = error.response?.data?.error || 'Login failed. Please try again.'
+        errorMessage.value = error.response?.data?.error || 'Login failed'
       } finally {
-        this.loading = false
+        loading.value = false
       }
-    },
+    }
     
-    async handleStep2() {
-      const otpCode = this.otpCodes.join('')
+    const handleStep2 = async () => {
+      const otpCode = otpCodes.value.join('')
       if (otpCode.length !== 6) {
-        this.errorMessage = 'Please enter the 6-digit verification code'
+        errorMessage.value = 'Please enter the 6-digit code'
         return
       }
       
-      this.loading = true
-      this.errorMessage = ''
+      loading.value = true
+      errorMessage.value = ''
       
       try {
-        const response = await authService.loginStep2(otpCode)
-        this.closeLoginModal()
-        this.$router.push('/admin/dashboard')
+        await authService.loginStep2(otpCode)
+        closeLoginModal()
+        router.push('/admin/dashboard')
       } catch (error) {
-        this.errorMessage = error.response?.data?.error || 'Invalid verification code'
-        this.otpCodes = ['', '', '', '', '', '']
-        if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {
-          this.$refs.otpInputs[0].focus()
-        }
+        errorMessage.value = error.response?.data?.error || 'Invalid code'
+        otpCodes.value = ['', '', '', '', '', '']
       } finally {
-        this.loading = false
+        loading.value = false
       }
-    },
+    }
     
-    handleOtpInput(index, event) {
+    const handleOtpInput = (index, event) => {
       const value = event.target.value.replace(/[^0-9]/g, '')
-      this.otpCodes[index] = value
-      
+      otpCodes.value[index] = value
       if (value && index < 5) {
-        this.$refs.otpInputs[index + 1].focus()
+        const nextInput = document.querySelectorAll('.otp-input')[index + 1]
+        nextInput?.focus()
       }
-      
-      if (this.otpCodes.join('').length === 6) {
-        this.handleStep2()
-      }
-    },
+    }
     
-    handleOtpKeyup(index, event) {
-      if (event.key === 'Backspace' && !this.otpCodes[index] && index > 0) {
-        this.$refs.otpInputs[index - 1].focus()
+    const handleOtpKeyup = (index, event) => {
+      if (event.key === 'Backspace' && !otpCodes.value[index] && index > 0) {
+        const prevInput = document.querySelectorAll('.otp-input')[index - 1]
+        prevInput?.focus()
       }
-    },
+    }
     
-    async resendOtp() {
-      if (this.resendCooldown) return
+    const resendOtp = async () => {
+      if (resendCooldown.value) return
       
       try {
-        await authService.loginStep1(this.loginForm.email, this.loginForm.password)
-        this.resendCooldown = true
-        this.resendTimer = 60
+        await authService.loginStep1(loginForm.value.email, loginForm.value.password)
+        resendCooldown.value = true
+        resendTimer.value = 60
         const interval = setInterval(() => {
-          this.resendTimer--
-          if (this.resendTimer <= 0) {
+          resendTimer.value--
+          if (resendTimer.value <= 0) {
             clearInterval(interval)
-            this.resendCooldown = false
+            resendCooldown.value = false
           }
         }, 1000)
-        this.errorMessage = ''
+        errorMessage.value = ''
       } catch (error) {
-        this.errorMessage = error.response?.data?.error || 'Failed to resend code'
+        errorMessage.value = 'Failed to resend code'
       }
-    },
+    }
     
-    async handleLogout() {
+    const toggleMobileMenu = () => {
+      mobileMenuOpen.value = !mobileMenuOpen.value
+      if (mobileMenuOpen.value) {
+        dropdownOpen.value = false
+        userMenuOpen.value = false
+      }
+    }
+    
+    const toggleDropdown = () => {
+      dropdownOpen.value = !dropdownOpen.value
+      if (dropdownOpen.value) {
+        userMenuOpen.value = false
+      }
+    }
+    
+    const toggleUserMenu = () => {
+      userMenuOpen.value = !userMenuOpen.value
+      if (userMenuOpen.value) {
+        dropdownOpen.value = false
+      }
+    }
+    
+    const closeMenu = () => {
+      mobileMenuOpen.value = false
+      dropdownOpen.value = false
+      userMenuOpen.value = false
+    }
+    
+    const closeLoginModal = () => {
+      showAdminLogin.value = false
+      loginStep.value = 1
+      loginForm.value = { email: '', password: '' }
+      otpCodes.value = ['', '', '', '', '', '']
+      errorMessage.value = ''
+    }
+    
+    const handleLogout = async () => {
       await authService.logout()
-      this.$router.push('/')
+      router.push('/')
+      closeMenu()
+    }
+    
+    const handleImageError = (e) => {
+      e.target.style.display = 'none'
+    }
+    
+    onMounted(() => {
+      window.addEventListener('scroll', handleScroll)
+      document.addEventListener('click', handleClickOutside)
+      handleInitialHash()
+    })
+    
+    onUnmounted(() => {
+      window.removeEventListener('scroll', handleScroll)
+      document.removeEventListener('click', handleClickOutside)
+    })
+    
+    return {
+      mobileMenuOpen,
+      dropdownOpen,
+      userMenuOpen,
+      showAdminLogin,
+      showSearch,
+      searchQuery,
+      searchSuggestions,
+      cartCount,
+      loginStep,
+      loginForm,
+      otpCodes,
+      loading,
+      errorMessage,
+      resendCooldown,
+      resendTimer,
+      isScrolled,
+      activeSection,
+      isAuthenticated,
+      userName,
+      scrollTo,
+      scrollToHome,
+      goToShop,
+      toggleSearch,
+      handleSearch,
+      handleSuggestionClick,
+      handleStep1,
+      handleStep2,
+      handleOtpInput,
+      handleOtpKeyup,
+      resendOtp,
+      toggleMobileMenu,
+      toggleDropdown,
+      toggleUserMenu,
+      closeMenu,
+      closeLoginModal,
+      handleLogout,
+      handleImageError
     }
   }
 }
 </script>
 
-
 <style scoped>
-:root {
-  --nav-bg: rgba(255,255,255,0.95);
+/* ========== BASE NAVBAR STYLES ========== */
+.navbar {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  transition: all 0.3s ease;
 }
 
-/* NAVBAR */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  backdrop-filter: blur(12px);
-  background: var(--nav-bg);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-  transition: all 0.3s ease;
+.navbar.scrolled {
+  padding: 0.5rem 0;
+  background: rgba(255,255,255,0.98);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
 .navbar .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.9rem 24px;
+  padding: 1rem 20px;
+  transition: padding 0.3s ease;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-/* BRAND */
+.navbar.scrolled .container {
+  padding: 0.5rem 20px;
+}
+
+/* ========== BRAND ========== */
 .navbar-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  cursor: pointer;
 }
 
 .logo {
-  height: 52px;
+  height: 50px;
   width: auto;
-  transition: transform 0.3s ease;
-}
-.logo2 {
-  max-height: 40px;
-  width: auto;
-  transition: transform 0.3s ease;
-  border-radius: 15px;
-  position: relative;
-  margin-right: 20px;
+  transition: height 0.3s ease;
 }
 
-
-.glass-card {
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-}
-
-
-.social-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px;
-  background: white;
-  text-decoration: none;
-  color: #1e3a8a;
-  font-weight: 500;
-  transition: all 0.3s;
-  border-radius: 12px;
-}
-
-
-
-
-
-.logo:hover {
-  transform: scale(1.05);
+.navbar.scrolled .logo {
+  height: 40px;
 }
 
 .brand-name {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--primary-blue);
-  letter-spacing: 0.4px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  transition: font-size 0.3s ease;
 }
 
-/* MENU */
+.navbar.scrolled .brand-name {
+  font-size: 1rem;
+}
+
+/* ========== NAVIGATION MENU ========== */
 .navbar-menu {
   display: flex;
-  align-items: center;
   gap: 1.5rem;
+  align-items: center;
 }
 
-.navbar-menu a,
-.dropdown-btn {
-  position: relative;
+.nav-link {
   text-decoration: none;
   color: #333;
-  font-weight: 600;
-  font-size: 0.96rem;
-  transition: all 0.3s ease;
+  font-weight: 500;
+  transition: all 0.3s;
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.navbar-menu a::after,
-.dropdown-btn::after {
+.nav-link i {
+  font-size: 0.9rem;
+}
+
+.nav-link::after {
   content: '';
   position: absolute;
+  bottom: -5px;
   left: 0;
-  bottom: -6px;
-  width: 0%;
+  width: 0;
   height: 2px;
-  background: var(--primary-blue);
-  transition: width 0.3s ease;
+  background: #f59e0b;
+  transition: width 0.3s;
 }
 
-.navbar-menu a:hover::after,
-.dropdown-btn:hover::after,
-.router-link-active::after {
+.nav-link:hover::after,
+.nav-link.active::after {
   width: 100%;
 }
 
-.navbar-menu a:hover,
-.dropdown-btn:hover,
-.router-link-active {
-  color: var(--primary-blue);
+.nav-link:hover,
+.nav-link.active {
+  color: #f59e0b;
 }
 
-/* DROPDOWN */
+/* ========== DROPDOWN ========== */
 .dropdown {
   position: relative;
 }
 
 .dropdown-btn {
-  background: transparent;
+  background: none;
   border: none;
+  font-weight: 500;
   cursor: pointer;
-  display: flex;
+  font-size: 1rem;
+  padding: 0;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.dropdown-btn span {
-  font-size: 0.7rem;
-  transition: transform 0.3s ease;
-}
-
-.dropdown:hover .dropdown-btn span {
-  transform: rotate(180deg);
+.dropdown-btn i {
+  font-size: 0.9rem;
 }
 
 .dropdown-content {
   position: absolute;
-  top: 130%;
+  top: 100%;
   left: 0;
+  background: white;
   min-width: 220px;
-  background: rgba(255,255,255,0.98);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-  animation: fadeDropdown 0.25s ease;
-  border: 1px solid rgba(255,255,255,0.3);
+  z-index: 100;
+  margin-top: 10px;
+  animation: fadeInDown 0.2s ease;
 }
 
-@keyframes fadeDropdown {
+@keyframes fadeInDown {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
@@ -494,231 +555,571 @@ beforeUnmount() {
   }
 }
 
-.dropdown-content a,
-.dropdown-content button {
-  display: block;
-  width: 100%;
-  padding: 14px 18px;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font-size: 0.92rem;
-  font-weight: 500;
-  cursor: pointer;
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  text-decoration: none;
   color: #333;
-  transition: all 0.25s ease;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s;
+  font-size: 0.9rem;
 }
 
-.dropdown-content a:hover,
-.dropdown-content button:hover {
-  background: rgba(0, 102, 255, 0.08);
-  color: var(--primary-blue);
-  padding-left: 24px;
+.dropdown-item i {
+  width: 20px;
+  color: #666;
 }
 
-.admin-link {
-  color: var(--primary-blue);
-  font-weight: 700;
+.dropdown-item:hover {
+  background: #f8fafc;
 }
 
-/* SOCIAL */
+.dropdown-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+
+.logout-btn {
+  color: #dc2626 !important;
+}
+
+.logout-btn i {
+  color: #dc2626;
+}
+
+/* ========== USER MENU ========== */
+.user-menu {
+  position: relative;
+}
+
+.user-menu-btn {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 50px;
+  transition: all 0.3s;
+  font-weight: 500;
+  color: #333;
+}
+
+.user-menu-btn:hover {
+  background: #f8fafc;
+  color: #f59e0b;
+}
+
+.user-menu-btn i:first-child {
+  font-size: 1.3rem;
+  color: #f59e0b;
+}
+
+.user-menu-btn i:last-child {
+  font-size: 0.8rem;
+  transition: transform 0.3s;
+}
+
+.user-menu-btn i:last-child.rotated {
+  transform: rotate(180deg);
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  min-width: 200px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 100;
+  margin-top: 10px;
+  animation: fadeInDown 0.2s ease;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  text-decoration: none;
+  color: #333;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s;
+  font-size: 0.9rem;
+}
+
+.user-menu-item i {
+  width: 20px;
+  color: #666;
+}
+
+.user-menu-item:hover {
+  background: #f8fafc;
+}
+
+/* ========== NAV ACTIONS ========== */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.search-btn, .cart-btn {
+  background: none;
+  border: none;
+  color: #333;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  padding: 6px;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-btn:hover, .cart-btn:hover {
+  background: #f8fafc;
+  color: #f59e0b;
+}
+
+.cart-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #f59e0b;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 50px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========== SOCIAL LINKS ========== */
 .social-links {
   display: flex;
-  gap: 1rem;
-  padding-right: 10px;
-  
+  gap: 0.5rem;
 }
 
-
 .social-links a {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 1rem;
+  transition: all 0.3s;
+  text-decoration: none;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: rgba(0,0,0,0.04);
-  color: var(--primary-blue);
-  transition: all 0.3s ease;
 }
 
 .social-links a:hover {
-  transform: translateY(-3px);
-  background: var(--primary-blue);
-  color: white;
+  background: #f8fafc;
+  color: #f59e0b;
+  transform: translateY(-2px);
 }
 
-/* MOBILE TOGGLE */
-.mobile-toggle {
-  display: none;
-  flex-direction: column;
-  gap: 5px;
-  cursor: pointer;
-}
-
-.mobile-toggle span {
-  width: 26px;
-  height: 3px;
-  border-radius: 10px;
-  background: var(--primary-blue);
-  transition: all 0.3s ease;
-}
-
-/* MODAL */
-.modal {
-  position: relative;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(5px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* ========== SEARCH MODAL ========== */
+.search-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.9);
   z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+
+.search-modal-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: 60px;
+  width: 90%;
+  max-width: 600px;
+  animation: slideInUp 0.3s ease;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-modal-content i {
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.search-modal-content input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  padding: 0.5rem 0;
+}
+
+.search-modal-content button {
+  background: #f59e0b;
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.search-modal-content button:hover {
+  background: #d97706;
+  transform: scale(1.05);
+}
+
+.search-suggestions {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  margin-top: 1rem;
+  overflow: hidden;
+  animation: fadeInUp 0.3s ease;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background 0.3s;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background: #f8fafc;
+}
+
+.suggestion-item i {
+  color: #666;
+}
+
+/* ========== MODAL STYLES ========== */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
   background: white;
-  border-radius: 22px;
+  border-radius: 20px;
   padding: 2rem;
   width: 90%;
   max-width: 420px;
   position: relative;
-  animation: modalFade 0.3s ease;
+  animation: fadeInUp 0.3s ease;
 }
 
-@keyframes modalFade {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.modal-icon {
+  text-align: center;
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.modal-icon i {
+  color: #f59e0b;
 }
 
 .modal-content h3 {
   text-align: center;
+  margin-bottom: 1.5rem;
+  color: #1e3a8a;
+}
+
+.input-group {
+  position: relative;
   margin-bottom: 1rem;
-  color: #222;
 }
 
-.modal-content input {
+.input-group i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+}
+
+.input-group input {
   width: 100%;
-  padding: 14px;
-  margin: 10px 0;
+  padding: 12px 12px 12px 42px;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  border: 1px solid #ddd;
-  transition: all 0.25s ease;
+  font-size: 0.9rem;
+  transition: all 0.3s;
 }
 
-.modal-content input:focus {
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 4px rgba(0,102,255,0.08);
+.input-group input:focus {
   outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
 }
 
-.btn {
-  width: 100%;
-  padding: 13px;
+.close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
   border: none;
-  border-radius: 12px;
-  font-weight: 700;
+  font-size: 1.5rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  color: #999;
+  transition: color 0.3s;
 }
 
-.btn-primary {
-  background: var(--primary-blue);
-  color: white;
+.close-btn:hover {
+  color: #ef4444;
 }
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  opacity: 0.95;
-}
-
-/* OTP */
-.modal .otp-inputs {
+/* OTP Inputs */
+.otp-inputs {
   display: flex;
+  gap: 0.5rem;
   justify-content: center;
-  gap: 10px;
-  margin: 1.2rem 0;
+  margin: 1.5rem 0;
 }
 
-.modal .otp-input {
-  width: 52px;
-  height: 55px;
-  font-size: 1.4rem;
-  font-weight: bold;
+.otp-input {
+  width: 50px;
+  height: 50px;
   text-align: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border: 2px solid #e5e7eb;
   border-radius: 12px;
+  transition: all 0.3s;
 }
 
-/* ERROR */
+.otp-input:focus {
+  border-color: #f59e0b;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+}
+
+.btn-resend, .btn-back {
+  width: 100%;
+  padding: 10px;
+  margin-top: 0.5rem;
+  background: none;
+  border: none;
+  color: #f59e0b;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-resend:hover, .btn-back:hover {
+  color: #d97706;
+}
+
+.btn-resend:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal-footer {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.modal-footer a {
+  color: #666;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.modal-footer a:hover {
+  color: #f59e0b;
+}
+
 .error-message {
   margin-top: 1rem;
-  background: #ffe5e5;
-  color: #d60000;
-  padding: 12px;
-  border-radius: 10px;
+  padding: 0.75rem;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 12px;
+  font-size: 0.85rem;
   text-align: center;
-  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-/* MOBILE */
-@media (max-width: 768px) {
-  .navbar .container {
-    padding: 1rem 18px;
-  }
+/* ========== MOBILE TOGGLE ========== */
+.mobile-toggle {
+  display: none;
+  flex-direction: column;
+  cursor: pointer;
+  gap: 4px;
+}
 
+.mobile-toggle span {
+  width: 25px;
+  height: 3px;
+  background: #1e3a8a;
+  transition: 0.3s;
+  border-radius: 3px;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
   .navbar-menu {
+    gap: 1rem;
+  }
+  
+  .social-links {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-menu {
+    display: none;
     position: absolute;
     top: 100%;
     left: 0;
     right: 0;
-    display: none;
+    background: white;
     flex-direction: column;
-    align-items: flex-start;
-    padding: 1.5rem;
-    background: rgba(255,255,255,0.98);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    animation: fadeDropdown 0.25s ease;
+    padding: 1rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
   }
-
+  
   .navbar-menu.is-active {
     display: flex;
   }
-
-  .navbar-menu a,
-  .dropdown-btn {
-    width: 100%;
-    padding: 10px 0;
-  }
-
-  .dropdown-content {
-    position: static;
-    width: 100%;
-    margin-top: 10px;
-    box-shadow: none;
-    border-radius: 12px;
-    background: rgba(0,0,0,0.03);
-  }
-
+  
   .mobile-toggle {
     display: flex;
   }
-
-  .social-links {
+  
+  .dropdown-content {
+    position: static;
+    box-shadow: none;
+    padding-left: 1rem;
+    margin-top: 0;
+    background: #f8fafc;
+  }
+  
+  .dropdown-btn {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .user-menu-dropdown {
+    position: static;
+    box-shadow: none;
+    margin-top: 0;
+    background: #f8fafc;
+  }
+  
+  .user-menu-btn {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .nav-actions {
+    gap: 0.5rem;
+  }
+  
+  .search-btn, .cart-btn {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .navbar.scrolled .container {
+    padding: 0.5rem 20px;
+  }
+  
+  .brand-name {
     display: none;
   }
+}
 
-  .brand-name {
-    font-size: 1rem;
+@media (max-width: 480px) {
+  .navbar .container {
+    padding: 0.8rem 15px;
   }
-
+  
   .logo {
-    height: 45px;
+    height: 40px;
+  }
+  
+  .search-btn, .cart-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+  }
+  
+  .modal-content {
+    padding: 1.5rem;
+  }
+  
+  .otp-input {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
   }
 }
 </style>
