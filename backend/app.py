@@ -10,9 +10,21 @@ from datetime import datetime
 import pkgutil
 import importlib.util
 
-# ============================================================================
-# PYTHON 3.14+ COMPATIBILITY SHIMS
-# ============================================================================
+# Add these imports at the top
+from permission_routes import permission_bp
+from user_management_routes import user_mgmt_bp
+
+
+from referral_routes import referral_bp
+from notification_routes import notification_bp
+from activity_routes import activity_bp
+
+
+
+
+
+
+
 if not hasattr(pkgutil, 'get_loader'):
     def _get_loader(name):
         try:
@@ -22,9 +34,11 @@ if not hasattr(pkgutil, 'get_loader'):
             return None
     pkgutil.get_loader = _get_loader
 
-# ============================================================================
 # APP INITIALIZATION
-# ============================================================================
+
+
+
+
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if not os.path.exists(dotenv_path):
     dotenv_path = os.path.join(os.path.dirname(__file__), 'dotenv.env')
@@ -42,6 +56,17 @@ app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'http://localhost:51
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Register blueprints
+app.register_blueprint(permission_bp, url_prefix='/api')
+app.register_blueprint(user_mgmt_bp, url_prefix='/api')
+
+
+
+
+app.register_blueprint(referral_bp, url_prefix='/api')
+app.register_blueprint(notification_bp, url_prefix='/api')
+app.register_blueprint(activity_bp, url_prefix='/api')
+
 # CORS Configuration
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -53,7 +78,14 @@ db.init_app(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login'
+login_manager.login_view = 'auth.test_login'
+
+# For API calls we generally want JSON 401/403 instead of redirects
+@login_manager.unauthorized_handler
+def unauthorized():
+    from flask import jsonify
+    return jsonify({'error': 'Authentication required'}), 401
+
 
 @login_manager.user_loader
 def load_user(user_id):

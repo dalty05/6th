@@ -1,17 +1,30 @@
+// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
+import authService from '@/services/auth'
+
+// Import existing views
 import Home from '../views/Home.vue'
 import ProductDetail from '../views/ProductDetail.vue'
 import BlogDetail from '../views/BlogDetail.vue'
 import Shop from '../views/Shop.vue'
 import Careers from '../views/Careers.vue'
 import CSR from '../views/CSR.vue'
-import AdminDashboard from '../views/admin/Dashboard.vue'
+
+// Admin Views
 import AdminLogin from '../views/admin/Login.vue'
 import AdminRegister from '../views/admin/Register.vue'
+import AdminDashboard from '../views/admin/Dashboard.vue'
 import ForgotPassword from '../views/admin/ForgotPassword.vue'
 import ResetPassword from '../views/admin/ResetPassword.vue'
 
+// Partner Views (NEW)
+import PartnerDashboard from '../views/partner/Dashboard.vue'
+import PartnerReferralLinks from '../views/partner/ReferralLinks.vue'
+import PartnerAnalytics from '../views/partner/Analytics.vue'
+import PartnerProfile from '../views/partner/Profile.vue'
+
 const routes = [
+  // Public routes
   {
     path: '/',
     name: 'Home',
@@ -48,38 +61,89 @@ const routes = [
     component: CSR,
     meta: { title: 'CSR | Mount Kenya Milk' }
   },
+  
+  // Auth routes
   {
     path: '/admin/login',
     name: 'AdminLogin',
     component: AdminLogin,
-    meta: { title: 'Admin Login | Mount Kenya Milk' }
+    meta: { title: 'Admin Login | Mount Kenya Milk', guestOnly: true }
   },
   {
     path: '/admin/register',
     name: 'AdminRegister',
     component: AdminRegister,
-    meta: { title: 'Admin Registration | Mount Kenya Milk' }
+    meta: { title: 'Admin Registration | Mount Kenya Milk', guestOnly: true }
   },
   {
     path: '/admin/forgot-password',
     name: 'ForgotPassword',
     component: ForgotPassword,
-    meta: { title: 'Forgot Password | Mount Kenya Milk' }
+    meta: { title: 'Forgot Password | Mount Kenya Milk', guestOnly: true }
   },
   {
     path: '/admin/reset-password',
     name: 'ResetPassword',
     component: ResetPassword,
-    meta: { title: 'Reset Password | Mount Kenya Milk' }
+    meta: { title: 'Reset Password | Mount Kenya Milk', guestOnly: true }
   },
+  
+  // Admin routes (super_admin and admin)
   {
     path: '/admin/dashboard',
     name: 'AdminDashboard',
     component: AdminDashboard,
-    meta: { requiresAuth: true, title: 'Admin Dashboard | Mount Kenya Milk' }
+    meta: { 
+      requiresAuth: true, 
+      allowedRoles: ['super_admin', 'admin'],
+      title: 'Admin Dashboard | Mount Kenya Milk'
+    }
+  },
+  
+  // Partner routes (NEW)
+  {
+    path: '/partner/dashboard',
+    name: 'PartnerDashboard',
+    component: PartnerDashboard,
+    meta: { 
+      requiresAuth: true, 
+      allowedRoles: ['partner'],
+      title: 'Partner Dashboard | Mount Kenya Milk'
+    }
   },
   {
-    // Catch all redirect for unknown routes
+    path: '/partner/links',
+    name: 'PartnerReferralLinks',
+    component: PartnerReferralLinks,
+    meta: { 
+      requiresAuth: true, 
+      allowedRoles: ['partner'],
+      title: 'My Referral Links | Mount Kenya Milk'
+    }
+  },
+  {
+    path: '/partner/analytics',
+    name: 'PartnerAnalytics',
+    component: PartnerAnalytics,
+    meta: { 
+      requiresAuth: true, 
+      allowedRoles: ['partner'],
+      title: 'Analytics | Mount Kenya Milk'
+    }
+  },
+  {
+    path: '/partner/profile',
+    name: 'PartnerProfile',
+    component: PartnerProfile,
+    meta: { 
+      requiresAuth: true, 
+      allowedRoles: ['partner'],
+      title: 'My Profile | Mount Kenya Milk'
+    }
+  },
+  
+  // Catch all
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/'
   }
@@ -89,89 +153,55 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior(to, from, savedPosition) {
-    // Handle saved position (browser back/forward)
     if (savedPosition) {
       return savedPosition
-    }
-    
-    // Handle hash navigation (e.g., #about, #products)
-    if (to.hash) {
-      const elementId = to.hash.substring(1) // Remove the # character
-      const element = document.getElementById(elementId)
-      
-      if (element) {
-        // Calculate position with navbar offset
-        const navbarHeight = 80
-        const elementPosition = element.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.pageYOffset - navbarHeight
-        
-        return {
-          top: offsetPosition,
-          behavior: 'smooth'
-        }
+    } else if (to.hash) {
+      return {
+        el: to.hash,
+        behavior: 'smooth',
+        top: 80
       }
-      
-      // Fallback - try to find element after a short delay
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          const delayedElement = document.getElementById(elementId)
-          if (delayedElement) {
-            const navbarHeight = 80
-            const elementPosition = delayedElement.getBoundingClientRect().top
-            const offsetPosition = elementPosition + window.pageYOffset - navbarHeight
-            resolve({
-              top: offsetPosition,
-              behavior: 'smooth'
-            })
-          } else {
-            resolve({ top: 0, behavior: 'smooth' })
-          }
-        }, 100)
-      })
+    } else {
+      return { top: 0, behavior: 'smooth' }
     }
-    
-    // Default - scroll to top
-    return { top: 0, behavior: 'smooth' }
   }
 })
 
-// Navigation guard for authentication
+// Navigation guard for authentication and role-based access
 router.beforeEach((to, from, next) => {
   // Update page title
   if (to.meta.title) {
     document.title = to.meta.title
   }
   
-  // Check authentication for protected routes
+  const isAuthenticated = authService.isAuthenticated()
+  const user = authService.getUser()
+  
+  // Check if route is for guests only (login, register, etc.)
+  if (to.meta.guestOnly && isAuthenticated) {
+    // Redirect authenticated users to their dashboard
+    const dashboard = authService.getRoleBasedDashboard()
+    next(dashboard)
+    return
+  }
+  
+  // Check if route requires authentication
   if (to.meta.requiresAuth) {
-    const user = localStorage.getItem('user')
-    if (!user) {
+    if (!isAuthenticated) {
       next('/admin/login')
-    } else {
-      next()
+      return
     }
-  } else {
-    next()
+    
+    // Check role-based access
+    if (to.meta.allowedRoles && !to.meta.allowedRoles.includes(user?.role)) {
+      // Redirect to appropriate dashboard based on role
+      const dashboard = authService.getRoleBasedDashboard()
+      next(dashboard)
+      return
+    }
   }
-})
-
-// After each route navigation, handle hash if present
-router.afterEach((to) => {
-  if (to.hash) {
-    const elementId = to.hash.substring(1)
-    setTimeout(() => {
-      const element = document.getElementById(elementId)
-      if (element) {
-        const navbarHeight = 80
-        const elementPosition = element.getBoundingClientRect().top
-        const offsetPosition = elementPosition + window.pageYOffset - navbarHeight
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        })
-      }
-    }, 100)
-  }
+  
+  next()
 })
 
 export default router

@@ -61,7 +61,7 @@
             <router-link to="/csr" @click="closeMenu" class="dropdown-item">
               <i class="fas fa-hand-holding-heart"></i> CSR
             </router-link>
-            <!-- <div class="dropdown-divider"></div>
+            <div class="dropdown-divider"></div>
             <template v-if="isAuthenticated">
               <router-link to="/admin/dashboard" @click="closeMenu" class="dropdown-item">
                 <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -74,7 +74,7 @@
               <router-link to="/admin/login" class="dropdown-item" @click="closeLoginModal">
                 <i class="fas fa-lock"></i> Admin Login
               </router-link>
-            </template> -->
+            </template> 
           </div>
         </div>
       </div>

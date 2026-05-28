@@ -1,3 +1,4 @@
+// src/services/auth.js
 import axios from 'axios'
 
 const API_URL = '/api'
@@ -5,6 +6,14 @@ const API_URL = '/api'
 class AuthService {
   constructor() {
     this.user = null
+    this.loadUserFromStorage()
+  }
+
+  loadUserFromStorage() {
+    const stored = localStorage.getItem('user')
+    if (stored) {
+      this.user = JSON.parse(stored)
+    }
   }
 
   async loginStep1(email, password) {
@@ -51,39 +60,32 @@ class AuthService {
     return response.data
   }
 
-  async getUsers() {
-    const response = await axios.get(`${API_URL}/admin/users`)
-    return response.data
-  }
-
-  async approveUser(userId) {
-    const response = await axios.put(`${API_URL}/admin/users/${userId}/approve`)
-    return response.data
-  }
-
-  async suspendUser(userId, isActive, reason = '') {
-    const response = await axios.put(`${API_URL}/admin/users/${userId}/suspend`, {
-      is_active: isActive,
-      reason
-    })
-    return response.data
-  }
-
-  async changeUserRole(userId, role) {
-    const response = await axios.put(`${API_URL}/admin/users/${userId}/role`, {
-      role
-    })
-    return response.data
-  }
-
-  async deleteUser(userId) {
-    const response = await axios.delete(`${API_URL}/admin/users/${userId}`)
-    return response.data
-  }
-
   async logout() {
     await axios.post(`${API_URL}/auth/logout`)
     this.clearUser()
+  }
+
+  async getProfile() {
+    const response = await axios.get(`${API_URL}/admin/profile`)
+    return response.data
+  }
+
+  async updateProfile(fullName) {
+    const response = await axios.put(`${API_URL}/admin/profile`, {
+      full_name: fullName
+    })
+    if (response.data.user) {
+      this.setUser(response.data.user)
+    }
+    return response.data
+  }
+
+  async changePassword(currentPassword, newPassword) {
+    const response = await axios.put(`${API_URL}/admin/change-password`, {
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+    return response.data
   }
 
   async checkAuth() {
@@ -97,6 +99,76 @@ class AuthService {
     } catch {
       return false
     }
+  }
+
+  // ========== NEW: Role-Based Methods ==========
+  
+  /**
+   * Get the dashboard route based on user role
+   */
+  getRoleBasedDashboard() {
+    const user = this.getUser()
+    if (!user) return '/admin/login'
+    
+    switch(user.role) {
+      case 'super_admin':
+        return '/admin/dashboard'
+      case 'admin':
+        return '/admin/dashboard'
+      case 'partner':
+        return '/partner/dashboard'
+      default:
+        return '/'
+    }
+  }
+
+  /**
+   * Get user role display name
+   */
+  getRoleDisplayName() {
+    const user = this.getUser()
+    if (!user) return ''
+    
+    switch(user.role) {
+      case 'super_admin':
+        return 'Super Administrator'
+      case 'admin':
+        return 'Administrator'
+      case 'partner':
+        return 'Marketing Partner'
+      default:
+        return user.role
+    }
+  }
+
+  /**
+   * Check if user has specific role
+   */
+  hasRole(role) {
+    const user = this.getUser()
+    return user && user.role === role
+  }
+
+  /**
+   * Check if user is super admin
+   */
+  isSuperAdmin() {
+    return this.hasRole('super_admin')
+  }
+
+  /**
+   * Check if user is admin (includes super admin)
+   */
+  isAdmin() {
+    const user = this.getUser()
+    return user && (user.role === 'super_admin' || user.role === 'admin')
+  }
+
+  /**
+   * Check if user is partner
+   */
+  isPartner() {
+    return this.hasRole('partner')
   }
 
   setUser(user) {
@@ -117,15 +189,11 @@ class AuthService {
   clearUser() {
     this.user = null
     localStorage.removeItem('user')
+    localStorage.removeItem('user_permissions')
   }
 
   isAuthenticated() {
     return !!this.getUser()
-  }
-
-  isSuperAdmin() {
-    const user = this.getUser()
-    return user && user.role === 'super_admin'
   }
 }
 

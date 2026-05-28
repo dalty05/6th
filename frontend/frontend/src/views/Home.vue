@@ -952,6 +952,7 @@ export default {
       }
     },
     
+    
 async fetchBlogs(reset = true) {
   try {
     if (reset) {
@@ -960,49 +961,46 @@ async fetchBlogs(reset = true) {
       this.hasMoreBlogs = true
       this.displayedBlogs = []
     }
-    
+
+    const perPage = this.blogsPerPage
     let response
+
     if (reset) {
-      // Initial load: use simple mode (returns array directly)
-      response = await axios.get(`/api/blog?simple=true&per_page=${this.blogsPerPage}`)
-      
-      if (Array.isArray(response.data)) {
-        this.displayedBlogs = response.data
-        this.totalBlogs = response.data.length
-        // If we got exactly per_page items, assume there might be more
-        this.hasMoreBlogs = response.data.length === this.blogsPerPage
-      }
+      // Initial load
+      response = await axios.get(`/api/blog?simple=true&per_page=${perPage}`)
+
+      const payload = response?.data
+      const dataArray = Array.isArray(payload)
+        ? payload
+        : (payload?.items && Array.isArray(payload.items) ? payload.items : [])
+
+      this.displayedBlogs = dataArray
+      this.totalBlogs = dataArray.length
+      this.hasMoreBlogs = dataArray.length === perPage
     } else {
-      // Load more: use paginated mode (returns object with data and pagination)
-      response = await axios.get(`/api/blog?page=${this.blogsPage}&per_page=${this.blogsPerPage}`)
-      
-      if (response.data && response.data.data) {
-        const newBlogs = response.data.data
-        // Filter out duplicates by ID
-        const existingIds = new Set(this.displayedBlogs.map(b => b.id))
-        const uniqueNewBlogs = newBlogs.filter(b => !existingIds.has(b.id))
-        this.displayedBlogs = [...this.displayedBlogs, ...uniqueNewBlogs]
-        this.totalBlogs = response.data.pagination?.total_items || this.totalBlogs
-        this.hasMoreBlogs = response.data.pagination?.has_next || false
-      }
+      // Load more
+      response = await axios.get(`/api/blog?page=${this.blogsPage}&per_page=${perPage}`)
+
+      const payload = response?.data
+      const newBlogs = payload?.data && Array.isArray(payload.data)
+        ? payload.data
+        : (payload?.items && Array.isArray(payload.items) ? payload.items : [])
+
+      const existingIds = new Set(this.displayedBlogs.map(b => b.id))
+      const uniqueNewBlogs = newBlogs.filter(b => !existingIds.has(b.id))
+
+      this.displayedBlogs = [...this.displayedBlogs, ...uniqueNewBlogs]
+      this.totalBlogs = payload?.pagination?.total_items || this.totalBlogs
+      this.hasMoreBlogs = payload?.pagination?.has_next || false
     }
 
-    // In fetchBlogs method, after getting response
-if (!reset) {
-  console.log('Loading more blogs - Page:', this.blogsPage)
-  console.log('New blogs received:', newBlogs.length)
-  console.log('Existing blogs count:', this.displayedBlogs.length)
-  console.log('Has more:', hasMore)
-}
-    
     this.blogsLoading = false
     this.blogsLoadingMore = false
-    
   } catch (error) {
     console.error('Error fetching blogs:', error)
     this.blogsLoading = false
     this.blogsLoadingMore = false
-    
+
     // Fallback sample data
     if (this.displayedBlogs.length === 0) {
       this.displayedBlogs = [
@@ -1032,6 +1030,7 @@ if (!reset) {
     this.hasMoreBlogs = false
   }
 },
+
 
 async loadMoreBlogs() {
   if (this.blogsLoadingMore || !this.hasMoreBlogs) return

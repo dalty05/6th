@@ -34,19 +34,13 @@
           </button>
         </div>
 
-        <div class="form-options">
-          <label class="checkbox">
-            <input type="checkbox" v-model="loginForm.remember"> Remember me
-          </label>
-          <router-link to="/admin/forgot-password" class="forgot-link">Forgot Password?</router-link>
-        </div>
-
         <button type="submit" class="btn-login" :disabled="loading">
           {{ loading ? 'Verifying...' : 'Continue' }}
         </button>
 
-        <div class="register-link">
-          Don't have an account? <router-link to="/admin/register">Register here</router-link>
+        <div class="login-links">
+          <router-link to="/admin/forgot-password" class="forgot-link">Forgot Password?</router-link>
+          <router-link to="/admin/register" class="register-link">Register</router-link>
         </div>
       </form>
 
@@ -59,7 +53,6 @@
         </div>
 
         <div class="form-group">
-          <label>Verification Code</label>
           <div class="otp-inputs">
             <input 
               v-for="i in 6" 
@@ -106,22 +99,21 @@ export default {
       step: 1,
       loginForm: {
         email: '',
-        password: '',
-        remember: false
+        password: ''
       },
       otpCodes: ['', '', '', '', '', ''],
       loading: false,
       errorMessage: '',
       showPassword: false,
       resendCooldown: false,
-      resendTimer: 0,
-      loginEmail: null
+      resendTimer: 0
     }
   },
   mounted() {
-    // Check if already logged in
+    // If already authenticated, redirect to role-based dashboard
     if (authService.isAuthenticated()) {
-      this.$router.push('/admin/dashboard')
+      const dashboard = authService.getRoleBasedDashboard()
+      this.$router.push(dashboard)
     }
   },
   methods: {
@@ -136,7 +128,6 @@ export default {
         )
         
         if (response.requires_otp) {
-          this.loginEmail = this.loginForm.email
           this.step = 2
           this.$nextTick(() => {
             if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {
@@ -162,12 +153,18 @@ export default {
       this.errorMessage = ''
       
       try {
-        const response = await authService.loginStep2(otpCode, this.loginForm.remember)
-        this.$router.push('/admin/dashboard')
+        const response = await authService.loginStep2(otpCode)
+        
+        // Redirect based on user role
+        const dashboard = authService.getRoleBasedDashboard()
+        this.$router.push(dashboard)
+        
       } catch (error) {
         this.errorMessage = error.response?.data?.error || 'Invalid verification code'
         this.otpCodes = ['', '', '', '', '', '']
-        this.$refs.otpInputs[0].focus()
+        if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {
+          this.$refs.otpInputs[0].focus()
+        }
       } finally {
         this.loading = false
       }
@@ -196,7 +193,7 @@ export default {
       if (this.resendCooldown) return
       
       try {
-        await authService.loginStep1(this.loginEmail, this.loginForm.password)
+        await authService.loginStep1(this.loginForm.email, this.loginForm.password)
         this.resendCooldown = true
         this.resendTimer = 60
         const interval = setInterval(() => {
@@ -247,7 +244,7 @@ export default {
 }
 
 .login-header h2 {
-  color: var(--primary-blue);
+  color: #1e3a8a;
   margin-bottom: 0.5rem;
 }
 
@@ -274,50 +271,26 @@ export default {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
-  transition: all 0.3s;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 3px rgba(30,58,138,0.1);
+  border-color: #1e3a8a;
 }
 
 .toggle-password {
   position: absolute;
   right: 12px;
-  bottom: 12px;
+  bottom: 10px;
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.1rem;
-}
-
-.form-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.forgot-link {
-  font-size: 0.9rem;
-  color: var(--primary-blue);
-  text-decoration: none;
 }
 
 .btn-login {
   width: 100%;
   padding: 12px;
-  background: var(--primary-blue);
+  background: #1e3a8a;
   color: white;
   border: none;
   border-radius: 8px;
@@ -328,13 +301,25 @@ export default {
 }
 
 .btn-login:hover:not(:disabled) {
-  background: var(--primary-light);
+  background: #3b82f6;
   transform: translateY(-2px);
 }
 
 .btn-login:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.forgot-link, .register-link {
+  color: #1e3a8a;
+  text-decoration: none;
 }
 
 .otp-header {
@@ -364,17 +349,17 @@ export default {
 }
 
 .otp-input:focus {
-  border-color: var(--primary-blue);
+  border-color: #1e3a8a;
   outline: none;
 }
 
 .btn-resend, .btn-back {
   width: 100%;
   padding: 10px;
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   background: none;
   border: none;
-  color: var(--primary-blue);
+  color: #1e3a8a;
   cursor: pointer;
   font-size: 0.9rem;
 }
@@ -382,18 +367,6 @@ export default {
 .btn-resend:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.register-link {
-  text-align: center;
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.register-link a {
-  color: var(--primary-blue);
-  text-decoration: none;
 }
 
 .error-message {
