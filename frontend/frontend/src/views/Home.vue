@@ -289,6 +289,15 @@
             <div class="shop-icon"><i class="fas fa-truck-fast"></i></div>
             <h3>Fast Delivery</h3>
             <p>Free delivery on orders above KES 2,000 within Nairobi</p>
+
+                <div class="physical-shops-section">
+      <button @click="showOutletsModal = true" class="btn-outlets">
+        <i class="fas fa-store"></i> Find Physical Shops & Depots Near You
+      </button>
+    </div>
+
+
+
             <button @click="scrollToContact" class="shop-link">
               Learn More <i class="fas fa-arrow-right"></i>
             </button>
