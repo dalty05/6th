@@ -1,899 +1,1072 @@
 <template>
   <div class="user-management">
-    <div class="header">
-      <h2>User Management</h2>
-      <button @click="openCreateModal" class="btn-primary">
-        <i class="fas fa-user-plus"></i> Create User
+    <!-- Header -->
+    <div class="management-header">
+      <div class="header-left">
+        <h1>User Management</h1>
+        <p>Manage system users and their access levels</p>
+      </div>
+      <button @click="openCreateModal" class="btn-create">
+        <i class="fas fa-plus"></i> Add User
       </button>
     </div>
-    
-    <!-- Filters -->
-    <div class="filters-bar">
-      <div class="search-box">
-        <i class="fas fa-search"></i>
-        <input 
-          type="text" 
-          v-model="filters.search" 
-          placeholder="Search users..."
-          @input="debouncedSearch"
-        >
-      </div>
-      <select v-model="filters.role" @change="applyFilters" class="filter-select">
-        <option value="">All Roles</option>
-        <option value="super_admin">Super Admin</option>
-        <option value="admin">Admin</option>
-        <option value="partner">Partner</option>
-      </select>
-      <select v-model="filters.status" @change="applyFilters" class="filter-select">
-        <option value="">All Status</option>
-        <option value="active">Active</option>
-        <option value="inactive">Inactive</option>
-      </select>
-    </div>
-    
-    <!-- Users Table -->
-    <DataTable 
-      :data="filteredUsers" 
-      :columns="columns" 
-      :loading="loading"
-      :search-keys="['full_name', 'email']"
-    >
-      <template #actions="{ row }">
-        <button @click="openEditModal(row)" class="btn-edit" title="Edit User">
-          <i class="fas fa-edit"></i>
-        </button>
-        <button @click="openPermissionsModal(row)" class="btn-permissions" title="Manage Permissions">
-          <i class="fas fa-lock"></i>
-        </button>
-        <button v-if="row.role !== 'super_admin'" @click="confirmDelete(row)" class="btn-delete" title="Delete User">
-          <i class="fas fa-trash"></i>
-        </button>
-      </template>
-    </DataTable>
-    
-    <!-- Create/Edit User Modal -->
-    <div v-if="showUserModal" class="modal-overlay" @click.self="closeUserModal">
-      <div class="modal-container glass-card modal-medium">
-        <div class="modal-header">
-          <h2>{{ editingUser ? 'Edit User' : 'Create New User' }}</h2>
-          <button @click="closeUserModal" class="close-btn">
-            <i class="fas fa-times"></i>
-          </button>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+        <div class="stat-info">
+          <h3>{{ users.length }}</h3>
+          <p>Total Users</p>
         </div>
-        
-        <form @submit.prevent="saveUser" class="modal-form">
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
+        <div class="stat-info">
+          <h3>{{ activeUsers }}</h3>
+          <p>Active</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange"><i class="fas fa-user-clock"></i></div>
+        <div class="stat-info">
+          <h3>{{ pendingUsers }}</h3>
+          <p>Pending Approval</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple"><i class="fas fa-user-tag"></i></div>
+        <div class="stat-info">
+          <h3>{{ adminCount }}</h3>
+          <p>Admins</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" v-model="searchQuery" placeholder="Search users by name or email...">
+    </div>
+
+    <!-- Loading -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading users...</p>
+    </div>
+
+    <!-- Users Grid -->
+    <div v-else class="users-grid">
+      <div v-for="user in paginatedUsers" :key="user.id" class="user-card">
+        <div class="user-header">
+          <div class="user-avatar">
+            <i class="fas fa-user-circle"></i>
+          </div>
+          <div class="user-info">
+            <h3>{{ user.full_name }}</h3>
+            <span :class="['role-badge', getRoleClass(user.role)]">
+              {{ getRoleLabel(user.role) }}
+            </span>
+          </div>
+          <div class="user-status">
+            <span :class="['status', user.is_active ? 'active' : 'inactive']">
+              {{ user.is_active ? 'Active' : 'Inactive' }}
+            </span>
+            <span v-if="!user.is_approved" class="status pending">
+              Pending
+            </span>
+          </div>
+        </div>
+
+        <div class="user-body">
+          <p><i class="fas fa-envelope"></i> {{ user.email }}</p>
+          <p v-if="user.referral_code"><i class="fas fa-link"></i> Code: {{ user.referral_code }}</p>
+          <p><i class="fas fa-calendar"></i> Joined: {{ formatDate(user.created_at) }}</p>
+          <p v-if="user.last_login"><i class="fas fa-clock"></i> Last login: {{ formatDate(user.last_login) }}</p>
+        </div>
+
+        <div class="user-footer">
+          <div class="referral-stats">
+            <span><i class="fas fa-mouse-pointer"></i> {{ user.total_clicks || 0 }} clicks</span>
+            <span><i class="fas fa-chart-line"></i> {{ user.total_conversions || 0 }} conversions</span>
+          </div>
+
+        <div class="action-buttons">
+  <!-- Edit button -->
+  <button @click="editUser(user)" class="action-btn edit" title="Edit">
+    <i class="fas fa-edit"></i>
+  </button>
+  
+  <!-- Approve button -->
+  <button v-if="!user.is_approved" @click="approveUser(user.id)" class="action-btn approve" title="Approve">
+    <i class="fas fa-check-circle"></i>
+  </button>
+  
+  <!-- Suspend button -->
+  <button v-if="user.is_active && user.id !== currentUserId" @click="suspendUser(user)" class="action-btn suspend" title="Suspend">
+    <i class="fas fa-ban"></i>
+  </button>
+  
+  <!-- Activate button -->
+  <button v-if="!user.is_active && user.id !== currentUserId" @click="activateUser(user.id)" class="action-btn activate" title="Activate">
+    <i class="fas fa-play-circle"></i>
+  </button>
+  
+  <!-- Reset Password button - opens modal -->
+  <button @click="openResetModal(user)" class="action-btn reset" title="Reset Password">
+    <i class="fas fa-key"></i>
+  </button>
+  
+  <!-- Delete button -->
+  <button v-if="user.id !== currentUserId" @click="openDeleteModal(user)" class="action-btn delete" title="Delete">
+    <i class="fas fa-trash-alt"></i>
+  </button>
+</div>
+          
+
+
+        </div>
+      </div>
+    </div>
+
+    <!-- No Results -->
+    <div v-if="!loading && filteredUsers.length === 0" class="no-results">
+      <i class="fas fa-users-slash"></i>
+      <h3>No Users Found</h3>
+      <p>Try adjusting your search</p>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" v-if="filteredUsers.length > 0">
+      <button @click="prevPage" :disabled="currentPage === 1" class="page-btn">
+        <i class="fas fa-chevron-left"></i> Previous
+      </button>
+      <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+      <button @click="nextPage" :disabled="currentPage === totalPages" class="page-btn">
+        Next <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal-overlay" v-if="showModal" @click.self="closeModal">
+      <div class="modal-container modal-lg">
+        <div class="modal-header">
+          <h2>{{ editingUser ? 'Edit User' : 'Add New User' }}</h2>
+          <button class="close-btn" @click="closeModal">&times;</button>
+        </div>
+        <form @submit.prevent="saveUser" class="user-form">
           <div class="form-group">
             <label>Full Name *</label>
-            <input type="text" v-model="userForm.full_name" required>
+            <input type="text" v-model="form.full_name" required>
           </div>
-          
           <div class="form-group">
             <label>Email *</label>
-            <input type="email" v-model="userForm.email" required :disabled="!!editingUser">
+            <input type="email" v-model="form.email" required :disabled="!!editingUser">
           </div>
-          
-          <div class="form-group" v-if="!editingUser">
-            <label>Password *</label>
-            <input type="password" v-model="userForm.password" required>
-            <small>Must be at least 8 characters with uppercase, lowercase, and number</small>
-          </div>
-          
           <div class="form-group">
             <label>Role *</label>
-            <select v-model="userForm.role" required>
-              <option value="admin">Administrator</option>
-              <option value="partner">Marketing Partner</option>
+            <select v-model="form.role" required>
+              <option value="super_admin">Super Admin</option>
+              <option value="admin">Admin</option>
+              <option value="partner">Partner</option>
             </select>
           </div>
-          
-          <div class="form-group">
-            <label>Status</label>
-            <label class="toggle-switch">
-              <input type="checkbox" v-model="userForm.is_active">
-              <span class="toggle-slider"></span>
-              <span class="toggle-label">{{ userForm.is_active ? 'Active' : 'Inactive' }}</span>
+          <div class="checkbox-group">
+            <label class="checkbox">
+              <input type="checkbox" v-model="form.is_active"> Active
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" v-model="form.is_approved"> Approved
             </label>
           </div>
-          
-          <div class="modal-actions">
-            <button type="submit" class="btn-primary" :disabled="saving">
-              <i v-if="saving" class="fas fa-spinner fa-spin"></i>
-              <i v-else class="fas fa-save"></i>
-              {{ saving ? 'Saving...' : 'Save User' }}
-            </button>
-            <button type="button" @click="closeUserModal" class="btn-secondary">Cancel</button>
+          <div class="form-actions">
+            <button type="button" @click="closeModal" class="btn-cancel">Cancel</button>
+            <button type="submit" class="btn-submit">{{ editingUser ? 'Update' : 'Create' }}</button>
           </div>
         </form>
+        <div v-if="newUserPassword" class="password-info">
+          <hr>
+          <h4>User Created Successfully!</h4>
+          <p><strong>Temporary Password:</strong> <code>{{ newUserPassword }}</code></p>
+          <p class="warning">Please share this password with the user. It will not be shown again.</p>
+        </div>
       </div>
     </div>
-    
-    <!-- Permission Editor Modal -->
-    <div v-if="showPermissionsModal" class="modal-overlay" @click.self="closePermissionsModal">
-      <div class="modal-container glass-card modal-large">
-        <div class="modal-header">
-          <h2>Permissions: {{ selectedUser?.full_name }}</h2>
-          <button @click="closePermissionsModal" class="close-btn">
-            <i class="fas fa-times"></i>
+
+    <!-- suspend modal -->
+    <div class="modal-overlay" v-if="showSuspendModal" @click.self="closeSuspendModal">
+    <div class="modal-container modal-sm">
+      <div class="modal-header">
+        <h2>Suspend User</h2>
+        <button class="close-btn" @click="closeSuspendModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>You are about to suspend <strong>{{ suspendUserData?.full_name }}</strong></p>
+        <div class="form-group">
+          <label>Reason for suspension *</label>
+          <textarea v-model="suspendReason" rows="4" placeholder="Please provide a reason for suspending this user..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button @click="closeSuspendModal" class="btn-cancel">Cancel</button>
+          <button @click="confirmSuspend" class="btn-danger" :disabled="!suspendReason.trim()">
+            Confirm Suspension
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+    
+    <!-- Delete Confirmation Modal -->  
+   <div class="modal-overlay" v-if="showDeleteModal" @click.self="closeDeleteModal">
+    <div class="modal-container modal-sm">
+      <div class="modal-header">
+        <h2 class="delete-title">⚠️ Permanently Delete User</h2>
+        <button class="close-btn" @click="closeDeleteModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="delete-warning">
+          <i class="fas fa-exclamation-triangle"></i>
+          <p>This action <strong>cannot be undone</strong>. This will permanently delete:</p>
         </div>
         
-        <div class="permissions-editor">
-          <div class="permissions-toolbar">
-            <div class="template-selector">
-              <span>Apply Template:</span>
-              <select v-model="selectedTemplate" class="template-select">
-                <option value="">Select template...</option>
-                <option value="admin_full">Admin - Full Access</option>
-                <option value="admin_limited">Admin - Limited</option>
-                <option value="partner_full">Partner - Full Access</option>
-                <option value="partner_readonly">Partner - Read Only</option>
-                <option value="partner_creator">Partner - Creator</option>
-              </select>
-              <button @click="applyTemplate" class="btn-sm">Apply</button>
-            </div>
-            <button @click="resetPermissions" class="btn-sm btn-outline">Reset to Default</button>
+        <div class="delete-user-info">
+          <div class="user-detail">
+            <span class="label">Name:</span>
+            <span class="value">{{ deleteUserData?.full_name }}</span>
           </div>
-          
-          <div class="permissions-grid">
-            <div v-for="resource in resources" :key="resource.id" class="permission-card">
-              <div class="resource-header">
-                <i class="fas" :class="getResourceIcon(resource.id)"></i>
-                <div>
-                  <h4>{{ resource.name }}</h4>
-                  <p>{{ resource.description }}</p>
-                </div>
-              </div>
-              
-              <div class="permission-actions">
-                <label class="permission-checkbox">
-                  <input type="checkbox" v-model="permissions[resource.id].create">
-                  <span>Create</span>
-                </label>
-                <label class="permission-checkbox">
-                  <input type="checkbox" v-model="permissions[resource.id].read">
-                  <span>Read</span>
-                </label>
-                <label class="permission-checkbox">
-                  <input type="checkbox" v-model="permissions[resource.id].update">
-                  <span>Update</span>
-                </label>
-                <label class="permission-checkbox">
-                  <input type="checkbox" v-model="permissions[resource.id].delete">
-                  <span>Delete</span>
-                </label>
-              </div>
-              
-              <div class="permission-level" :class="getPermissionLevelClass(resource.id)">
-                {{ getPermissionLevelText(resource.id) }}
-              </div>
-            </div>
+          <div class="user-detail">
+            <span class="label">Email:</span>
+            <span class="value">{{ deleteUserData?.email }}</span>
           </div>
-          
-          <div class="modal-actions">
-            <button @click="savePermissions" class="btn-primary" :disabled="savingPermissions">
-              <i v-if="savingPermissions" class="fas fa-spinner fa-spin"></i>
-              <i v-else class="fas fa-save"></i>
-              Save Permissions
-            </button>
-            <button @click="closePermissionsModal" class="btn-secondary">Cancel</button>
+          <div class="user-detail">
+            <span class="label">Role:</span>
+            <span class="value">{{ getRoleLabel(deleteUserData?.role) }}</span>
           </div>
+        </div>
+        
+        <div class="delete-items-list">
+          <p><strong>The following data will be deleted:</strong></p>
+          <ul>
+            <li><i class="fas fa-link"></i> All referral links and click data</li>
+            <li><i class="fas fa-lock"></i> All custom permissions</li>
+            <li><i class="fas fa-history"></i> All activity logs</li>
+            <li><i class="fas fa-key"></i> Login history and OTP records</li>
+          </ul>
+        </div>
+        
+        <div class="confirm-input">
+          <label>Type <strong>"DELETE"</strong> to confirm:</label>
+          <input type="text" v-model="deleteConfirmText" placeholder="DELETE" class="delete-confirm-input">
+        </div>
+        
+        <div class="form-actions">
+          <button @click="closeDeleteModal" class="btn-cancel">Cancel</button>
+          <button 
+            @click="confirmDelete" 
+            class="btn-danger" 
+            :disabled="deleteConfirmText !== 'DELETE' || deleting"
+          >
+            <i v-if="deleting" class="fas fa-spinner fa-spin"></i>
+            {{ deleting ? 'Deleting...' : 'Permanently Delete' }}
+          </button>
         </div>
       </div>
     </div>
-    
-    <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
-      <div class="modal-container glass-card modal-small">
-        <div class="modal-header">
-          <h2>Delete User</h2>
-          <button @click="closeDeleteModal" class="close-btn">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <p>Are you sure you want to delete <strong>{{ userToDelete?.full_name }}</strong>?</p>
-          <p class="warning-text">This action cannot be undone. All associated data will be lost.</p>
-        </div>
-        <div class="modal-actions">
-          <button @click="deleteUser" class="btn-danger">
-            <i class="fas fa-trash"></i> Delete Permanently
-          </button>
-          <button @click="closeDeleteModal" class="btn-secondary">Cancel</button>
-        </div>
-      </div>
-    </div>
+  </div>
+
+
+
+
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
 import { toast } from 'vue3-toastify'
-import DataTable from './DataTable.vue'
 import api from '@/services/api'
+import authService from '@/services/auth'
+
+
+
+const showDeleteModal = ref(false)
+const deleteUserData = ref(null)
+const deleteConfirmText = ref('')
+const deleting = ref(false)
 
 const users = ref([])
 const loading = ref(false)
-const saving = ref(false)
-const savingPermissions = ref(false)
-const showUserModal = ref(false)
-const showPermissionsModal = ref(false)
-const showDeleteModal = ref(false)
+const showModal = ref(false)
 const editingUser = ref(null)
-const selectedUser = ref(null)
-const userToDelete = ref(null)
-const selectedTemplate = ref('')
+const newUserPassword = ref('')
+const searchQuery = ref('')
+const currentPage = ref(1)
+const itemsPerPage = 12
 
-const filters = ref({
-  search: '',
-  role: '',
-  status: ''
-})
 
-const userForm = ref({
+
+const showSuspendModal = ref(false)
+const suspendUserData = ref(null)
+const suspendReason = ref('')
+
+
+
+const currentUser = authService.getUser()
+const currentUserId = computed(() => currentUser?.id)
+
+const form = ref({
   full_name: '',
   email: '',
-  password: '',
-  role: 'admin',
-  is_active: true
+  role: 'partner',
+  is_active: true,
+  is_approved: true
 })
 
-const permissions = ref({})
-const resources = [
-  { id: 'products', name: 'Products', description: 'Manage dairy products catalog' },
-  { id: 'blog', name: 'Blog Posts', description: 'Create and manage blog content' },
-  { id: 'users', name: 'Users', description: 'Manage user accounts' },
-  { id: 'partners', name: 'Partners', description: 'Manage partner accounts' },
-  { id: 'referrals', name: 'Referrals', description: 'Referral links and tracking' },
-  { id: 'statistics', name: 'Statistics', description: 'View analytics and reports' },
-  { id: 'settings', name: 'Settings', description: 'System configuration' }
-]
-
-const columns = [
-  { key: 'full_name', label: 'Name', sortable: true },
-  { key: 'email', label: 'Email', sortable: true },
-  { key: 'role', label: 'Role', type: 'status', sortable: true },
-  { key: 'is_active', label: 'Status', type: 'status', sortable: true },
-  { key: 'created_at', label: 'Joined', type: 'date', sortable: true, width: '120px' },
-  { key: 'last_login', label: 'Last Login', type: 'date', sortable: true, width: '140px' }
-]
+// Computed
+const activeUsers = computed(() => users.value.filter(u => u.is_active).length)
+const pendingUsers = computed(() => users.value.filter(u => !u.is_approved).length)
+const adminCount = computed(() => users.value.filter(u => u.role === 'admin' || u.role === 'super_admin').length)
 
 const filteredUsers = computed(() => {
-  let result = [...users.value]
-  
-  if (filters.value.role) {
-    result = result.filter(u => u.role === filters.value.role)
-  }
-  
-  if (filters.value.status === 'active') {
-    result = result.filter(u => u.is_active === true)
-  } else if (filters.value.status === 'inactive') {
-    result = result.filter(u => u.is_active === false)
-  }
-  
-  if (filters.value.search) {
-    const search = filters.value.search.toLowerCase()
-    result = result.filter(u => 
-      u.full_name.toLowerCase().includes(search) ||
-      u.email.toLowerCase().includes(search)
-    )
-  }
-  
-  return result
+  if (!searchQuery.value) return users.value
+  const query = searchQuery.value.toLowerCase()
+  return users.value.filter(u => 
+    u.full_name.toLowerCase().includes(query) || 
+    u.email.toLowerCase().includes(query)
+  )
 })
 
-const fetchUsers = async () => {
+const totalPages = computed(() => Math.ceil(filteredUsers.value.length / itemsPerPage))
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  return filteredUsers.value.slice(start, start + itemsPerPage)
+})
+
+// Methods
+const loadUsers = async () => {
   loading.value = true
   try {
     const response = await api.get('/admin/users')
     users.value = response.data
   } catch (error) {
-    console.error('Error fetching users:', error)
+    console.error('Error loading users:', error)
+    toast.error('Failed to load users')
   } finally {
     loading.value = false
   }
 }
 
-const openCreateModal = () => {
-  editingUser.value = null
-  userForm.value = {
-    full_name: '',
-    email: '',
-    password: '',
-    role: 'admin',
-    is_active: true
-  }
-  showUserModal.value = true
+const prevPage = () => {
+  if (currentPage.value > 1) currentPage.value--
 }
 
-const openEditModal = (user) => {
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value++
+}
+
+const openCreateModal = () => {
+  editingUser.value = null
+  newUserPassword.value = ''
+  form.value = {
+    full_name: '',
+    email: '',
+    role: 'partner',
+    is_active: true,
+    is_approved: true
+  }
+  showModal.value = true
+}
+
+const editUser = (user) => {
   editingUser.value = user
-  userForm.value = {
+  newUserPassword.value = ''
+  form.value = {
     full_name: user.full_name,
     email: user.email,
-    password: '',
     role: user.role,
-    is_active: user.is_active
+    is_active: user.is_active,
+    is_approved: user.is_approved
   }
-  showUserModal.value = true
+  showModal.value = true
 }
 
 const saveUser = async () => {
-  saving.value = true
   try {
     if (editingUser.value) {
-      await api.put(`/admin/users/${editingUser.value.id}`, {
-        full_name: userForm.value.full_name,
-        role: userForm.value.role,
-        is_active: userForm.value.is_active
-      })
+      await api.put(`/admin/users/${editingUser.value.id}`, form.value)
       toast.success('User updated successfully')
     } else {
-      await api.post('/admin/users', userForm.value)
+      const response = await api.post('/admin/users', form.value)
+      newUserPassword.value = response.data.user?.temporary_password
       toast.success('User created successfully')
     }
-    await fetchUsers()
-    closeUserModal()
+    closeModal()
+    await loadUsers()
   } catch (error) {
-    console.error('Error saving user:', error)
-  } finally {
-    saving.value = false
+    toast.error(error.response?.data?.error || 'Failed to save user')
   }
 }
 
-const openPermissionsModal = async (user) => {
-  selectedUser.value = user
-  showPermissionsModal.value = true
-  await loadUserPermissions(user.id)
-}
-
-const loadUserPermissions = async (userId) => {
+const approveUser = async (userId) => {
   try {
-    const response = await api.get(`/permissions/users/${userId}/permissions`)
-    permissions.value = response.data
+    await api.post(`/admin/users/${userId}/approve`)
+    toast.success('User approved')
+    await loadUsers()
   } catch (error) {
-    console.error('Error loading permissions:', error)
-    // Initialize default permissions structure
-    const defaultPerms = {}
-    resources.forEach(resource => {
-      defaultPerms[resource.id] = {
-        create: false,
-        read: false,
-        update: false,
-        delete: false
-      }
-    })
-    permissions.value = defaultPerms
+    toast.error('Failed to approve user')
   }
 }
 
-const savePermissions = async () => {
-  savingPermissions.value = true
-  try {
-    await api.put(`/permissions/users/${selectedUser.value.id}/permissions`, {
-      permissions: permissions.value
-    })
-    toast.success('Permissions saved successfully')
-    closePermissionsModal()
-  } catch (error) {
-    console.error('Error saving permissions:', error)
-  } finally {
-    savingPermissions.value = false
-  }
+const suspendUser = (user) => {
+  suspendUserData.value = user
+  suspendReason.value = ''
+  showSuspendModal.value = true
 }
 
-const applyTemplate = () => {
-  if (!selectedTemplate.value) return
+const confirmSuspend = async () => {
+  if (!suspendReason.value.trim()) {
+    toast.error('Please provide a reason for suspension')
+    return
+  }
   
-  const templates = {
-    admin_full: {
-      products: { create: true, read: true, update: true, delete: true },
-      blog: { create: true, read: true, update: true, delete: true },
-      users: { create: false, read: true, update: false, delete: false },
-      partners: { create: true, read: true, update: true, delete: false },
-      referrals: { create: true, read: true, update: true, delete: false },
-      statistics: { create: false, read: true, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false }
-    },
-    admin_limited: {
-      products: { create: true, read: true, update: true, delete: false },
-      blog: { create: true, read: true, update: true, delete: false },
-      users: { create: false, read: false, update: false, delete: false },
-      partners: { create: false, read: true, update: false, delete: false },
-      referrals: { create: true, read: true, update: false, delete: false },
-      statistics: { create: false, read: true, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false }
-    },
-    partner_full: {
-      products: { create: false, read: true, update: false, delete: false },
-      blog: { create: false, read: true, update: false, delete: false },
-      users: { create: false, read: false, update: false, delete: false },
-      partners: { create: false, read: false, update: false, delete: false },
-      referrals: { create: true, read: true, update: true, delete: false },
-      statistics: { create: false, read: true, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false }
-    },
-    partner_readonly: {
-      products: { create: false, read: true, update: false, delete: false },
-      blog: { create: false, read: true, update: false, delete: false },
-      users: { create: false, read: false, update: false, delete: false },
-      partners: { create: false, read: false, update: false, delete: false },
-      referrals: { create: false, read: true, update: false, delete: false },
-      statistics: { create: false, read: true, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false }
-    },
-    partner_creator: {
-      products: { create: false, read: true, update: false, delete: false },
-      blog: { create: false, read: true, update: false, delete: false },
-      users: { create: false, read: false, update: false, delete: false },
-      partners: { create: false, read: false, update: false, delete: false },
-      referrals: { create: true, read: true, update: true, delete: true },
-      statistics: { create: false, read: true, update: false, delete: false },
-      settings: { create: false, read: false, update: false, delete: false }
+  try {
+    await api.post(`/admin/users/${suspendUserData.value.id}/suspend`, {
+      reason: suspendReason.value
+    })
+    toast.success('User suspended successfully')
+    closeSuspendModal()
+    await loadUsers()
+  } catch (error) {
+    toast.error(error.response?.data?.error || 'Failed to suspend user')
+  }
+}
+
+const closeSuspendModal = () => {
+  showSuspendModal.value = false
+  suspendUserData.value = null
+  suspendReason.value = ''
+}
+
+
+const activateUser = async (userId) => {
+  if (confirm('Activate this user? They will be able to log in again.')) {
+    try {
+      await api.post(`/admin/users/${userId}/activate`)
+      toast.success('User activated successfully')
+      await loadUsers()
+    } catch (error) {
+      toast.error('Failed to activate user')
     }
   }
-  
-  const template = templates[selectedTemplate.value]
-  if (template) {
-    permissions.value = template
-    toast.success(`Template "${selectedTemplate.value}" applied`)
+}
+
+const resetPassword = async (userId) => {
+  if (confirm('Reset password for this user?')) {
+    try {
+      const response = await api.post(`/admin/users/${userId}/reset-password`)
+      const newPassword = response.data.new_password
+      alert(`New password: ${newPassword}\n\nPlease share this with the user.`)
+      toast.success('Password reset successfully')
+    } catch (error) {
+      toast.error('Failed to reset password')
+    }
   }
 }
 
-const resetPermissions = async () => {
-  try {
-    await api.post(`/permissions/users/${selectedUser.value.id}/reset-permissions`)
-    await loadUserPermissions(selectedUser.value.id)
-    toast.success('Permissions reset to default')
-  } catch (error) {
-    console.error('Error resetting permissions:', error)
-  }
-}
-
-const getResourceIcon = (resourceId) => {
-  const icons = {
-    products: 'fa-box-open',
-    blog: 'fa-newspaper',
-    users: 'fa-users',
-    partners: 'fa-handshake',
-    referrals: 'fa-link',
-    statistics: 'fa-chart-line',
-    settings: 'fa-cog'
-  }
-  return icons[resourceId] || 'fa-key'
-}
-
-const getPermissionLevelClass = (resourceId) => {
-  const perms = permissions.value[resourceId]
-  if (!perms) return 'level-none'
-  if (perms.delete) return 'level-full'
-  if (perms.update) return 'level-edit'
-  if (perms.create) return 'level-create'
-  if (perms.read) return 'level-read'
-  return 'level-none'
-}
-
-const getPermissionLevelText = (resourceId) => {
-  const perms = permissions.value[resourceId]
-  if (!perms) return 'No Access'
-  if (perms.delete) return 'Full Control'
-  if (perms.update) return 'Can Edit'
-  if (perms.create) return 'Can Create'
-  if (perms.read) return 'View Only'
-  return 'No Access'
-}
-
-const confirmDelete = (user) => {
-  userToDelete.value = user
+const openDeleteModal = (user) => {
+  deleteUserData.value = user
+  deleteConfirmText.value = ''
   showDeleteModal.value = true
-}
-
-const deleteUser = async () => {
-  try {
-    await api.delete(`/admin/users/${userToDelete.value.id}`)
-    toast.success('User deleted successfully')
-    await fetchUsers()
-    closeDeleteModal()
-  } catch (error) {
-    console.error('Error deleting user:', error)
-  }
-}
-
-const applyFilters = () => {
-  // Filters are reactive
-}
-
-const debouncedSearch = useDebounceFn(() => {
-  applyFilters()
-}, 300)
-
-const closeUserModal = () => {
-  showUserModal.value = false
-  editingUser.value = null
-}
-
-const closePermissionsModal = () => {
-  showPermissionsModal.value = false
-  selectedUser.value = null
-  selectedTemplate.value = ''
 }
 
 const closeDeleteModal = () => {
   showDeleteModal.value = false
-  userToDelete.value = null
+  deleteUserData.value = null
+  deleteConfirmText.value = ''
+  deleting.value = false
+}
+
+const confirmDelete = async () => {
+  if (deleteConfirmText.value !== 'DELETE') {
+    toast.error('Please type DELETE to confirm')
+    return
+  }
+  
+  deleting.value = true
+  try {
+    await api.delete(`/admin/users/${deleteUserData.value.id}`)
+    toast.success(`User ${deleteUserData.value.email} has been permanently deleted`)
+    closeDeleteModal()
+    await loadUsers()
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    toast.error(error.response?.data?.error || 'Failed to delete user')
+  } finally {
+    deleting.value = false
+  }
+}
+
+
+const getRoleLabel = (role) => {
+  const roles = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    partner: 'Partner'
+  }
+  return roles[role] || role
+}
+
+const getRoleClass = (role) => {
+  const classes = {
+    super_admin: 'role-super',
+    admin: 'role-admin',
+    partner: 'role-partner'
+  }
+  return classes[role] || ''
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'Never'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+const closeModal = () => {
+  showModal.value = false
+  editingUser.value = null
+  newUserPassword.value = ''
 }
 
 onMounted(() => {
-  fetchUsers()
-})
-
-
-
-
-
-defineExpose({
-  fetchUsers
+  loadUsers()
 })
 </script>
 
 <style scoped>
-.user-management {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
+/* delete functionality styles */
+
+.delete-title {
+  color: #dc2626 !important;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.header h2 {
-  color: #1e3a8a;
-  margin: 0;
-}
-
-.btn-primary {
-  background: #f59e0b;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s;
-}
-
-.btn-primary:hover {
-  background: #d97706;
-  transform: translateY(-2px);
-}
-
-.filters-bar {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #f8fafc;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  flex: 1;
-  min-width: 200px;
-}
-
-.search-box i {
-  color: #999;
-}
-
-.search-box input {
-  border: none;
-  background: none;
-  outline: none;
-  width: 100%;
-}
-
-.filter-select {
-  padding: 0.5rem 1rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: white;
-  cursor: pointer;
-}
-
-.btn-edit, .btn-permissions, .btn-delete {
-  background: none;
-  border: none;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-right: 0.25rem;
-  transition: all 0.3s;
-}
-
-.btn-edit {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-permissions {
-  background: #8b5cf6;
-  color: white;
-}
-
-.btn-delete {
-  background: #dc2626;
-  color: white;
-}
-
-.btn-edit:hover, .btn-permissions:hover, .btn-delete:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
-}
-
-/* Permissions Editor */
-.permissions-editor {
-  padding: 1.5rem;
-}
-
-.permissions-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.template-selector {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.template-select {
-  padding: 0.4rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: white;
-}
-
-.btn-sm {
-  padding: 0.4rem 0.75rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid #e5e7eb;
-  color: #666;
-}
-
-.btn-outline:hover {
-  background: #f8fafc;
-}
-
-.permissions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.permission-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1rem;
-  transition: all 0.3s;
-}
-
-.permission-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.resource-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.resource-header i {
-  font-size: 1.2rem;
-  color: #f59e0b;
-}
-
-.resource-header h4 {
-  margin: 0;
-  color: #1e3a8a;
-}
-
-.resource-header p {
-  margin: 0;
-  font-size: 0.7rem;
-  color: #666;
-}
-
-.permission-actions {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.75rem;
-}
-
-.permission-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-.permission-checkbox input {
-  cursor: pointer;
-}
-
-.permission-level {
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.65rem;
-  font-weight: 600;
+.delete-warning {
   text-align: center;
+  padding: 1rem;
+  background: #fef2f2;
+  border-radius: 8px;
+  margin-bottom: 1rem;
 }
 
-.level-full {
-  background: #d1fae5;
-  color: #065f46;
+.delete-warning i {
+  font-size: 2rem;
+  color: #dc2626;
+  margin-bottom: 0.5rem;
 }
 
-.level-edit {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.level-create {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.level-read {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.level-none {
-  background: #fee2e2;
+.delete-warning p {
+  margin: 0;
   color: #991b1b;
 }
 
-/* Toggle Switch */
-.toggle-switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
+.delete-user-info {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
 }
 
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
-}
-
-.toggle-slider {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 24px;
-  background-color: #ccc;
-  transition: 0.3s;
-  border-radius: 24px;
-}
-
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.3s;
-  border-radius: 50%;
-}
-
-input:checked + .toggle-slider {
-  background-color: #f59e0b;
-}
-
-input:checked + .toggle-slider:before {
-  transform: translateX(26px);
-}
-
-.toggle-label {
-  font-size: 0.85rem;
-  color: #333;
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-container {
-  background: white;
-  border-radius: 20px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-medium {
-  max-width: 500px;
-}
-
-.modal-large {
-  max-width: 900px;
-}
-
-.modal-small {
-  max-width: 400px;
-}
-
-.modal-header {
+.user-detail {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
+  padding: 0.5rem 0;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.modal-header h2 {
+.user-detail:last-child {
+  border-bottom: none;
+}
+
+.user-detail .label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.user-detail .value {
   color: #1e3a8a;
+  font-weight: 500;
+}
+
+.delete-items-list {
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.delete-items-list p {
+  margin: 0 0 0.5rem;
+  color: #92400e;
+}
+
+.delete-items-list ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.delete-items-list li {
+  margin: 0.25rem 0;
+  color: #78350f;
+  font-size: 0.85rem;
+}
+
+.delete-items-list li i {
+  margin-right: 0.5rem;
+  width: 16px;
+}
+
+.confirm-input {
+  margin-bottom: 1rem;
+}
+
+.confirm-input label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.delete-confirm-input {
+  width: 100%;
+  padding: 0.6rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.delete-confirm-input:focus {
+  outline: none;
+  border-color: #dc2626;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* buttons */
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+
+
+
+.user-management {
+  padding: 0;
+}
+
+/* Header */
+.management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-left h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin: 0 0 0.25rem;
+}
+
+.header-left p {
+  font-size: 0.85rem;
+  color: #6b7280;
   margin: 0;
 }
 
-.close-btn {
-  background: none;
+.btn-create {
+  background: #1e3a8a;
+  color: white;
   border: none;
-  font-size: 1.2rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
   cursor: pointer;
-  color: #666;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.modal-form, .modal-body {
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon.blue { background: #e0e7ff; color: #1e3a8a; }
+.stat-icon.green { background: #d1fae5; color: #065f46; }
+.stat-icon.orange { background: #fed7aa; color: #9a3412; }
+.stat-icon.purple { background: #e0e7ff; color: #1e3a8a; }
+
+.stat-icon i { font-size: 1.25rem; }
+
+.stat-info h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: #1e3a8a;
+}
+
+.stat-info p {
+  font-size: 0.75rem;
+  margin: 0;
+  color: #6b7280;
+}
+
+/* Search */
+.search-box {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.search-box i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.6rem 0.75rem 0.6rem 2.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* Loading */
+.loading-state {
+  text-align: center;
+  padding: 3rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #1e3a8a;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Users Grid */
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.user-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.user-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.user-avatar i {
+  font-size: 2.5rem;
+  color: #9ca3af;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-info h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin: 0 0 0.25rem;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.role-super { background: #1e3a8a; color: white; }
+.role-admin { background: #f59e0b; color: white; }
+.role-partner { background: #10b981; color: white; }
+
+.user-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-end;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+}
+
+.status.active { background: #d1fae5; color: #065f46; }
+.status.inactive { background: #fee2e2; color: #991b1b; }
+.status.pending { background: #fef3c7; color: #92400e; }
+
+.user-body {
+  padding: 1rem;
+}
+
+.user-body p {
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-body i {
+  width: 20px;
+  color: #9ca3af;
+}
+
+.user-footer {
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.referral-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.action-btn.edit { color: #3b82f6; }
+.action-btn.approve { color: #10b981; }
+.action-btn.suspend { color: #f59e0b; }
+.action-btn.activate { color: #10b981; }
+.action-btn.reset { color: #8b5cf6; }
+.action-btn.delete { color: #ef4444; }
+
+.action-btn:hover {
+  background: #f1f5f9;
+}
+
+/* No Results */
+.no-results {
+  text-align: center;
+  padding: 3rem;
+  background: white;
+  border-radius: 12px;
+}
+
+.no-results i {
+  font-size: 3rem;
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.page-btn {
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* =========================
+   UNIVERSAL MODAL SYSTEM
+========================= */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  z-index: 9999;
+  animation: fadeIn .2s ease;
+}
+
+.modal-container {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow:
+    0 25px 50px rgba(0,0,0,.25),
+    0 10px 25px rgba(0,0,0,.1);
+  animation: modalPop .25s ease;
+}
+
+.modal-sm {
+  max-width: 500px;
+}
+
+.modal-md {
+  max-width: 650px;
+}
+
+.modal-lg {
+  max-width: 800px;
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(
+    135deg,
+    #1e3a8a,
+    #2563eb
+  );
+  color: white;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: white;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.modal-body,
+.user-form {
   padding: 1.5rem;
+}
+
+.close-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.15);
+  color: white;
+  cursor: pointer;
+  font-size: 1.3rem;
+  transition: .2s;
+}
+
+.close-btn:hover {
+  background: rgba(255,255,255,.25);
 }
 
 .form-group {
@@ -902,91 +1075,125 @@ input:checked + .toggle-slider:before {
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
+  font-size: .85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: .45rem;
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: .8rem .9rem;
+  transition: .2s;
+  font-size: .9rem;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
-  border-color: #f59e0b;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37,99,235,.12);
 }
 
-.form-group small {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.7rem;
-  color: #999;
-}
-
-.modal-actions {
+.form-actions {
   display: flex;
-  gap: 1rem;
   justify-content: flex-end;
+  gap: .75rem;
+  margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
-  margin-top: 1rem;
 }
 
-.btn-secondary {
-  background: #e5e7eb;
-  color: #333;
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 10px;
+  padding: .75rem 1.25rem;
+  font-weight: 600;
   cursor: pointer;
+}
+
+.btn-submit {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: .75rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-submit:hover {
+  background: #1d4ed8;
 }
 
 .btn-danger {
   background: #dc2626;
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 10px;
+  padding: .75rem 1.25rem;
+  font-weight: 600;
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
-.warning-text {
-  font-size: 0.85rem;
-  color: #dc2626;
-  margin-top: 0.5rem;
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
-.glass-card {
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.2);
+.btn-danger:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .users-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .filters-bar {
-    flex-direction: column;
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  .permissions-grid {
+  .users-grid {
     grid-template-columns: 1fr;
   }
   
-  .permissions-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .user-header {
+    flex-wrap: wrap;
   }
   
-  .template-selector {
-    flex-wrap: wrap;
+  .action-buttons {
+    justify-content: center;
   }
 }
 </style>

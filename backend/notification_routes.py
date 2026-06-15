@@ -4,6 +4,13 @@ from flask_login import login_required, current_user
 from models import db, ActivityLog
 from datetime import datetime, timedelta
 
+
+
+
+
+
+
+
 notification_bp = Blueprint('notification', __name__)
 
 @notification_bp.route('/notifications', methods=['GET'])

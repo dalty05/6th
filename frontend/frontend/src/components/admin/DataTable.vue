@@ -48,7 +48,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, index) in paginatedData" :key="index">
+          <tr v-for="(row, index) in paginatedData" :key="row?.id ?? index">
+            <template v-if="!row"></template>
             <td v-for="column in columns" :key="column.key">
               <div v-if="column.type === 'image' && row[column.key]">
                 <img :src="row[column.key]" class="table-image" :alt="row[column.altKey]">
@@ -230,15 +231,34 @@ const truncate = (text, length) => {
 }
 
 const getStatusClass = (status) => {
+  // 1. Return default immediately if it's completely empty, null, or undefined
+  if (status === null || status === undefined || status === '') {
+    return 'status-default'
+  }
+
+  // 2. Safely force the value to a string and lowercase it
+  const normalizedStatus = String(status).toLowerCase()
+
+  // 3. Map out the status keys (including common boolean/integer fallbacks)
   const classes = {
     published: 'status-published',
     draft: 'status-draft',
+    
+    // Active states
     active: 'status-active',
-    inactive: 'status-inactive',
     approved: 'status-approved',
-    pending: 'status-pending'
+    true: 'status-active',     // Fallback for boolean true
+    '1': 'status-active',      // Fallback for integer 1
+    
+    // Inactive/Pending states
+    inactive: 'status-inactive',
+    pending: 'status-pending',
+    false: 'status-inactive',  // Fallback for boolean false
+    '0': 'status-inactive'     // Fallback for integer 0
   }
-  return classes[status?.toLowerCase()] || 'status-default'
+
+  // 4. Return the matched class or the default fallback
+  return classes[normalizedStatus] || 'status-default'
 }
 
 // Watch for data changes to reset pagination

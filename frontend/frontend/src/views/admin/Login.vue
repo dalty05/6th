@@ -3,12 +3,12 @@
     <div class="login-card">
       <div class="login-header">
         <img src="/logo.png" alt="Meru Dairy" class="login-logo">
-        <h2>Admin Portal</h2>
+        <h2>Admin Portal </h2>
         <p>Secure access to Meru Dairy management system</p>
       </div>
 
       <!-- Step 1: Email & Password -->
-      <form v-if="step === 1" @submit.prevent="handleStep1" class="login-form">
+      <form v-if="step === 1" @submit.prevent="handleStep1" class="login-form" >
         <div class="form-group">
           <label>Email Address</label>
           <input 
@@ -218,7 +218,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  background: whitesmoke ;
   padding: 1rem;
 }
 

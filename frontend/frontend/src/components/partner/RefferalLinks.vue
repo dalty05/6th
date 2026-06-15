@@ -1,32 +1,49 @@
 <template>
-  <div class="partner-links">
+  <div class="referral-links">
     <div class="page-header">
       <div>
         <h1>Referral Links</h1>
-        <p>Create and manage your referral links to track your marketing performance</p>
+        <p>Create and manage your referral links to track marketing performance</p>
       </div>
-      <button @click="openCreateModal" class="btn-primary">
+      <button @click="openCreateModal" class="btn btn-primary">
         <i class="fas fa-plus"></i> Create New Link
       </button>
     </div>
-    
+
+    <!-- Stats Summary -->
+    <div class="stats-row">
+      <div class="stat-chip">
+        <span class="stat-label">Total Links</span>
+        <span class="stat-value">{{ links.length }}</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-label">Total Clicks</span>
+        <span class="stat-value">{{ totalClicks }}</span>
+      </div>
+      <div class="stat-chip">
+        <span class="stat-label">Avg Conversion</span>
+        <span class="stat-value">{{ avgConversionRate }}%</span>
+      </div>
+    </div>
+
+    <!-- Links Grid -->
     <div v-if="loading" class="loading-state">
       <div class="loading-spinner"></div>
       <p>Loading your links...</p>
     </div>
-    
+
     <div v-else-if="links.length === 0" class="empty-state">
       <i class="fas fa-link"></i>
       <h3>No Referral Links Yet</h3>
       <p>Create your first referral link to start tracking your marketing campaigns</p>
-      <button @click="openCreateModal" class="btn-primary">
+      <button @click="openCreateModal" class="btn btn-primary">
         <i class="fas fa-plus"></i> Create Your First Link
       </button>
     </div>
-    
-    <div v-else class="links-container">
-      <ReferralLinkCard 
-        v-for="link in links" 
+
+    <div v-else class="links-grid">
+      <ReferralLinkCard
+        v-for="link in links"
         :key="link.id"
         :link="link"
         @edit="editLink"
@@ -34,99 +51,76 @@
         @delete="confirmDelete"
       />
     </div>
-    
+
     <!-- Create/Edit Modal -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-container glass-card">
+      <div class="modal-container modal-medium glass-card">
         <div class="modal-header">
           <h2>{{ editingLink ? 'Edit Link' : 'Create New Link' }}</h2>
-          <button @click="closeModal" class="close-btn">
-            <i class="fas fa-times"></i>
-          </button>
+          <button @click="closeModal" class="close-btn">×</button>
         </div>
         
         <form @submit.prevent="saveLink" class="modal-form">
           <div class="form-group">
-            <label>Link Name *</label>
-            <input 
-              type="text" 
-              v-model="linkForm.name" 
-              placeholder="e.g., Summer Campaign 2024"
-              required
-            >
-            <small>Give your link a memorable name for easy identification</small>
+            <label class="form-label">Link Name *</label>
+            <input type="text" v-model="form.name" class="form-input" placeholder="e.g., Summer Campaign 2024" required>
+            <div class="form-hint">Give your link a memorable name for easy identification</div>
           </div>
           
           <div class="form-group">
-            <label>Destination URL</label>
-            <input 
-              type="url" 
-              v-model="linkForm.destination_url" 
-              placeholder="https://merudairy.co.ke/shop"
-            >
-            <small>Where should users be redirected? Leave blank to use homepage</small>
+            <label class="form-label">Destination URL</label>
+            <input type="url" v-model="form.destination_url" class="form-input" placeholder="https://merudairy.co.ke/shop">
+            <div class="form-hint">Where should users be redirected? Leave blank to use homepage</div>
           </div>
           
           <div class="form-group">
-            <label>Campaign Name (Optional)</label>
-            <input 
-              type="text" 
-              v-model="linkForm.campaign_name" 
-              placeholder="e.g., Summer Sale 2024"
-            >
+            <label class="form-label">Campaign Name (Optional)</label>
+            <input type="text" v-model="form.campaign_name" class="form-input" placeholder="e.g., Summer Sale 2024">
           </div>
           
           <div class="form-row">
             <div class="form-group">
-              <label>Active Status</label>
               <label class="toggle-switch">
-                <input type="checkbox" v-model="linkForm.is_active">
+                <input type="checkbox" v-model="form.is_active">
                 <span class="toggle-slider"></span>
+                <span class="toggle-label">Active Status</span>
               </label>
             </div>
             
             <div class="form-group">
-              <label>Expiry Date (Optional)</label>
-              <input type="date" v-model="linkForm.expires_at">
+              <label class="form-label">Expiry Date (Optional)</label>
+              <input type="date" v-model="form.expires_at" class="form-input">
             </div>
           </div>
           
           <div class="modal-actions">
-            <button type="submit" class="btn-primary" :disabled="saving">
+            <button type="submit" class="btn btn-primary" :disabled="saving">
               <i v-if="saving" class="fas fa-spinner fa-spin"></i>
               <i v-else class="fas fa-save"></i>
               {{ saving ? 'Saving...' : 'Save Link' }}
             </button>
-            <button type="button" @click="closeModal" class="btn-secondary">
-              Cancel
-            </button>
+            <button type="button" @click="closeModal" class="btn btn-secondary">Cancel</button>
           </div>
         </form>
       </div>
     </div>
-    
+
     <!-- Delete Confirmation Modal -->
     <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
-      <div class="modal-container glass-card modal-small">
+      <div class="modal-container modal-small glass-card">
         <div class="modal-header">
           <h2>Delete Link</h2>
-          <button @click="closeDeleteModal" class="close-btn">
-            <i class="fas fa-times"></i>
-          </button>
+          <button @click="closeDeleteModal" class="close-btn">×</button>
         </div>
-        
         <div class="modal-body">
           <p>Are you sure you want to delete <strong>{{ linkToDelete?.name }}</strong>?</p>
           <p class="warning-text">This action cannot be undone and all click data will be lost.</p>
         </div>
-        
         <div class="modal-actions">
-          <button @click="deleteLink" class="btn-danger">
+          <button @click="deleteLink" class="btn btn-danger">
             <i class="fas fa-trash"></i> Delete Permanently
           </button>
-          <button @click="closeDeleteModal" class="btn-secondary">
-            Cancel
-          </button>
+          <button @click="closeDeleteModal" class="btn btn-secondary">Cancel</button>
         </div>
       </div>
     </div>
@@ -134,24 +128,35 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { toast } from 'vue3-toastify'
 import referralService from '@/services/referral'
 import ReferralLinkCard from '@/components/partner/ReferralLinkCard.vue'
 
 const links = ref([])
 const loading = ref(true)
+const saving = ref(false)
 const showModal = ref(false)
 const showDeleteModal = ref(false)
 const editingLink = ref(null)
 const linkToDelete = ref(null)
-const saving = ref(false)
 
-const linkForm = ref({
+const form = ref({
   name: '',
   destination_url: '',
   campaign_name: '',
   is_active: true,
   expires_at: ''
+})
+
+const totalClicks = computed(() => {
+  return links.value.reduce((sum, link) => sum + (link.total_clicks || 0), 0)
+})
+
+const avgConversionRate = computed(() => {
+  if (links.value.length === 0) return 0
+  const total = links.value.reduce((sum, link) => sum + (link.conversion_rate || 0), 0)
+  return Math.round(total / links.value.length)
 })
 
 const loadLinks = async () => {
@@ -161,6 +166,7 @@ const loadLinks = async () => {
     links.value = response
   } catch (error) {
     console.error('Error loading links:', error)
+    toast.error('Failed to load links')
   } finally {
     loading.value = false
   }
@@ -168,7 +174,7 @@ const loadLinks = async () => {
 
 const openCreateModal = () => {
   editingLink.value = null
-  linkForm.value = {
+  form.value = {
     name: '',
     destination_url: '',
     campaign_name: '',
@@ -180,7 +186,7 @@ const openCreateModal = () => {
 
 const editLink = (link) => {
   editingLink.value = link
-  linkForm.value = {
+  form.value = {
     name: link.name,
     destination_url: link.destination_url || '',
     campaign_name: link.campaign_name || '',
@@ -194,15 +200,17 @@ const saveLink = async () => {
   saving.value = true
   try {
     if (editingLink.value) {
-      await referralService.updateLink(editingLink.value.id, linkForm.value)
+      await referralService.updateLink(editingLink.value.id, form.value)
+      toast.success('Link updated successfully')
     } else {
-      await referralService.createLink(linkForm.value)
+      await referralService.createLink(form.value)
+      toast.success('Link created successfully')
     }
     await loadLinks()
     closeModal()
   } catch (error) {
     console.error('Error saving link:', error)
-    alert('Failed to save link. Please try again.')
+    toast.error(error.response?.data?.error || 'Failed to save link')
   } finally {
     saving.value = false
   }
@@ -211,10 +219,11 @@ const saveLink = async () => {
 const toggleLinkStatus = async (link) => {
   try {
     await referralService.toggleLinkStatus(link.id, !link.is_active)
+    toast.success(link.is_active ? 'Link deactivated' : 'Link activated')
     await loadLinks()
   } catch (error) {
     console.error('Error toggling link status:', error)
-    alert('Failed to update link status.')
+    toast.error('Failed to update link status')
   }
 }
 
@@ -226,24 +235,18 @@ const confirmDelete = (link) => {
 const deleteLink = async () => {
   try {
     await referralService.deleteLink(linkToDelete.value.id)
+    toast.success('Link deleted successfully')
     await loadLinks()
     closeDeleteModal()
   } catch (error) {
     console.error('Error deleting link:', error)
-    alert('Failed to delete link.')
+    toast.error('Failed to delete link')
   }
 }
 
 const closeModal = () => {
   showModal.value = false
   editingLink.value = null
-  linkForm.value = {
-    name: '',
-    destination_url: '',
-    campaign_name: '',
-    is_active: true,
-    expires_at: ''
-  }
 }
 
 const closeDeleteModal = () => {
@@ -257,62 +260,79 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.partner-links {
+.referral-links {
   min-height: 100vh;
-  background: #f8fafc;
-  padding: 2rem;
+  background: var(--gray-50);
+  padding: var(--spacing-6);
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-6);
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: var(--spacing-4);
 }
 
 .page-header h1 {
-  color: #1e3a8a;
-  margin-bottom: 0.25rem;
+  color: var(--primary-blue);
+  margin: 0 0 var(--spacing-1) 0;
 }
 
 .page-header p {
-  color: #666;
+  color: var(--gray-500);
+  margin: 0;
 }
 
-.btn-primary {
-  background: #f59e0b;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  display: inline-flex;
+.stats-row {
+  display: flex;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+  flex-wrap: wrap;
+}
+
+.stat-chip {
+  background: white;
+  padding: var(--spacing-2) var(--spacing-4);
+  border-radius: var(--radius-full);
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s;
+  gap: var(--spacing-2);
+  box-shadow: var(--shadow-sm);
 }
 
-.btn-primary:hover {
-  background: #d97706;
-  transform: translateY(-2px);
+.stat-label {
+  font-size: var(--text-sm);
+  color: var(--gray-500);
+}
+
+.stat-value {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--primary-blue);
+}
+
+.links-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
 }
 
 .loading-state, .empty-state {
   text-align: center;
-  padding: 4rem;
+  padding: var(--spacing-12);
   background: white;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
 }
 
 .loading-spinner {
   width: 50px;
   height: 50px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #f59e0b;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--accent-orange);
   border-radius: 50%;
-  margin: 0 auto 1rem;
+  margin: 0 auto var(--spacing-4);
   animation: spin 1s linear infinite;
 }
 
@@ -321,198 +341,39 @@ onMounted(() => {
 }
 
 .empty-state i {
-  font-size: 4rem;
-  color: #cbd5e1;
-  margin-bottom: 1rem;
+  font-size: var(--text-5xl);
+  color: var(--gray-300);
+  margin-bottom: var(--spacing-4);
 }
 
 .empty-state h3 {
-  color: #1e3a8a;
-  margin-bottom: 0.5rem;
+  color: var(--primary-blue);
+  margin-bottom: var(--spacing-2);
 }
 
 .empty-state p {
-  color: #666;
-  margin-bottom: 1.5rem;
-}
-
-.links-container {
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-container {
-  background: white;
-  border-radius: 20px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-small {
-  max-width: 400px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-header h2 {
-  color: #1e3a8a;
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  color: #666;
-}
-
-.modal-form, .modal-body {
-  padding: 1.5rem;
-}
-
-.form-group {
-  margin-bottom: 1.25rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #f59e0b;
-}
-
-.form-group small {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.7rem;
-  color: #999;
+  color: var(--gray-500);
+  margin-bottom: var(--spacing-4);
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 24px;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: 0.3s;
-  border-radius: 24px;
-}
-
-.toggle-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.3s;
-  border-radius: 50%;
-}
-
-input:checked + .toggle-slider {
-  background-color: #f59e0b;
-}
-
-input:checked + .toggle-slider:before {
-  transform: translateX(26px);
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-.btn-secondary {
-  background: #e5e7eb;
-  color: #333;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.btn-danger {
-  background: #dc2626;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.warning-text {
-  font-size: 0.85rem;
-  color: #dc2626;
-  margin-top: 0.5rem;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
 }
 
 @media (max-width: 768px) {
-  .partner-links {
-    padding: 1rem;
+  .referral-links {
+    padding: var(--spacing-4);
+  }
+  
+  .page-header {
+    flex-direction: column;
+  }
+  
+  .stats-row {
+    justify-content: center;
   }
   
   .form-row {

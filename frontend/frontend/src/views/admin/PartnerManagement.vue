@@ -63,6 +63,8 @@ const fetchPartners = async () => {
   } finally {
     loading.value = false
   }
+
+  
 }
 
 const viewPartnerStats = (partner) => {

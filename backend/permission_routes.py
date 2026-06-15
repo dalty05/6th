@@ -1,158 +1,149 @@
-# permission_routes.py
+# backend/permission_routes.py
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
-from models import db, User, PermissionTemplate
-import json
+from models import db, User, UserPermission
+from permission_service import has_permission, get_user_permissions, ROLE_PERMISSIONS
+from datetime import datetime
+
+
+
+
+
+
+
+
+
+
+
 
 permission_bp = Blueprint('permission', __name__)
 
-def role_required(*roles):
-    from functools import wraps
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not current_user.is_authenticated:
-                return jsonify({'error': 'Authentication required'}), 401
-            if current_user.role not in roles:
-                return jsonify({'error': 'Insufficient permissions'}), 403
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
+@permission_bp.route('/permissions/users/<int:user_id>', methods=['GET'])
+@login_required
+def get_user_permissions_route(user_id):
+    """Get permissions for a specific user"""
+    # Only super admin can view other users' permissions
+    if current_user.role != 'super_admin' and current_user.id != user_id:
+        return jsonify({'error': 'Permission denied'}), 403
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Get custom permissions from database
+    custom_perms = UserPermission.query.filter_by(user_id=user_id).all()
+    
+    # Get effective permissions using the same logic as middleware
+    resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'settings', 'contacts']
+    actions = ['create', 'read', 'update', 'delete']
+    
+    effective_permissions = {}
+    for resource in resources:
+        effective_permissions[resource] = {}
+        for action in actions:
+            effective_permissions[resource][action] = has_permission(user, resource, action)
+    
+    return jsonify({
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'full_name': user.full_name,
+            'role': user.role,
+            'is_active': user.is_active
+        },
+        'custom_permissions': [{
+            'id': p.id,
+            'resource': p.resource,
+            'action': p.action,
+            'is_allowed': p.is_allowed
+        } for p in custom_perms],
+        'role_defaults': ROLE_PERMISSIONS.get(user.role, {}),
+        'effective_permissions': effective_permissions
+    }), 200
+
+@permission_bp.route('/permissions/users/<int:user_id>', methods=['POST'])
+@login_required
+def set_user_permission(user_id):
+    """Set a custom permission for a user"""
+    if current_user.role != 'super_admin':
+        return jsonify({'error': 'Super admin only'}), 403
+    
+    data = request.json
+    resource = data.get('resource')
+    action = data.get('action')
+    is_allowed = data.get('is_allowed', True)
+    
+    if not resource or not action:
+        return jsonify({'error': 'Resource and action required'}), 400
+    
+    # Check if permission already exists
+    perm = UserPermission.query.filter_by(
+        user_id=user_id,
+        resource=resource,
+        action=action
+    ).first()
+    
+    if perm:
+        perm.is_allowed = is_allowed
+        perm.updated_at = datetime.utcnow()
+    else:
+        perm = UserPermission(
+            user_id=user_id,
+            resource=resource,
+            action=action,
+            is_allowed=is_allowed,
+            created_by=current_user.id
+        )
+        db.session.add(perm)
+    
+    db.session.commit()
+    return jsonify({'message': 'Permission set', 'id': perm.id}), 200
+
+@permission_bp.route('/permissions/users/<int:user_id>/<int:perm_id>', methods=['DELETE'])
+@login_required
+def delete_user_permission(user_id, perm_id):
+    """Delete a custom permission"""
+    if current_user.role != 'super_admin':
+        return jsonify({'error': 'Super admin only'}), 403
+    
+    perm = UserPermission.query.get_or_404(perm_id)
+    if perm.user_id != user_id:
+        return jsonify({'error': 'Permission not found for this user'}), 404
+    
+    db.session.delete(perm)
+    db.session.commit()
+    return jsonify({'message': 'Permission removed'}), 200
 
 @permission_bp.route('/permissions/resources', methods=['GET'])
 @login_required
-@role_required('super_admin')
 def get_resources():
-    """Get all available permission resources"""
+    """Get list of all resources and available actions"""
+    if current_user.role != 'super_admin':
+        return jsonify({'error': 'Super admin only'}), 403
+    
     resources = [
-        {'id': 'products', 'name': 'Products', 'description': 'Manage dairy products', 'actions': ['create', 'read', 'update', 'delete']},
-        {'id': 'blog', 'name': 'Blog Posts', 'description': 'Manage blog content', 'actions': ['create', 'read', 'update', 'delete']},
-        {'id': 'users', 'name': 'Users', 'description': 'Manage user accounts', 'actions': ['create', 'read', 'update', 'delete']},
-        {'id': 'partners', 'name': 'Partners', 'description': 'Manage partner accounts', 'actions': ['create', 'read', 'update', 'delete']},
-        {'id': 'referrals', 'name': 'Referrals', 'description': 'Referral links and tracking', 'actions': ['create', 'read', 'update', 'delete']},
-        {'id': 'statistics', 'name': 'Statistics', 'description': 'View analytics and reports', 'actions': ['create', 'read', 'update', 'delete']},
-        {'id': 'settings', 'name': 'Settings', 'description': 'System configuration', 'actions': ['create', 'read', 'update', 'delete']}
+        {'name': 'products', 'label': 'Products', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'blog', 'label': 'Blog Posts', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'jobs', 'label': 'Jobs', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'outlets', 'label': 'Outlets', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'users', 'label': 'Users', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'partners', 'label': 'Partners', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'referrals', 'label': 'Referrals', 'actions': ['create', 'read', 'update', 'delete']},
+        {'name': 'statistics', 'label': 'Statistics', 'actions': ['read']},
+        {'name': 'settings', 'label': 'Settings', 'actions': ['read', 'update']},
+        {'name': 'contacts', 'label': 'Contacts', 'actions': ['read', 'update', 'delete']}
     ]
     return jsonify(resources), 200
 
-@permission_bp.route('/permissions/templates', methods=['GET'])
+@permission_bp.route('/permissions/check', methods=['POST'])
 @login_required
-@role_required('super_admin')
-def get_templates():
-    """Get permission templates for quick assignment"""
-    templates = [
-        {
-            'id': 'partner_full',
-            'name': 'Partner - Full Access',
-            'description': 'Can create and manage referral links, view all stats'
-        },
-        {
-            'id': 'partner_readonly',
-            'name': 'Partner - Read Only',
-            'description': 'Can only view stats, cannot create or edit links'
-        },
-        {
-            'id': 'partner_creator',
-            'name': 'Partner - Creator',
-            'description': 'Can create, edit, and delete own referral links'
-        },
-        {
-            'id': 'admin_full',
-            'name': 'Admin - Full Access',
-            'description': 'Full product and blog management, can view partners'
-        },
-        {
-            'id': 'admin_limited',
-            'name': 'Admin - Limited',
-            'description': 'Can edit but not delete products and blog'
-        }
-    ]
-    return jsonify(templates), 200
-
-@permission_bp.route('/users/<int:user_id>/permissions', methods=['GET'])
-@login_required
-def get_user_permissions(user_id):
-    """Get specific user's permissions"""
-    user = User.query.get_or_404(user_id)
-    
-    # Users can only view their own permissions (unless super admin)
-    if current_user.id != user_id and current_user.role != 'super_admin':
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    return jsonify(user.get_permissions()), 200
-
-@permission_bp.route('/users/<int:user_id>/permissions', methods=['PUT'])
-@login_required
-@role_required('super_admin')
-def update_user_permissions(user_id):
-    """Update user permissions (granular control)"""
-    user = User.query.get_or_404(user_id)
+def check_permission():
+    """Check if current user has a specific permission"""
     data = request.json
+    resource = data.get('resource')
+    action = data.get('action')
     
-    # Don't allow modifying super admin permissions
-    if user.role == 'super_admin':
-        return jsonify({'error': 'Cannot modify super admin permissions'}), 403
+    if not resource or not action:
+        return jsonify({'error': 'Resource and action required'}), 400
     
-    permissions_dict = data.get('permissions', {})
-    user.set_permissions_bulk(permissions_dict)
-    db.session.commit()
-    
-    return jsonify({'message': 'Permissions updated successfully'}), 200
-
-@permission_bp.route('/users/<int:user_id>/permissions/<resource>/<action>', methods=['PUT'])
-@login_required
-@role_required('super_admin')
-def toggle_permission(user_id, resource, action):
-    """Toggle a single permission for a user"""
-    user = User.query.get_or_404(user_id)
-    data = request.json
-    value = data.get('value', False)
-    
-    if user.role == 'super_admin':
-        return jsonify({'error': 'Cannot modify super admin permissions'}), 403
-    
-    if action not in ['create', 'read', 'update', 'delete']:
-        return jsonify({'error': 'Invalid action'}), 400
-    
-    user.set_permission(resource, action, value)
-    db.session.commit()
-    
-    return jsonify({'message': f'Permission {resource}.{action} set to {value}'}), 200
-
-@permission_bp.route('/users/<int:user_id>/apply-template', methods=['POST'])
-@login_required
-@role_required('super_admin')
-def apply_permission_template(user_id):
-    """Apply a permission template to a user"""
-    user = User.query.get_or_404(user_id)
-    data = request.json
-    template_name = data.get('template')
-    
-    if user.role == 'super_admin':
-        return jsonify({'error': 'Cannot modify super admin permissions'}), 403
-    
-    template = PermissionTemplate.get_template(template_name)
-    if not template:
-        return jsonify({'error': 'Invalid template'}), 400
-    
-    user.set_permissions_bulk(template['permissions'])
-    db.session.commit()
-    
-    return jsonify({'message': f'Template {template_name} applied successfully'}), 200
-
-@permission_bp.route('/users/<int:user_id>/reset-permissions', methods=['POST'])
-@login_required
-@role_required('super_admin')
-def reset_user_permissions(user_id):
-    """Reset user permissions to role defaults"""
-    user = User.query.get_or_404(user_id)
-    
-    if user.role == 'super_admin':
-        return jsonify({'error': 'Cannot reset super admin permissions'}), 403
-    
-    # Reset to default permissions for role
-    default_perms = user.get_default_permissions()
-    user.set_permissions_bulk(default_perms)
-    db.session.commit()
-    
-    return jsonify({'message': 'Permissions reset to default'}), 200
+    return jsonify({
+        'has_permission': has_permission(current_user, resource, action)
+    }), 200

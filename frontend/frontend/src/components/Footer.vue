@@ -8,101 +8,130 @@
           <div class="footer-brand">
             <div class="brand-logo">
               <img src="/logo.png" alt="Mount Kenya Milk" class="logo-img" @error="handleImageError">
-              <span class="brand-name">Mount Kenya Milk</span>
+              <div class="brand-info">
+                <h3>Mount Kenya Milk</h3>
+                <p>Kenya's biggest dairy co-operative</p>
+              </div>
             </div>
             <p class="brand-description">
-              Kenya's biggest dairy co-operative, providing quality dairy products 
-              from the pristine slopes of Mount Kenya.
+              Providing quality dairy products from the pristine slopes of Mount Kenya 
+              since 1972. Empowering over 120,000 farmers and serving millions of customers nationwide.
             </p>
-            <!-- <div class="certification-badges">
-              <span class="cert-badge">⭐ ISO 22000</span>
-              <span class="cert-badge">✓ HACCP</span>
-              <span class="cert-badge">🏆 KEBS</span>
-            </div> -->
+            <div class="certification-badges">
+              <span class="cert-badge">
+                <i class="fas fa-check-circle"></i> ISO 22000
+              </span>
+              <span class="cert-badge">
+                <i class="fas fa-check-circle"></i> HACCP
+              </span>
+              <span class="cert-badge">
+                <i class="fas fa-check-circle"></i> KEBS
+              </span>
+            </div>
           </div>
 
           <!-- Quick Links -->
-          <div class="footer-section">
-            <h3 class="footer-title">Quick Links</h3>
-            <ul class="footer-links">
-              <li><router-link to="/">Home</router-link></li>
-              <li><router-link to="/about">About Us</router-link></li>
-              <!-- <li><router-link to="/products">Products</router-link></li> -->
-              <!-- <li><router-link to="/shop">Shop Online</router-link></li> -->
-              <!-- <li><router-link to="/blog">Blog</router-link></li> -->
+          <div class="footer-links">
+            <h4>Quick Links</h4>
+            <ul>
+              <li><a @click.prevent="scrollTo('home')" href="#">Home</a></li>
+              <li><a @click.prevent="scrollTo('about')" href="#">About Us</a></li>
+              <li><a @click.prevent="scrollTo('products')" href="#">Products</a></li>
+              <li><a @click.prevent="scrollTo('shop')" href="#">Shop Online</a></li>
+              <li><a @click.prevent="scrollTo('blog')" href="#">Blog</a></li>
+              <li><a @click.prevent="scrollTo('contact')" href="#">Contact Us</a></li>
             </ul>
           </div>
 
           <!-- Important Links -->
-          <div class="footer-section">
-            <h3 class="footer-title">Important Links</h3>
-            <ul class="footer-links">
-              <li><router-link to="/contact">Contact Us</router-link></li>
+          <div class="footer-links">
+            <h4>Resources</h4>
+            <ul>
               <li><router-link to="/careers">Careers</router-link></li>
-              <!-- <li><router-link to="/csr">CSR Initiatives</router-link></li> -->
-              <!-- <li><a href="#">Privacy Policy</a></li> -->
-              <!-- <li><a href="#">Terms & Conditions</a></li> -->
+              <li><router-link to="/csr">CSR Initiatives</router-link></li>
+              <li><a href="#">Privacy Policy</a></li>
+              <li><a href="#">Terms & Conditions</a></li>
+              <li><a href="#">FAQs</a></li>
+              <li><a href="#">Delivery Information</a></li>
             </ul>
           </div>
 
           <!-- Contact Info -->
-          <div class="footer-section">
-            <h3 class="footer-title">Contact Info</h3>
-            <div class="contact-info">
+          <div class="footer-contact">
+            <h4>Contact Us</h4>
+            <div class="contact-details">
               <div class="contact-item">
-                <span class="contact-icon">📍</span>
+                <i class="fas fa-map-marker-alt"></i>
                 <span>Meru Town, Kenya</span>
               </div>
               <div class="contact-item">
-                <span class="contact-icon">📞</span>
+                <i class="fas fa-phone-alt"></i>
                 <div>
                   <a href="tel:+254710901376">+254 710 901 376</a><br>
                   <a href="tel:+254719111444">+254 719 111 444</a>
                 </div>
               </div>
-              <!-- <div class="contact-item">
-                <span class="contact-icon">✉️</span>
+              <div class="contact-item">
+                <i class="fas fa-envelope"></i>
                 <div>
-                  <a href="mailto:maziwa@merudairy.co.ke">maziwa@merudairy.co.ke</a><br>
+                  <a href="mailto:info@merudairy.co.ke">info@merudairy.co.ke</a><br>
                   <a href="mailto:sales@merudairy.co.ke">sales@merudairy.co.ke</a>
                 </div>
-              </div> -->
-              <!-- <div class="contact-item">
-                <span class="contact-icon">🕒</span>
-                <span>Mon-Fri: 8AM - 5PM<br>Sat: 9AM - 1PM</span>
-              </div> -->
+              </div>
+              <div class="contact-item">
+                <i class="fas fa-clock"></i>
+                <div>
+                  <span>Mon-Fri: 8AM - 5PM</span><br>
+                  <span>Sat: 9AM - 1PM</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Newsletter Section -->
-    <!-- <div class="footer-newsletter">
+    <!-- Newsletter Subscription Section -->
+    <div class="footer-newsletter">
       <div class="container">
-        <div class="newsletter-wrapper glass-card">
+        <div class="newsletter-wrapper">
           <div class="newsletter-content">
-            <div class="newsletter-icon">📧</div>
+            <div class="newsletter-icon">
+              <i class="fas fa-envelope-open-text"></i>
+            </div>
             <div>
               <h3>Subscribe to Our Newsletter</h3>
-              <p>Get updates on products, promotions, and dairy industry news</p>
+              <p>Get the latest updates on products, promotions, and dairy industry news</p>
             </div>
           </div>
-          <div class="newsletter-form">
-            <input 
-              type="email" 
-              v-model="newsletterEmail" 
-              placeholder="Enter your email address"
-              class="newsletter-input"
-            >
-            <button @click="subscribeNewsletter" :disabled="newsletterLoading" class="newsletter-btn">
-              {{ newsletterLoading ? 'Subscribing...' : 'Subscribe' }}
-              <span class="btn-icon">→</span>
+          <form @submit.prevent="submitNewsletter" class="newsletter-form">
+            <div class="input-group">
+              <i class="fas fa-user"></i>
+              <input 
+                type="text" 
+                v-model="newsletterForm.name" 
+                placeholder="Your Name" 
+                required
+              >
+            </div>
+            <div class="input-group">
+              <i class="fas fa-envelope"></i>
+              <input 
+                type="email" 
+                v-model="newsletterForm.email" 
+                placeholder="Email Address" 
+                required
+              >
+            </div>
+            <button type="submit" class="btn-subscribe" :disabled="newsletterLoading">
+              <span v-if="!newsletterLoading">Subscribe</span>
+              <span v-else><i class="fas fa-spinner fa-spin"></i> Subscribing...</span>
+              <i class="fas fa-arrow-right"></i>
             </button>
-          </div>
+          </form>
         </div>
       </div>
-    </div> -->
+    </div>
 
     <!-- Footer Bottom -->
     <div class="footer-bottom">
@@ -114,27 +143,35 @@
           
           <div class="social-links">
             <a href="#" class="social-icon" aria-label="Facebook">
-              <span>📘</span>
+              <i class="fab fa-facebook-f"></i>
             </a>
             <a href="#" class="social-icon" aria-label="Twitter">
-              <span>🐦</span>
+              <i class="fab fa-twitter"></i>
             </a>
             <a href="#" class="social-icon" aria-label="Instagram">
-              <span>📸</span>
+              <i class="fab fa-instagram"></i>
             </a>
             <a href="#" class="social-icon" aria-label="LinkedIn">
-              <span>💼</span>
+              <i class="fab fa-linkedin-in"></i>
             </a>
             <a href="#" class="social-icon" aria-label="YouTube">
-              <span>▶️</span>
+              <i class="fab fa-youtube"></i>
             </a>
           </div>
           
           <div class="payment-methods">
-            <span class="payment-icon">💳 Visa</span>
-            <span class="payment-icon">💳 Mastercard</span>
-            <span class="payment-icon">📱 M-Pesa</span>
-            <span class="payment-icon">💵 Cash</span>
+            <span class="payment-icon">
+              <i class="fab fa-cc-visa"></i> Visa
+            </span>
+            <span class="payment-icon">
+              <i class="fab fa-cc-mastercard"></i> Mastercard
+            </span>
+            <span class="payment-icon">
+              <i class="fas fa-mobile-alt"></i> M-Pesa
+            </span>
+            <span class="payment-icon">
+              <i class="fas fa-money-bill-wave"></i> Cash
+            </span>
           </div>
         </div>
       </div>
@@ -144,22 +181,41 @@
     <button 
       v-show="showBackToTop" 
       @click="scrollToTop" 
-      class="back-to-top glass-card"
+      class="back-to-top"
       aria-label="Back to top"
     >
-      <span>↑</span>
+      <i class="fas fa-arrow-up"></i>
     </button>
+
+    <!-- Newsletter Success Modal -->
+    <div v-if="showNewsletterSuccess" class="newsletter-success-modal" @click.self="closeNewsletterSuccess">
+      <div class="success-content">
+        <div class="success-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <h3>Subscribed Successfully!</h3>
+        <p>Thank you for subscribing to our newsletter. You'll receive updates on products, promotions, and dairy industry news.</p>
+        <button @click="closeNewsletterSuccess" class="btn-close">Continue</button>
+      </div>
+    </div>
   </footer>
 </template>
 
 <script>
+import { scrollToSection } from '@/utils/scroll'
+import api from '@/services/api'
+
 export default {
   name: 'Footer',
   data() {
     return {
-      newsletterEmail: '',
+      newsletterForm: {
+        name: '',
+        email: ''
+      },
       newsletterLoading: false,
       showBackToTop: false,
+      showNewsletterSuccess: false,
       currentYear: new Date().getFullYear()
     }
   },
@@ -170,34 +226,54 @@ export default {
     window.removeEventListener('scroll', this.handleScroll)
   },
   methods: {
-    handleImageError(e) {
-      e.target.style.display = 'none'
-    },
     handleScroll() {
       this.showBackToTop = window.scrollY > 300
     },
     scrollToTop() {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     },
-    async subscribeNewsletter() {
-      if (!this.newsletterEmail) {
-        alert('Please enter your email address')
-        return
-      }
-      
-      if (!this.newsletterEmail.includes('@')) {
+    scrollTo(sectionId) {
+      scrollToSection(sectionId, 80)
+    },
+    handleImageError(e) {
+      e.target.style.display = 'none'
+    },
+    async submitNewsletter() {
+      // Validate email
+      if (!this.newsletterForm.email.includes('@')) {
         alert('Please enter a valid email address')
         return
       }
-      
+
       this.newsletterLoading = true
       
-      // Simulate API call - replace with actual endpoint
-      setTimeout(() => {
-        alert(`Thank you for subscribing! We'll send updates to ${this.newsletterEmail}`)
-        this.newsletterEmail = ''
+      try {
+        // API call to backend - will be implemented later
+        // const response = await api.post('/newsletter/subscribe', this.newsletterForm)
+        
+        // Simulate API call for now
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        console.log('Newsletter subscription:', this.newsletterForm)
+        
+        // Show success modal
+        this.showNewsletterSuccess = true
+        this.newsletterForm = { name: '', email: '' }
+        
+        // Auto hide after 5 seconds
+        setTimeout(() => {
+          this.showNewsletterSuccess = false
+        }, 5000)
+        
+      } catch (error) {
+        console.error('Newsletter subscription error:', error)
+        alert('Failed to subscribe. Please try again later.')
+      } finally {
         this.newsletterLoading = false
-      }, 1000)
+      }
+    },
+    closeNewsletterSuccess() {
+      this.showNewsletterSuccess = false
     }
   }
 }
@@ -209,7 +285,6 @@ export default {
   color: #e2e8f0;
   position: relative;
   overflow: hidden;
-  /* height:20%; */
 }
 
 .footer::before {
@@ -218,7 +293,7 @@ export default {
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 3px;
   background: linear-gradient(90deg, #f59e0b, #3b82f6, #10b981, #f59e0b);
   background-size: 200% 100%;
   animation: gradientMove 3s ease infinite;
@@ -236,34 +311,46 @@ export default {
   z-index: 1;
 }
 
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
 .footer-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1.5fr;
-  gap: 20px;
-  margin: top 0px; ;
+  gap: 40px;
 }
 
 /* Brand Section */
+.footer-brand {
+  margin-bottom: 20px;
+}
+
 .brand-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 15px;
   margin-bottom: 20px;
 }
 
 .logo-img {
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   object-fit: contain;
 }
 
-.brand-name {
+.brand-info h3 {
+  color: white;
   font-size: 1.3rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #f59e0b, #fbbf24);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  margin: 0 0 5px;
+}
+
+.brand-info p {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin: 0;
 }
 
 .brand-description {
@@ -275,7 +362,7 @@ export default {
 
 .certification-badges {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -285,34 +372,39 @@ export default {
   border-radius: 50px;
   font-size: 0.7rem;
   color: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-/* Footer Sections */
-.footer-section {
-  margin-bottom: 30px;
+.cert-badge i {
+  color: #10b981;
+  font-size: 0.6rem;
 }
 
-.footer-title {
+/* Footer Links */
+.footer-links h4,
+.footer-contact h4 {
   color: white;
   font-size: 1.1rem;
-  font-weight: 600;
   margin-bottom: 20px;
   position: relative;
   display: inline-block;
 }
 
-.footer-title::after {
+.footer-links h4::after,
+.footer-contact h4::after {
   content: '';
   position: absolute;
   bottom: -8px;
   left: 0;
-  width: 30px;
+  width: 40px;
   height: 2px;
   background: #f59e0b;
   border-radius: 2px;
 }
 
-.footer-links {
+.footer-links ul {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -326,16 +418,9 @@ export default {
   color: #94a3b8;
   text-decoration: none;
   transition: all 0.3s;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   font-size: 0.9rem;
-}
-
-.footer-links a::before {
-  content: '→';
-  opacity: 0;
-  transition: all 0.3s;
+  cursor: pointer;
+  display: inline-block;
 }
 
 .footer-links a:hover {
@@ -343,13 +428,8 @@ export default {
   transform: translateX(5px);
 }
 
-.footer-links a:hover::before {
-  opacity: 1;
-  margin-right: 5px;
-}
-
-/* Contact Info */
-.contact-info {
+/* Contact Section */
+.contact-details {
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -363,9 +443,10 @@ export default {
   color: #94a3b8;
 }
 
-.contact-icon {
-  font-size: 1.1rem;
-  min-width: 24px;
+.contact-item i {
+  color: #f59e0b;
+  margin-top: 3px;
+  width: 18px;
 }
 
 .contact-item a {
@@ -380,21 +461,18 @@ export default {
 
 /* Newsletter Section */
 .footer-newsletter {
-  padding: 0 0 40px;
-  position: relative;
-  z-index: 1;
+  padding: 40px 0;
+  background: rgba(255,255,255,0.05);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .newsletter-wrapper {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 30px;
-  padding: 30px 40px;
-  background: rgba(30, 41, 59, 0.9);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.1);
+  gap: 40px;
+  flex-wrap: wrap;
 }
 
 .newsletter-content {
@@ -404,83 +482,98 @@ export default {
 }
 
 .newsletter-icon {
-  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
+  background: rgba(245,158,11,0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.newsletter-icon i {
+  font-size: 1.8rem;
+  color: #f59e0b;
 }
 
 .newsletter-content h3 {
   color: white;
+  margin: 0 0 5px;
   font-size: 1.2rem;
-  margin-bottom: 5px;
 }
 
 .newsletter-content p {
   color: #94a3b8;
+  margin: 0;
   font-size: 0.85rem;
 }
 
 .newsletter-form {
   display: flex;
   gap: 12px;
-  min-width: 350px;
+  flex-wrap: wrap;
 }
 
-.newsletter-input {
-  flex: 1;
-  padding: 12px 16px;
-  background: #1e293b;
-  border: 1px solid #334155;
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-group i {
+  position: absolute;
+  left: 14px;
+  color: #64748b;
+}
+
+.input-group input {
+  padding: 12px 16px 12px 42px;
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 12px;
+  background: #1e293b;
   color: white;
   font-size: 0.9rem;
+  width: 250px;
   transition: all 0.3s;
 }
 
-.newsletter-input:focus {
+.input-group input:focus {
   outline: none;
   border-color: #f59e0b;
   box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
 }
 
-.newsletter-input::placeholder {
+.input-group input::placeholder {
   color: #64748b;
 }
 
-.newsletter-btn {
-  padding: 12px 24px;
+.btn-subscribe {
   background: #f59e0b;
   color: white;
   border: none;
+  padding: 12px 24px;
   border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   transition: all 0.3s;
 }
 
-.newsletter-btn:hover:not(:disabled) {
+.btn-subscribe:hover:not(:disabled) {
   background: #d97706;
   transform: translateY(-2px);
 }
 
-.newsletter-btn:disabled {
+.btn-subscribe:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.btn-icon {
-  transition: transform 0.3s;
-}
-
-.newsletter-btn:hover .btn-icon {
-  transform: translateX(5px);
-}
-
 /* Footer Bottom */
 .footer-bottom {
-  padding: 20px 0;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 25px 0;
   position: relative;
   z-index: 1;
 }
@@ -496,18 +589,19 @@ export default {
 .copyright p {
   font-size: 0.8rem;
   color: #64748b;
+  margin: 0;
 }
 
 /* Social Links */
 .social-links {
   display: flex;
-  gap: 15px;
+  gap: 12px;
 }
 
 .social-icon {
   width: 36px;
   height: 36px;
-  background: #1e293b;
+  background: rgba(255,255,255,0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -534,9 +628,13 @@ export default {
 .payment-icon {
   font-size: 0.75rem;
   color: #64748b;
-  padding: 4px 10px;
-  background: #1e293b;
-  border-radius: 50px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.payment-icon i {
+  font-size: 1rem;
 }
 
 /* Back to Top Button */
@@ -544,51 +642,112 @@ export default {
   position: fixed;
   bottom: 30px;
   right: 30px;
-  width: 50px;
-  height: 50px;
-  background: rgba(30, 41, 59, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.2);
+  width: 45px;
+  height: 45px;
+  background: #f59e0b;
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  z-index: 999;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.back-to-top:hover {
+  background: #d97706;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(245,158,11,0.3);
+}
+
+/* Newsletter Success Modal */
+.newsletter-success-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.success-content {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  animation: fadeInUp 0.3s ease;
+}
+
+.success-icon {
+  width: 70px;
+  height: 70px;
+  background: #d1fae5;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s;
-  z-index: 100;
+  margin: 0 auto 1rem;
 }
 
-.back-to-top span {
-  font-size: 1.5rem;
-  color: #f59e0b;
+.success-icon i {
+  font-size: 2.5rem;
+  color: #10b981;
 }
 
-.back-to-top:hover {
-  transform: translateY(-5px);
+.success-content h3 {
+  color: #1e3a8a;
+  margin-bottom: 0.5rem;
+}
+
+.success-content p {
+  color: #666;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.btn-close {
   background: #f59e0b;
-  box-shadow: 0 5px 15px rgba(245,158,11,0.3);
-}
-
-.back-to-top:hover span {
   color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
 }
 
-/* Glass Card Effect */
-.glass-card {
-  background: rgba(30, 41, 59, 0.8);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.1);
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-/* Responsive Design */
+/* Responsive */
 @media (max-width: 1024px) {
   .footer-grid {
-    grid-template-columns: 1.5fr 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 30px;
   }
-  
-  .footer-section:last-child {
-    grid-column: span 3;
+}
+
+@media (max-width: 768px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 30px;
   }
   
   .newsletter-wrapper {
@@ -602,28 +761,11 @@ export default {
   }
   
   .newsletter-form {
-    width: 100%;
-    min-width: auto;
-  }
-}
-
-@media (max-width: 768px) {
-  .footer-main {
-    padding: 40px 0 20px;
+    justify-content: center;
   }
   
-  .footer-grid {
-    grid-template-columns: 1fr;
-    gap: 30px;
-  }
-  
-  .footer-section:last-child {
-    grid-column: span 1;
-  }
-  
-  .footer-title::after {
-    left: 0;
-    transform: none;
+  .input-group input {
+    width: 200px;
   }
   
   .bottom-content {
@@ -639,34 +781,30 @@ export default {
     justify-content: center;
   }
   
-  .newsletter-wrapper {
-    padding: 25px 20px;
-    margin: 0 20px;
+  .footer-links h4::after,
+  .footer-contact h4::after {
+    left: 50%;
+    transform: translateX(-50%);
   }
   
-  .newsletter-form {
-    flex-direction: column;
+  .footer-links ul {
+    text-align: center;
   }
   
-  .newsletter-btn {
+  .footer-links a:hover {
+    transform: translateX(0);
+  }
+  
+  .contact-item {
     justify-content: center;
   }
   
-  .back-to-top {
-    bottom: 20px;
-    right: 20px;
-    width: 45px;
-    height: 45px;
-  }
-  
-  .back-to-top span {
-    font-size: 1.2rem;
-  }
-}
-
-@media (max-width: 480px) {
   .brand-logo {
     justify-content: center;
+  }
+  
+  .brand-info {
+    text-align: center;
   }
   
   .brand-description {
@@ -676,30 +814,28 @@ export default {
   .certification-badges {
     justify-content: center;
   }
-  
-  .footer-section {
-    text-align: center;
+}
+
+@media (max-width: 480px) {
+  .newsletter-form {
+    flex-direction: column;
+    width: 100%;
   }
   
-  .footer-title::after {
-    left: 50%;
-    transform: translateX(-50%);
+  .input-group input {
+    width: 100%;
   }
   
-  .footer-links a {
+  .btn-subscribe {
+    width: 100%;
     justify-content: center;
   }
   
-  .contact-item {
-    justify-content: center;
-  }
-  
-  .newsletter-content h3 {
-    font-size: 1rem;
-  }
-  
-  .newsletter-content p {
-    font-size: 0.75rem;
+  .back-to-top {
+    bottom: 20px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
   }
 }
 </style>

@@ -111,6 +111,9 @@
         </div>
       </div>
     </div>
+
+
+    <PartnerFooter />
   </div>
 </template>
 
@@ -120,6 +123,13 @@ import { useRouter } from 'vue-router'
 import authService from '@/services/auth'
 import referralService from '@/services/referral'
 import CopyLinkButton from '@/components/partner/CopyLinkButton.vue'
+
+
+import PartnerFooter from '@/components/partner/PartnerFooter.vue'
+
+
+
+
 
 const router = useRouter()
 const user = ref(null)
@@ -170,7 +180,26 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Styles from previous dashboard plus enhancements */
+
+.partner-dashboard {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 60px);
+  padding: 80px 2rem 0;
+}
+
+.content-wrapper {
+  flex: 1;
+}
+
+
+
+
 .partner-dashboard {
   min-height: 100vh;
   background: #f8fafc;
@@ -462,6 +491,31 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
+
+.partner-links {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.page-content {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 60px);
+  padding: 80px 2rem 0;
+}
+
+.content-wrapper {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 70px 1rem 0;
+  }
+}
+
+
+
 @media (max-width: 768px) {
   .dashboard-header {
     flex-direction: column;
@@ -486,4 +540,13 @@ onMounted(() => {
     align-items: flex-start;
   }
 }
+
+@media (max-width: 768px) {
+  .dashboard-content {
+    padding: 70px 1rem 0;
+  }
+}
+
+
+
 </style>

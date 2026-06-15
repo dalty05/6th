@@ -1,133 +1,66 @@
 <template>
-  <nav class="admin-navbar" :class="{ scrolled: isScrolled }">
+  <nav class="admin-navbar">
     <div class="navbar-container">
-      <div class="navbar-brand" @click="goToDashboard">
-        <img src="/logo.png" alt="Meru Dairy" class="logo">
-        <span class="brand-text">Admin Panel</span>
-      </div>
-      
-      <div class="navbar-actions">
-        <!-- Quick Actions Dropdown -->
-        <div class="quick-actions-dropdown">
-          <button class="action-btn" @click="toggleQuickActions">
-            <i class="fas fa-plus-circle"></i>
-            <span>Quick Actions</span>
-            <i class="fas fa-chevron-down" :class="{ rotated: quickActionsOpen }"></i>
-          </button>
-          <div v-if="quickActionsOpen" class="dropdown-menu" @click.stop>
-            <button @click="quickCreate('product')" class="dropdown-item">
-              <i class="fas fa-box-open"></i> Add Product
-            </button>
-            <button @click="quickCreate('blog')" class="dropdown-item">
-              <i class="fas fa-newspaper"></i> Write Blog
-            </button>
-            <button @click="quickCreate('user')" class="dropdown-item">
-              <i class="fas fa-user-plus"></i> Create User
-            </button>
-            <button @click="quickCreate('partner')" class="dropdown-item">
-              <i class="fas fa-handshake"></i> Add Partner
-            </button>
+      <div class="navbar-left">
+        <MobileMenuButton @toggle="toggleMobileSidebar" />
+        <div class="company-brand" @click="goToDashboard">
+          <img src="/logo.png" alt="Meru Dairy" class="company-logo">
+          <div class="company-info">
+            <span class="company-name">Meru Dairy</span>
+            <span class="company-role">Admin Portal</span>
           </div>
         </div>
-        
-        <!-- Search -->
-        <button class="action-btn" @click="toggleSearch">
-          <i class="fas fa-search"></i>
+      </div>
+
+      <div class="navbar-right">
+        <div class="user-info">
+          <div class="user-avatar">
+            <i class="fas fa-user-shield"></i>
+          </div>
+          <div class="user-details">
+            <span class="user-name">{{ userName }}</span>
+            <span class="user-role">
+              <i class="fas fa-tag"></i>
+              {{ userRole }}
+            </span>
+          </div>
+        </div>
+        <button @click="handleLogout" class="logout-btn" title="Logout">
+          <i class="fas fa-sign-out-alt"></i>
+          <span>Logout</span>
         </button>
-        
-        <!-- User Menu -->
-        <div class="user-menu">
-          <button class="user-btn" @click="toggleUserMenu">
-            <i class="fas fa-user-circle"></i>
-            <span>{{ userName }}</span>
-            <i class="fas fa-chevron-down" :class="{ rotated: userMenuOpen }"></i>
-          </button>
-          <div v-if="userMenuOpen" class="dropdown-menu user-dropdown" @click.stop>
-            <router-link to="/admin/profile" class="dropdown-item">
-              <i class="fas fa-user"></i> My Profile
-            </router-link>
-            <router-link to="/admin/settings" class="dropdown-item">
-              <i class="fas fa-cog"></i> Settings
-            </router-link>
-            <div class="dropdown-divider"></div>
-            <button @click="handleLogout" class="dropdown-item logout">
-              <i class="fas fa-sign-out-alt"></i> Logout
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Search Modal -->
-    <div v-if="showSearch" class="search-modal" @click.self="toggleSearch">
-      <div class="search-modal-content">
-        <i class="fas fa-search"></i>
-        <input 
-          type="text" 
-          v-model="searchQuery" 
-          placeholder="Search products, blogs, users..." 
-          @keyup.enter="handleSearch"
-          autofocus
-        >
-        <button @click="handleSearch"><i class="fas fa-arrow-right"></i></button>
       </div>
     </div>
   </nav>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import authService from '@/services/auth'
+import MobileMenuButton from '@/components/admin/MobileMenuButton.vue'
 
 const router = useRouter()
-const quickActionsOpen = ref(false)
-const userMenuOpen = ref(false)
-const showSearch = ref(false)
-const searchQuery = ref('')
-const isScrolled = ref(false)
+const user = ref(null)
 
 const userName = computed(() => {
-  const user = authService.getUser()
-  return user?.full_name?.split(' ')[0] || 'Admin'
+  return user.value?.full_name?.split(' ')[0] || 'Admin'
 })
 
-const toggleQuickActions = () => {
-  quickActionsOpen.value = !quickActionsOpen.value
-  userMenuOpen.value = false
-}
-
-const toggleUserMenu = () => {
-  userMenuOpen.value = !userMenuOpen.value
-  quickActionsOpen.value = false
-}
-
-const toggleSearch = () => {
-  showSearch.value = !showSearch.value
-  if (!showSearch.value) {
-    searchQuery.value = ''
+const userRole = computed(() => {
+  const role = user.value?.role
+  switch(role) {
+    case 'super_admin': return 'Super Admin'
+    case 'admin': return 'Admin'
+    case 'partner': return 'Partner'
+    default: return 'User'
   }
-}
+})
 
-const handleSearch = () => {
-  if (searchQuery.value.trim()) {
-    router.push(`/admin/search?q=${encodeURIComponent(searchQuery.value)}`)
-    showSearch.value = false
-    searchQuery.value = ''
-  }
-}
+const emit = defineEmits(['toggleSidebar'])
 
-const quickCreate = (type) => {
-  quickActionsOpen.value = false
-  if (type === 'product') {
-    router.push('/admin/dashboard?tab=products&action=create')
-  } else if (type === 'blog') {
-    router.push('/admin/dashboard?tab=blog&action=create')
-  } else if (type === 'user') {
-    router.push('/admin/dashboard?tab=users&action=create')
-  } else if (type === 'partner') {
-    router.push('/admin/dashboard?tab=partners&action=create')
-  }
+const toggleMobileSidebar = () => {
+  emit('toggleSidebar')
 }
 
 const goToDashboard = () => {
@@ -139,30 +72,8 @@ const handleLogout = async () => {
   router.push('/admin/login')
 }
 
-const handleScroll = () => {
-  isScrolled.value = window.scrollY > 10
-}
-
-const handleClickOutside = (event) => {
-  const quickActions = document.querySelector('.quick-actions-dropdown')
-  const userMenu = document.querySelector('.user-menu')
-  
-  if (quickActions && !quickActions.contains(event.target) && quickActionsOpen.value) {
-    quickActionsOpen.value = false
-  }
-  if (userMenu && !userMenu.contains(event.target) && userMenuOpen.value) {
-    userMenuOpen.value = false
-  }
-}
-
 onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('scroll', handleScroll)
-  document.removeEventListener('click', handleClickOutside)
+  user.value = authService.getUser()
 })
 </script>
 
@@ -173,203 +84,139 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   background: white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  z-index: 999;
-  transition: all 0.3s;
-}
-
-.admin-navbar.scrolled {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 1001;
+  height: 60px;
 }
 
 .navbar-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 2rem;
-  max-width: 100%;
-  margin: 0 auto;
+  height: 100%;
+  padding: 0 1.5rem;
 }
 
-.navbar-brand {
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.company-brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   cursor: pointer;
 }
 
-.logo {
-  height: 40px;
+.company-logo {
+  height: 36px;
   width: auto;
 }
 
-.brand-text {
+.company-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.company-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  line-height: 1.2;
+}
+
+.company-role {
+  font-size: 0.65rem;
+  color: #f59e0b;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: #f8fafc;
+  border-radius: 40px;
+}
+
+.user-avatar i {
   font-size: 1.2rem;
+  color: #f59e0b;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 0.85rem;
   font-weight: 600;
   color: #1e3a8a;
 }
 
-.navbar-actions {
+.user-role {
+  font-size: 0.65rem;
+  color: #666;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.25rem;
 }
 
-.action-btn {
+.logout-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
+  background: none;
+  border: none;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s;
-  color: #333;
+  color: #ef4444;
+  font-size: 0.85rem;
 }
 
-.action-btn:hover {
-  background: #e0e7ff;
-  border-color: #f59e0b;
-}
-
-.quick-actions-dropdown, .user-menu {
-  position: relative;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 0.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-  min-width: 200px;
-  overflow: hidden;
-  z-index: 1000;
-}
-
-.user-dropdown {
-  right: 0;
-  left: auto;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-  color: #333;
-  font-size: 0.9rem;
-  transition: background 0.3s;
-}
-
-.dropdown-item:hover {
-  background: #f8fafc;
-}
-
-.dropdown-item.logout {
-  color: #dc2626;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: #e5e7eb;
-  margin: 0.25rem 0;
-}
-
-.user-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-  color: #1e3a8a;
-}
-
-.fa-chevron-down {
-  transition: transform 0.3s;
-}
-
-.fa-chevron-down.rotated {
-  transform: rotate(180deg);
-}
-
-/* Search Modal */
-.search-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.8);
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-modal-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: white;
-  padding: 1rem 1.5rem;
-  border-radius: 60px;
-  width: 90%;
-  max-width: 600px;
-}
-
-.search-modal-content i {
-  font-size: 1.2rem;
-  color: #666;
-}
-
-.search-modal-content input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 1rem;
-}
-
-.search-modal-content button {
-  background: #f59e0b;
-  border: none;
-  color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.search-modal-content button:hover {
-  background: #d97706;
+.logout-btn:hover {
+  background: #fee2e2;
 }
 
 @media (max-width: 768px) {
   .navbar-container {
-    padding: 0.5rem 1rem;
+    padding: 0 1rem;
   }
   
-  .brand-text {
+  .company-role {
     display: none;
   }
   
-  .action-btn span {
+  .user-details {
     display: none;
   }
   
-  .user-btn span {
+  .user-info {
+    padding: 0.5rem;
+  }
+  
+  .logout-btn span {
+    display: none;
+  }
+  
+  .logout-btn {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .company-info {
     display: none;
   }
 }

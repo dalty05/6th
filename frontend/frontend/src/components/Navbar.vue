@@ -55,12 +55,12 @@
             <i class="fas fa-ellipsis-h"></i> More <span>▼</span>
           </button>
           <div class="dropdown-content" v-show="dropdownOpen" @click.stop>
-            <router-link to="/careers" @click="closeMenu" class="dropdown-item">
+            <button @click="openCareersModal" class="dropdown-item">
               <i class="fas fa-briefcase"></i> Job Opportunities
-            </router-link>
-            <router-link to="/csr" @click="closeMenu" class="dropdown-item">
+            </button>
+            <button @click="openCSRModal" class="dropdown-item">
               <i class="fas fa-hand-holding-heart"></i> CSR
-            </router-link>
+            </button>
             <div class="dropdown-divider"></div>
             <template v-if="isAuthenticated">
               <router-link to="/admin/dashboard" @click="closeMenu" class="dropdown-item">
@@ -85,8 +85,6 @@
           <i class="fas fa-search"></i>
         </button>
         
-        <!-- REMOVED: User Menu Section -->
-        
         <!-- Mobile Toggle -->
         <div class="mobile-toggle" @click="toggleMobileMenu">
           <span></span><span></span><span></span>
@@ -96,13 +94,87 @@
     
     <!-- Search Modal -->
     <div class="search-modal" v-if="showSearch" @click.self="toggleSearch">
-      <!-- ... search modal content ... -->
+      <div class="search-modal-content">
+        <i class="fas fa-search"></i>
+        <input 
+          type="text" 
+          v-model="searchQuery" 
+          placeholder="Search products..."
+          @keyup.enter="handleSearch"
+          autofocus
+        >
+        <button @click="handleSearch"><i class="fas fa-arrow-right"></i></button>
+      </div>
+      <div class="search-suggestions" v-if="searchSuggestions.length > 0">
+        <div class="suggestion-item" v-for="suggestion in searchSuggestions" :key="suggestion.id" @click="handleSuggestionClick(suggestion)">
+          <i class="fas fa-search"></i>
+          <span>{{ suggestion.name || suggestion.title }}</span>
+        </div>
+      </div>
     </div>
     
     <!-- Admin Login Modal -->
     <div class="modal" v-if="showAdminLogin" @click.self="closeLoginModal">
-      <!-- ... login modal content ... -->
+      <div class="modal-content">
+        <div class="modal-icon">
+          <i class="fas fa-lock"></i>
+        </div>
+        <h3>Admin Login</h3>
+        
+        <div v-if="loginStep === 1">
+          <form @submit.prevent="handleStep1">
+            <div class="input-group">
+              <i class="fas fa-envelope"></i>
+              <input type="email" v-model="loginForm.email" placeholder="Email Address" required>
+            </div>
+            <div class="input-group">
+              <i class="fas fa-lock"></i>
+              <input type="password" v-model="loginForm.password" placeholder="Password" required>
+            </div>
+            <button type="submit" class="btn btn-primary" :disabled="loading">
+              {{ loading ? 'Verifying...' : 'Continue' }}
+            </button>
+          </form>
+          <div class="modal-footer">
+            <router-link to="/admin/forgot-password" @click="closeLoginModal">Forgot Password?</router-link>
+            <router-link to="/admin/register" @click="closeLoginModal">Register</router-link>
+          </div>
+        </div>
+        
+        <div v-else-if="loginStep === 2">
+          <p class="otp-instruction">Enter the 6-digit code sent to your email</p>
+          <form @submit.prevent="handleStep2">
+            <div class="otp-inputs">
+              <input v-for="i in 6" :key="i" type="text" maxlength="1" class="otp-input"
+                v-model="otpCodes[i-1]" @input="handleOtpInput(i-1, $event)"
+                @keyup="handleOtpKeyup(i-1, $event)" ref="otpInputs" autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary" :disabled="loading">
+              {{ loading ? 'Verifying...' : 'Verify & Login' }}
+            </button>
+          </form>
+          <button class="btn-resend" @click="resendOtp" :disabled="resendCooldown">
+            {{ resendCooldown ? `Resend in ${resendTimer}s` : 'Resend Code' }}
+          </button>
+          <button class="btn-back" @click="loginStep = 1">← Back</button>
+        </div>
+        
+        <div v-if="errorMessage" class="error-message">
+          <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+        </div>
+        <button class="close-btn" @click="closeLoginModal">×</button>
+      </div>
     </div>
+    
+    <!-- Careers Modal -->
+    <InfoModal v-model:visible="showCareersModal" title="Job Opportunities">
+      <CareersContent />
+    </InfoModal>
+    
+    <!-- CSR Modal -->
+    <InfoModal v-model:visible="showCSRModal" title="Corporate Social Responsibility">
+      <CSRContent />
+    </InfoModal>
   </nav>
 </template>
 
@@ -112,9 +184,17 @@ import { useRouter } from 'vue-router'
 import { scrollToSection, handleInitialHash } from '@/utils/scroll'
 import { useSectionObserver } from '@/composables/useSectionObserver'
 import authService from '@/services/auth'
+import InfoModal from '@/components/common/InfoModal.vue'
+import CareersContent from '@/components/modals/CareersContent.vue'
+import CSRContent from '@/components/modals/CSRContent.vue'
 
 export default {
   name: 'Navbar',
+  components: {
+    InfoModal,
+    CareersContent,
+    CSRContent
+  },
   setup() {
     const router = useRouter()
     const mobileMenuOpen = ref(false)
@@ -124,7 +204,7 @@ export default {
     const showSearch = ref(false)
     const searchQuery = ref('')
     const searchSuggestions = ref([])
-    const cartCount = ref(0) // For future e-commerce
+    const cartCount = ref(0)
     const loginStep = ref(1)
     const loginForm = ref({ email: '', password: '' })
     const otpCodes = ref(['', '', '', '', '', ''])
@@ -133,6 +213,8 @@ export default {
     const resendCooldown = ref(false)
     const resendTimer = ref(0)
     const isScrolled = ref(false)
+    const showCareersModal = ref(false)
+    const showCSRModal = ref(false)
     
     const { activeSection } = useSectionObserver(['home', 'about', 'products', 'blog', 'contact'])
     
@@ -141,6 +223,16 @@ export default {
       const user = authService.getUser()
       return user?.full_name?.split(' ')[0] || 'Admin'
     })
+    
+    const openCareersModal = () => {
+      showCareersModal.value = true
+      closeMenu()
+    }
+    
+    const openCSRModal = () => {
+      showCSRModal.value = true
+      closeMenu()
+    }
     
     // Close dropdowns when clicking outside
     const handleClickOutside = (event) => {
@@ -179,7 +271,6 @@ export default {
     const handleSearch = async () => {
       if (!searchQuery.value.trim()) return
       
-      // Search products and blog posts
       router.push(`/products?search=${encodeURIComponent(searchQuery.value)}`)
       showSearch.value = false
       searchQuery.value = ''
@@ -199,11 +290,9 @@ export default {
     watch(searchQuery, async (newQuery) => {
       if (newQuery.length > 2) {
         try {
-          // Fetch product suggestions
           const productRes = await fetch(`/api/products?search=${newQuery}&per_page=3`)
           const productData = await productRes.json()
           
-          // Fetch blog suggestions
           const blogRes = await fetch(`/api/blog?simple=true&per_page=3`)
           const blogData = await blogRes.json()
           
@@ -379,6 +468,10 @@ export default {
       activeSection,
       isAuthenticated,
       userName,
+      showCareersModal,
+      showCSRModal,
+      openCareersModal,
+      openCSRModal,
       scrollTo,
       scrollToHome,
       goToShop,
@@ -594,83 +687,6 @@ export default {
   color: #dc2626;
 }
 
-/* ========== USER MENU ========== */
-.user-menu {
-  position: relative;
-}
-
-.user-menu-btn {
-  background: none;
-  border: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 50px;
-  transition: all 0.3s;
-  font-weight: 500;
-  color: #333;
-}
-
-.user-menu-btn:hover {
-  background: #f8fafc;
-  color: #f59e0b;
-}
-
-.user-menu-btn i:first-child {
-  font-size: 1.3rem;
-  color: #f59e0b;
-}
-
-.user-menu-btn i:last-child {
-  font-size: 0.8rem;
-  transition: transform 0.3s;
-}
-
-.user-menu-btn i:last-child.rotated {
-  transform: rotate(180deg);
-}
-
-.user-menu-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: white;
-  min-width: 200px;
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-  border-radius: 12px;
-  overflow: hidden;
-  z-index: 100;
-  margin-top: 10px;
-  animation: fadeInDown 0.2s ease;
-}
-
-.user-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  text-decoration: none;
-  color: #333;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: background 0.3s;
-  font-size: 0.9rem;
-}
-
-.user-menu-item i {
-  width: 20px;
-  color: #666;
-}
-
-.user-menu-item:hover {
-  background: #f8fafc;
-}
-
 /* ========== NAV ACTIONS ========== */
 .nav-actions {
   display: flex;
@@ -678,7 +694,7 @@ export default {
   gap: 1rem;
 }
 
-.search-btn, .cart-btn {
+.search-btn {
   background: none;
   border: none;
   color: #333;
@@ -695,51 +711,9 @@ export default {
   justify-content: center;
 }
 
-.search-btn:hover, .cart-btn:hover {
+.search-btn:hover {
   background: #f8fafc;
   color: #f59e0b;
-}
-
-.cart-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: #f59e0b;
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 50px;
-  min-width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ========== SOCIAL LINKS ========== */
-.social-links {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.social-links a {
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  font-size: 1rem;
-  transition: all 0.3s;
-  text-decoration: none;
-  border-radius: 50%;
-}
-
-.social-links a:hover {
-  background: #f8fafc;
-  color: #f59e0b;
-  transform: translateY(-2px);
 }
 
 /* ========== SEARCH MODAL ========== */
@@ -1025,10 +999,6 @@ export default {
   .navbar-menu {
     gap: 1rem;
   }
-  
-  .social-links {
-    display: none;
-  }
 }
 
 @media (max-width: 768px) {
@@ -1067,23 +1037,11 @@ export default {
     justify-content: space-between;
   }
   
-  .user-menu-dropdown {
-    position: static;
-    box-shadow: none;
-    margin-top: 0;
-    background: #f8fafc;
-  }
-  
-  .user-menu-btn {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
   .nav-actions {
     gap: 0.5rem;
   }
   
-  .search-btn, .cart-btn {
+  .search-btn {
     width: 32px;
     height: 32px;
   }
@@ -1106,7 +1064,7 @@ export default {
     height: 40px;
   }
   
-  .search-btn, .cart-btn {
+  .search-btn {
     width: 28px;
     height: 28px;
     font-size: 0.9rem;

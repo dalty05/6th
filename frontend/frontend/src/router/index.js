@@ -17,11 +17,23 @@ import AdminDashboard from '../views/admin/Dashboard.vue'
 import ForgotPassword from '../views/admin/ForgotPassword.vue'
 import ResetPassword from '../views/admin/ResetPassword.vue'
 
-// Partner Views (NEW)
+import JobManagement from '../components/admin/JobManagement.vue'
+
+// Partner Views 
 import PartnerDashboard from '../views/partner/Dashboard.vue'
 import PartnerReferralLinks from '../views/partner/ReferralLinks.vue'
 import PartnerAnalytics from '../views/partner/Analytics.vue'
 import PartnerProfile from '../views/partner/Profile.vue'
+
+
+
+import ReferralRedirect from '../views/ReferralRedirect.vue'
+
+
+
+// jobs
+import Jobs from '../views/Jobs.vue'
+import JobDetail from '../views/JobDetail.vue'
 
 const routes = [
   // Public routes
@@ -99,8 +111,28 @@ const routes = [
       title: 'Admin Dashboard | Mount Kenya Milk'
     }
   },
+
+
+{
+  path: '/admin',
+  component: () => import('@/layouts/AdminLayout.vue'),
+  meta: { requiresAuth: true, layout: 'admin' },
+  children: [
+   
+  ]
+},
+
+{
+  path: '/jobs',
+  name: 'AdminJobs',
+  component: JobManagement
+},
+
+
+
+
   
-  // Partner routes (NEW)
+  // Partner routes 
   {
     path: '/partner/dashboard',
     name: 'PartnerDashboard',
@@ -141,12 +173,37 @@ const routes = [
       title: 'My Profile | Mount Kenya Milk'
     }
   },
+
+  // Add to partner routes
+{
+  path: '/partner/help',
+  name: 'PartnerHelp',
+  component: () => import('@/views/partner/Help.vue'),
+  meta: { 
+    requiresAuth: true, 
+    allowedRoles: ['partner'],
+    title: 'Help Center | Mount Kenya Milk'
+  }
+},
   
   // Catch all
   {
     path: '/:pathMatch(.*)*',
     redirect: '/'
-  }
+  },
+
+  
+  { 
+    path: '/r/:code', 
+    name: 'ReferralRedirect', 
+    component: ReferralRedirect 
+  },
+
+    { path: '/jobs', name: 'Jobs', component: Jobs },
+  { path: '/jobs/:slug', name: 'JobDetail', component: JobDetail }
+
+
+
 ]
 
 const router = createRouter({

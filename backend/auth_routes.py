@@ -6,6 +6,15 @@ from datetime import datetime, timedelta
 import re
 from functools import wraps
 
+from flask import Blueprint, request, jsonify, current_app, session
+from flask_login import login_user, logout_user, login_required, current_user
+from models import db, User, OTP, PasswordResetToken, EmailVerificationToken, LoginAttempt
+
+
+
+
+
+
 auth_bp = Blueprint('auth', __name__)
 email_service = EmailService()
 
@@ -203,10 +212,18 @@ def login_step1():
     db.session.commit()
     
     # Send OTP email
-    # if not email_service.send_otp_email(user, otp_code):
-    #     print(f"Failed to send OTP email for {email}")
-    #     return jsonify({'error': 'Unable to send OTP email. Please contact support.'}), 500
+    # ========== SEND OTP EMAIL ==========
+    try:
+        from email_service import EmailService
+        email_service = EmailService()
+        email_service.send_otp_email(user, otp_code)
+        print(f"✅ OTP email sent to {email}")
+    except Exception as e:
+        print(f"❌ Failed to send OTP email: {e}")
 
+
+
+  
     print(f"\n{'='*50}")
     print(f"🔐 OTP LOGIN CODE FOR {email}")
     print(f"📱 CODE: {otp_code}")
@@ -268,7 +285,16 @@ def login_step2():
     
     return jsonify({
         'message': 'Login successful',
-        'user': user.to_dict(),
+        'user': {
+    'id': user.id,
+    'email': user.email,
+    'full_name': user.full_name,
+    'role': user.role,
+    'is_active': user.is_active,
+    'is_approved': user.is_approved,
+    'created_at': user.created_at.isoformat() if user.created_at else None,
+    'last_login': user.last_login.isoformat() if user.last_login else None
+},
         'is_super_admin': user.is_super_admin()
     }), 200
 
@@ -509,6 +535,16 @@ def test_login():
     
     return jsonify({
         'message': 'Login successful',
-        'user': user.to_dict(),
+        'user': {
+    'id': user.id,
+    'email': user.email,
+    'full_name': user.full_name,
+    'role': user.role,
+    'is_active': user.is_active,
+    'is_approved': user.is_approved,
+    'created_at': user.created_at.isoformat() if user.created_at else None,
+    'last_login': user.last_login.isoformat() if user.last_login else None
+},
         'is_super_admin': user.is_super_admin()
     }), 200
+

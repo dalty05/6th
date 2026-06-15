@@ -3,8 +3,32 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from models import db, ActivityLog
 from datetime import datetime, timedelta
+import json
 
 activity_bp = Blueprint('activity', __name__)
+
+def log_activity(user_id, user_name, action, resource_type, resource_id, description, details=None):
+    """Helper function to log activities"""
+    try:
+        log = ActivityLog(
+            user_id=user_id,
+            user_name=user_name,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            description=description,
+            details=json.dumps(details) if details else None,
+            ip_address=request.remote_addr if request else None,
+            user_agent=request.headers.get('User-Agent', '') if request else ''
+        )
+        db.session.add(log)
+        db.session.commit()
+        return True
+    except Exception as e:
+        print(f"Error logging activity: {e}")
+        db.session.rollback()
+        return False
+
 
 @activity_bp.route('/admin/activities', methods=['GET'])
 @login_required
@@ -38,13 +62,14 @@ def get_activities():
             'action': a.action,
             'resource_type': a.resource_type,
             'description': a.description,
-            'details': a.details,
+            'details': json.loads(a.details) if a.details else None,
             'ip_address': a.ip_address,
             'created_at': a.created_at.isoformat() if a.created_at else None
         } for a in activities]), 200
     except Exception as e:
         print(f"Error in get_activities: {e}")
         return jsonify([]), 200
+
 
 @activity_bp.route('/admin/activities/<int:id>', methods=['GET'])
 @login_required
@@ -58,7 +83,7 @@ def get_activity(id):
             'action': activity.action,
             'resource_type': activity.resource_type,
             'description': activity.description,
-            'details': activity.details,
+            'details': json.loads(activity.details) if activity.details else None,
             'ip_address': activity.ip_address,
             'created_at': activity.created_at.isoformat() if activity.created_at else None
         }), 200

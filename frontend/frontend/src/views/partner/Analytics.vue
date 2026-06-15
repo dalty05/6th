@@ -10,11 +10,15 @@
       <p>Detailed analytics dashboard is under development</p>
       <router-link to="/partner/dashboard" class="btn-back">← Back to Dashboard</router-link>
     </div>
+    <PartnerFooter />
   </div>
 </template>
 
 <script>
 import authService from '@/services/auth'
+
+
+import PartnerFooter from '@/components/partner/PartnerFooter.vue'
 
 export default {
   name: 'PartnerAnalytics',
@@ -27,6 +31,29 @@ export default {
 </script>
 
 <style scoped>
+
+.partner-analytics {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.page-content {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 60px);
+  padding: 80px 2rem 0;
+}
+
+.content-wrapper {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 70px 1rem 0;
+  }
+}
+
 .partner-analytics {
   padding: 2rem;
   min-height: 100vh;

@@ -1,15 +1,16 @@
 <template>
-  <div id="app">
-    <Navbar />
+<div id="app">
+    <Navbar v-if="!isAdminRoute" />
     <router-view />
-    <Footer />
+    <Footer v-if="!isAdminRoute" />
   </div>
 </template>
 
 <script>
 import Navbar from './components/Navbar.vue'
 import Footer from './components/Footer.vue'
-import { useTitle } from './composables/useTitle'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 
 export default {
   name: 'App',
@@ -18,12 +19,15 @@ export default {
     Footer
   },
   setup() {
-    const { updateTitleFromRoute } = useTitle()
+    const route = useRoute()
     
-    // Initialize title on app start
-    updateTitleFromRoute()
+    const isAdminRoute = computed(() => {
+      return route.path.startsWith('/admin') || route.path.startsWith('/partner')
+    })
     
-    return {}
+    return {
+      isAdminRoute
+    }
   }
 }
 </script>

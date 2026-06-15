@@ -13,11 +13,14 @@
       <p>Referral link management is under development</p>
       <router-link to="/partner/dashboard" class="btn-back">← Back to Dashboard</router-link>
     </div>
+    <PartnerFooter />
   </div>
 </template>
 
 <script>
 import authService from '@/services/auth'
+
+import PartnerFooter from '@/components/partner/PartnerFooter.vue'
 
 export default {
   name: 'PartnerReferralLinks',

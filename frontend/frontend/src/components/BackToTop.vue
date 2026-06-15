@@ -9,6 +9,9 @@
       <div class="back-to-top-icon">
         <span>↑</span>
       </div>
+      <span></span><span></span>
+      
+    
       <span class="back-to-top-text">Top</span>
     </button>
   </Transition>
@@ -44,7 +47,7 @@ export default {
 }
 </script>
 
-<style scoped>
+<!-- <style scoped>
 .back-to-top {
   position: fixed;
   bottom: 30px;
@@ -106,4 +109,4 @@ export default {
     font-size: 1rem;
   }
 }
-</style>
+</style> -->

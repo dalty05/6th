@@ -3,6 +3,10 @@ import axios from 'axios'
 
 const API_URL = '/api'
 
+const authAxios = axios.create({
+  withCredentials: true
+})
+
 class AuthService {
   constructor() {
     this.user = null
@@ -17,7 +21,7 @@ class AuthService {
   }
 
   async loginStep1(email, password) {
-    const response = await axios.post(`${API_URL}/auth/login/step1`, {
+    const response = await authAxios.post(`${API_URL}/auth/login/step1`, {
       email,
       password
     })
@@ -25,19 +29,22 @@ class AuthService {
   }
 
   async loginStep2(otpCode, remember = false) {
-    const response = await axios.post(`${API_URL}/auth/login/step2`, {
+    const response = await authAxios.post(`${API_URL}/auth/login/step2`, {
       otp_code: otpCode,
       remember
     })
-    
+
     if (response.data.user) {
       this.setUser(response.data.user)
     }
+
     return response.data
   }
 
+
+
   async register(email, fullName, password) {
-    const response = await axios.post(`${API_URL}/auth/register`, {
+    const response = await authAxios.post(`${API_URL}/auth/register`, {
       email,
       full_name: fullName,
       password
@@ -45,15 +52,16 @@ class AuthService {
     return response.data
   }
 
+
   async forgotPassword(email) {
-    const response = await axios.post(`${API_URL}/auth/forgot-password`, {
+const response = await authAxios.post(`${API_URL}/auth/forgot-password`, {
       email
     })
     return response.data
   }
 
   async resetPassword(token, newPassword) {
-    const response = await axios.post(`${API_URL}/auth/reset-password`, {
+const response = await authAxios.post(`${API_URL}/auth/reset-password`, {
       token,
       new_password: newPassword
     })
@@ -61,17 +69,18 @@ class AuthService {
   }
 
   async logout() {
-    await axios.post(`${API_URL}/auth/logout`)
+await authAxios.post(`${API_URL}/auth/logout`)
+
     this.clearUser()
   }
 
   async getProfile() {
-    const response = await axios.get(`${API_URL}/admin/profile`)
+const response = await authAxios.get(`${API_URL}/admin/profile`)
     return response.data
   }
 
   async updateProfile(fullName) {
-    const response = await axios.put(`${API_URL}/admin/profile`, {
+const response = await authAxios.put(`${API_URL}/admin/profile`, {
       full_name: fullName
     })
     if (response.data.user) {
@@ -81,7 +90,7 @@ class AuthService {
   }
 
   async changePassword(currentPassword, newPassword) {
-    const response = await axios.put(`${API_URL}/admin/change-password`, {
+const response = await authAxios.put(`${API_URL}/admin/change-password`, {
       current_password: currentPassword,
       new_password: newPassword
     })
@@ -90,7 +99,7 @@ class AuthService {
 
   async checkAuth() {
     try {
-      const response = await axios.get(`${API_URL}/admin/check-auth`)
+const response = await authAxios.get(`${API_URL}/admin/check-auth`)
       if (response.data.is_admin) {
         this.setUser(response.data.user)
         return true
