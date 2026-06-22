@@ -106,16 +106,6 @@
           <span v-if="isCollapsed" class="tooltip">Partners</span>
         </button>
 
-        <button
-          v-if="canViewReferrals"
-          class="nav-item"
-          :class="{ active: activeTab === 'referrals' }"
-          @click="navigate('referrals')"
-        >
-          <i class="fas fa-link"></i>
-          <span v-if="!isCollapsed">Referrals</span>
-          <span v-if="isCollapsed" class="tooltip">Referrals</span>
-        </button>
 
         <button
           v-if="canViewStatistics"
@@ -139,16 +129,21 @@
           <span v-if="isCollapsed" class="tooltip">Contact Messages</span>
         </button>
 
+
+
         <button
-          v-if="canViewSettings"
-          class="nav-item"
-          :class="{ active: activeTab === 'settings' }"
-          @click="navigate('settings')"
-        >
-          <i class="fas fa-cog"></i>
-          <span v-if="!isCollapsed">Settings</span>
-          <span v-if="isCollapsed" class="tooltip">Settings</span>
-        </button>
+  v-if="canViewNewsletter"
+  class="nav-item"
+  :class="{ active: activeTab === 'newsletter' }"
+  @click="navigate('newsletter')"
+>
+  <i class="fas fa-envelope-open-text"></i>
+  <span v-if="!isCollapsed">Newsletter</span>
+  <span v-if="isCollapsed" class="tooltip">Newsletter</span>
+</button>
+
+
+
 
         <button
           v-if="canManagePermissions"
@@ -162,16 +157,6 @@
         </button>
       </div>
 
-      <button
-  v-if="isSuperAdmin"
-  class="nav-item"
-  :class="{ active: activeTab === 'system-settings' }"
-  @click="navigate('system-settings')"
->
-  <i class="fas fa-cogs"></i>
-  <span v-if="!isCollapsed">System Settings</span>
-  <span v-if="isCollapsed" class="tooltip">System Settings</span>
-</button>
 
 
 
@@ -179,7 +164,7 @@
       <div class="nav-section" v-if="!isCollapsed">
         <div class="nav-section-title">Account</div>
         
-        <!-- PROFILE BUTTON - Add this -->
+        <!-- PROFILE BUTTON -->
         <button
           class="nav-item"
           :class="{ active: activeTab === 'profile' }"
@@ -238,11 +223,14 @@ const canViewJobs = computed(() => isAdmin.value)
 const canViewOutlets = computed(() => isAdmin.value)
 const canViewUsers = computed(() => isSuperAdmin.value)
 const canViewPartners = computed(() => isSuperAdmin.value)
-const canViewReferrals = computed(() => true)
+
 const canViewStatistics = computed(() => isAdmin.value)
-const canViewSettings = computed(() => isSuperAdmin.value)
 const canViewContacts = computed(() => isAdmin.value)
 const canManagePermissions = computed(() => isSuperAdmin.value)
+
+const canViewNewsletter = computed(() => {
+  return user.value?.role === 'super_admin' || user.value?.role === 'admin'
+})
 
 const formatRole = (role) => {
   const roles = {

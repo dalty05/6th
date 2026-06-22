@@ -1,8 +1,7 @@
-# backend/permission_service.py
 from models import db, UserPermission
 from flask_login import current_user
 
-# Single source of truth for role-based permissions
+
 ROLE_PERMISSIONS = {
     'super_admin': {
         'products': ['create', 'read', 'update', 'delete'],
@@ -13,7 +12,7 @@ ROLE_PERMISSIONS = {
         'partners': ['create', 'read', 'update', 'delete'],
         'referrals': ['create', 'read', 'update', 'delete'],
         'statistics': ['read', 'update'],
-        'settings': ['read', 'update'],
+        
         'contacts': ['read', 'update', 'delete'],
         'uploads': ['create'],
         'permissions': ['read', 'create', 'update', 'delete']
@@ -27,7 +26,6 @@ ROLE_PERMISSIONS = {
         'partners': ['create', 'read', 'update'],
         'referrals': ['create', 'read', 'update'],
         'statistics': ['read'],
-        'settings': ['read'],
         'contacts': ['read', 'update'],
         'uploads': ['create'],
         'permissions': []
@@ -40,8 +38,6 @@ ROLE_PERMISSIONS = {
         'users': [],
         'partners': [],
         'referrals': ['create', 'read', 'update'],
-        'statistics': ['read'],
-        'settings': [],
         'contacts': [],
         'uploads': [],
         'permissions': []

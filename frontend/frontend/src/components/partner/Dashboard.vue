@@ -1,157 +1,168 @@
 <template>
-  <div class="partner-dashboard">
-    <div class="dashboard-header">
-      <h1>Partner Dashboard</h1>
-      <div class="header-actions">
-        <div class="date-range">
-          <select v-model="dateRange" class="form-select" @change="loadData">
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
-        </div>
-        <button class="btn btn-outline" @click="refreshData">
-          <i class="fas fa-sync-alt"></i> Refresh
-        </button>
-      </div>
-    </div>
+  <div class="partner-layout">
+    <!-- Sidebar -->
+    <PartnerSidebar ref="sidebarRef" />
 
-    <!-- Welcome Section -->
-    <div class="welcome-section glass-card">
-      <div class="welcome-text">
-        <h2>Welcome back, {{ user?.full_name?.split(' ')[0] }}!</h2>
-        <p>Track your referral performance and manage your marketing campaigns.</p>
-      </div>
-      <div class="referral-code-box">
-        <div class="code-label">Your Referral Code</div>
-        <div class="code-value">
-          <code>{{ user?.referral_code || 'Generate your first link' }}</code>
-          <button v-if="user?.referral_code" @click="copyReferralCode" class="btn btn-sm btn-primary">
-            <i class="fas fa-copy"></i> Copy
+    <!-- Main Content -->
+    <main class="partner-main">
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="header-left">
+          <button class="sidebar-toggle" @click="toggleSidebar">
+            <i class="fas fa-bars"></i>
+          </button>
+          <h1><i class="fas fa-home"></i> Dashboard</h1>
+        </div>
+        <div class="header-actions">
+          <button class="btn-primary" @click="createNewLink">
+            <i class="fas fa-plus"></i> New Link
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- Stats Grid -->
-    <div class="stats-grid">
-      <StatsCard
-        title="Total Clicks"
-        :value="stats.totalClicks"
-        icon="fas fa-mouse-pointer"
-        :trend="stats.clickTrend"
-      />
-      <StatsCard
-        title="Unique Visitors"
-        :value="stats.uniqueClicks"
-        icon="fas fa-users"
-        format="number"
-      />
-      <StatsCard
-        title="Conversions"
-        :value="stats.totalConversions"
-        icon="fas fa-shopping-cart"
-        :trend="stats.conversionTrend"
-      />
-      <StatsCard
-        title="Conversion Rate"
-        :value="stats.conversionRate"
-        icon="fas fa-chart-line"
-        format="percentage"
-      />
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <router-link to="/partner/links" class="action-card glass-card">
-        <i class="fas fa-plus-circle"></i>
-        <div>
-          <h3>Create New Link</h3>
-          <p>Generate a new referral link for your campaign</p>
+      <!-- Page Content -->
+      <div class="page-content">
+        <!-- Welcome Section -->
+        <div class="welcome-section">
+          <h2>Welcome back, {{ user?.full_name?.split(' ')[0] || 'Partner' }}!</h2>
+          <p>Track your referral performance and marketing campaigns</p>
         </div>
-        <i class="fas fa-arrow-right action-arrow"></i>
-      </router-link>
-      <router-link to="/partner/analytics" class="action-card glass-card">
-        <i class="fas fa-chart-line"></i>
-        <div>
-          <h3>View Analytics</h3>
-          <p>See detailed performance reports</p>
-        </div>
-        <i class="fas fa-arrow-right action-arrow"></i>
-      </router-link>
-    </div>
 
-    <!-- Recent Links -->
-    <div class="recent-links-section">
-      <div class="section-header">
-        <h3><i class="fas fa-link"></i> Your Recent Links</h3>
-        <router-link to="/partner/links" class="view-all">View All →</router-link>
-      </div>
-      
-      <div v-if="recentLinksLoading" class="loading-state">
-        <div class="loading-spinner"></div>
-      </div>
-      
-      <div v-else-if="recentLinks.length === 0" class="empty-state">
-        <i class="fas fa-link"></i>
-        <p>No referral links yet</p>
-        <router-link to="/partner/links" class="btn btn-primary btn-sm">Create Your First Link</router-link>
-      </div>
-      
-      <div v-else class="links-list">
-        <div v-for="link in recentLinks" :key="link.id" class="link-item glass-card">
-          <div class="link-info">
-            <h4>{{ link.name }}</h4>
-            <code>{{ baseUrl }}/r/{{ link.link_code }}</code>
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-mouse-pointer"></i></div>
+            <div class="stat-info">
+              <h3>{{ stats.totalClicks || 0 }}</h3>
+              <p>Total Clicks</p>
+            </div>
           </div>
-          <div class="link-stats">
-            <span><i class="fas fa-mouse-pointer"></i> {{ link.total_clicks }}</span>
-            <span><i class="fas fa-chart-line"></i> {{ link.conversion_rate }}%</span>
+          <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-users"></i></div>
+            <div class="stat-info">
+              <h3>{{ stats.uniqueClicks || 0 }}</h3>
+              <p>Unique Visitors</p>
+            </div>
           </div>
-          <CopyLinkButton :link="`${baseUrl}/r/${link.link_code}`" />
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fas fa-shopping-cart"></i></div>
+            <div class="stat-info">
+              <h3>{{ stats.totalConversions || 0 }}</h3>
+              <p>Conversions</p>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon purple"><i class="fas fa-chart-line"></i></div>
+            <div class="stat-info">
+              <h3>{{ stats.conversionRate || 0 }}%</h3>
+              <p>Conversion Rate</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Referral Code -->
+        <div class="glass-card">
+          <h3><i class="fas fa-link"></i> Your Referral Code</h3>
+          <div class="code-box">
+            <code>{{ user?.referral_code || 'Generate your code' }}</code>
+            <CopyLinkButton 
+              v-if="user?.referral_code" 
+              :link="fullReferralLink" 
+            />
+          </div>
+          <p v-if="user?.referral_code" class="referral-link">
+            <i class="fas fa-globe"></i>
+            Full referral link: <strong>{{ fullReferralLink }}</strong>
+          </p>
+          <p v-else class="info-text">
+            Your referral code will be generated automatically.
+          </p>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+          <router-link to="/partner/links" class="action-card">
+            <i class="fas fa-plus-circle"></i>
+            <span>Create New Link</span>
+          </router-link>
+          <router-link to="/partner/analytics" class="action-card">
+            <i class="fas fa-chart-bar"></i>
+            <span>View Analytics</span>
+          </router-link>
+        </div>
+
+        <!-- Recent Links -->
+        <div class="glass-card">
+          <div class="section-header">
+            <h3>Your Recent Links</h3>
+            <router-link to="/partner/links" class="view-all">View All →</router-link>
+          </div>
+
+          <div v-if="recentLinksLoading" class="loading-state">
+            <div class="loading-spinner"></div>
+          </div>
+
+          <div v-else-if="recentLinks.length === 0" class="empty-state">
+            <i class="fas fa-link"></i>
+            <p>No referral links yet</p>
+            <router-link to="/partner/links" class="btn-primary">
+              Create Your First Link
+            </router-link>
+          </div>
+
+          <div v-else class="links-list">
+            <div v-for="link in recentLinks" :key="link.id" class="link-item">
+              <div class="link-info">
+                <h4>{{ link.name }}</h4>
+                <code>{{ baseUrl }}/r/{{ link.link_code }}</code>
+              </div>
+              <div class="link-stats">
+                <span><i class="fas fa-mouse-pointer"></i> {{ link.total_clicks }}</span>
+                <span><i class="fas fa-chart-line"></i> {{ link.conversion_rate || 0 }}%</span>
+              </div>
+              <CopyLinkButton :link="`${baseUrl}/r/${link.link_code}`" />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-
-    <PartnerFooter />
+    </main>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { toast } from 'vue3-toastify'
 import authService from '@/services/auth'
 import referralService from '@/services/referral'
+import PartnerSidebar from '@/components/partner/PartnerSidebar.vue'
 import CopyLinkButton from '@/components/partner/CopyLinkButton.vue'
-import StatsCard from '@/components/partner/StatsCard.vue'
-
-
-import PartnerFooter from '@/components/partner/PartnerFooter.vue'
-
-
-
-
 
 const router = useRouter()
+const sidebarRef = ref(null)
 const user = ref(null)
-const stats = ref({
-  totalClicks: 0,
-  uniqueClicks: 0,
-  totalConversions: 0,
-  conversionRate: 0,
-  clickTrend: null,
-  conversionTrend: null
-})
+const stats = ref({})
 const recentLinks = ref([])
 const recentLinksLoading = ref(true)
-const dateRange = ref('30')
 const baseUrl = window.location.origin
+
+const fullReferralLink = computed(() => 
+  user.value?.referral_code ? `${baseUrl}/r/${user.value.referral_code}` : ''
+)
+
+const toggleSidebar = () => {
+  if (sidebarRef.value) {
+    sidebarRef.value.toggleMobile()
+  }
+}
+
+const createNewLink = () => {
+  router.push('/partner/links')
+}
 
 const loadStats = async () => {
   try {
     const response = await referralService.getStats()
-    stats.value = { ...stats.value, ...response }
+    stats.value = response
   } catch (error) {
     console.error('Error loading stats:', error)
   }
@@ -160,28 +171,18 @@ const loadStats = async () => {
 const loadRecentLinks = async () => {
   recentLinksLoading.value = true
   try {
-    const response = await referralService.getTopLinks(5)
+    const response = await referralService.getTopLinks(3)
     recentLinks.value = response
   } catch (error) {
     console.error('Error loading recent links:', error)
-    recentLinks.value = []
   } finally {
     recentLinksLoading.value = false
   }
 }
 
-const loadData = async () => {
-  await Promise.all([loadStats(), loadRecentLinks()])
-}
-
-const refreshData = async () => {
-  await loadData()
-  toast.success('Data refreshed')
-}
-
-const copyReferralCode = () => {
-  navigator.clipboard.writeText(user.value?.referral_code || '')
-  toast.success('Referral code copied to clipboard!')
+const handleLogout = async () => {
+  await authService.logout()
+  router.push('/')
 }
 
 onMounted(() => {
@@ -190,241 +191,354 @@ onMounted(() => {
     router.push('/')
     return
   }
-  loadData()
+  loadStats()
+  loadRecentLinks()
 })
 </script>
 
 <style scoped>
-/* .partner-dashboard {
-  min-height: 100vh;
-  background: #f8fafc;
-} */
+@import '@/styles/partner.css';
 
-.dashboard-content {
+.partner-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f1f5f9;
+}
+
+.partner-main {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 60px);
-  padding: 80px 2rem 0;
 }
 
-.content-wrapper {
-  flex: 1;
-}
-
-
-
-.partner-dashboard {
-  min-height: 100vh;
-  background: var(--gray-50);
-  padding: var(--spacing-6);
-}
-
-.dashboard-header {
+.page-header {
+  background: white;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-6);
   flex-wrap: wrap;
-  gap: var(--spacing-4);
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.dashboard-header h1 {
-  color: var(--primary-blue);
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-header h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #0f172a;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-header h1 i {
+  color: #f59e0b;
 }
 
 .header-actions {
   display: flex;
-  gap: var(--spacing-3);
+  gap: 0.75rem;
   align-items: center;
 }
 
-.date-range .form-select {
-  padding: var(--spacing-2) var(--spacing-3);
+.page-content {
+  flex: 1;
+  padding: 1.5rem 2rem;
 }
 
 .welcome-section {
-  background: linear-gradient(135deg, var(--primary-blue), var(--gray-800));
-  color: white;
-  padding: var(--spacing-6);
-  border-radius: var(--radius-2xl);
-  margin-bottom: var(--spacing-6);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-4);
+  margin-bottom: 1.5rem;
 }
 
-.welcome-text h2 {
-  margin: 0 0 var(--spacing-2) 0;
-  font-size: var(--text-2xl);
+.welcome-section h2 {
+  font-size: 1.3rem;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
 }
 
-.welcome-text p {
+.welcome-section p {
+  color: #6b7280;
   margin: 0;
-  opacity: 0.9;
 }
 
-.referral-code-box {
-  background: rgba(255,255,255,0.15);
-  padding: var(--spacing-3) var(--spacing-4);
-  border-radius: var(--radius-xl);
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #0f172a;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
 }
 
-.code-label {
-  font-size: var(--text-xs);
-  opacity: 0.8;
-  margin-bottom: var(--spacing-1);
+.sidebar-toggle:hover {
+  background: #f1f5f9;
 }
 
-.code-value {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-  flex-wrap: wrap;
-}
-
-.code-value code {
-  background: rgba(0,0,0,0.3);
-  padding: var(--spacing-1) var(--spacing-3);
-  border-radius: var(--radius-lg);
-  font-family: monospace;
-  font-size: var(--text-sm);
-}
-
+/* Stats Grid */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: var(--spacing-5);
-  margin-bottom: var(--spacing-6);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+
+.stat-icon.blue { background: #dbeafe; color: #2563eb; }
+.stat-icon.green { background: #d1fae5; color: #059669; }
+.stat-icon.orange { background: #fef3c7; color: #d97706; }
+.stat-icon.purple { background: #ede9fe; color: #7c3aed; }
+
+.stat-info h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+}
+
+.stat-info p {
+  font-size: 0.75rem;
+  margin: 0;
+  color: #6b7280;
+}
+
+/* Glass Card */
+.glass-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.glass-card h3 {
+  font-size: 1rem;
+  color: #0f172a;
+  margin: 0 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.glass-card h3 i {
+  color: #f59e0b;
+}
+
+/* Code Box */
+.code-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f1f5f9;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.code-box code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #0f172a;
+  word-break: break-all;
+  flex: 1;
+}
+
+.referral-link {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0.5rem 0 0;
+  word-break: break-all;
+}
+
+.referral-link strong {
+  color: #0f172a;
+}
+
+.info-text {
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+/* Quick Actions */
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: var(--spacing-5);
-  margin-bottom: var(--spacing-6);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .action-card {
   display: flex;
   align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-5);
+  gap: 1rem;
+  padding: 1.25rem;
+  background: white;
+  border-radius: 12px;
   text-decoration: none;
-  transition: transform var(--transition-base);
+  color: #0f172a;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
 }
 
 .action-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: #f59e0b;
 }
 
-.action-card i:first-child {
-  font-size: var(--text-3xl);
-  color: var(--accent-orange);
+.action-card i {
+  font-size: 1.5rem;
+  color: #f59e0b;
 }
 
-.action-card h3 {
-  margin: 0 0 var(--spacing-1) 0;
-  color: var(--primary-blue);
+.action-card span {
+  font-weight: 500;
 }
 
-.action-card p {
-  margin: 0;
-  color: var(--gray-500);
-  font-size: var(--text-sm);
-}
-
-.action-arrow {
-  margin-left: auto;
-  color: var(--gray-400);
-  transition: transform var(--transition-base);
-}
-
-.action-card:hover .action-arrow {
-  transform: translateX(4px);
-  color: var(--accent-orange);
-}
-
-.recent-links-section {
-  background: white;
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-5);
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-4);
-}
-
-.section-header h3 {
-  color: var(--primary-blue);
-  margin: 0;
-}
-
-.view-all {
-  color: var(--accent-orange);
-  text-decoration: none;
-  font-size: var(--text-sm);
-}
-
+/* Link Items */
 .links-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
+  gap: 0.75rem;
 }
 
 .link-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-4);
-  background: var(--gray-50);
-  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
   flex-wrap: wrap;
-  gap: var(--spacing-3);
+  gap: 0.75rem;
 }
 
-.link-info h4 {
-  margin: 0 0 var(--spacing-1) 0;
-  color: var(--primary-blue);
+.link-item .link-info h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.9rem;
+  color: #0f172a;
 }
 
-.link-info code {
-  font-size: var(--text-xs);
-  color: var(--gray-500);
+.link-item .link-info code {
+  font-size: 0.75rem;
+  color: #6b7280;
+  background: #e5e7eb;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
 }
 
-.link-stats {
+.link-item .link-stats {
   display: flex;
-  gap: var(--spacing-4);
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: #6b7280;
 }
 
-.link-stats span {
-  font-size: var(--text-sm);
-  color: var(--gray-500);
+.link-item .link-stats i {
+  color: #f59e0b;
+  margin-right: 0.25rem;
 }
 
-.link-stats i {
-  margin-right: var(--spacing-1);
-  color: var(--accent-orange);
+/* Section Header */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
 }
 
-.loading-state, .empty-state {
+.section-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+.view-all {
+  color: #f59e0b;
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.view-all:hover {
+  text-decoration: underline;
+}
+
+/* Buttons */
+.btn-primary {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-primary:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+
+/* Loading & Empty States */
+.loading-state {
   text-align: center;
-  padding: var(--spacing-8);
+  padding: 2rem;
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--gray-200);
-  border-top-color: var(--accent-orange);
+  width: 30px;
+  height: 30px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #f59e0b;
   border-radius: 50%;
-  margin: 0 auto;
+  margin: 0 auto 0.5rem;
   animation: spin 1s linear infinite;
 }
 
@@ -432,29 +546,38 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
 .empty-state i {
-  font-size: var(--text-4xl);
-  color: var(--gray-300);
-  margin-bottom: var(--spacing-4);
+  font-size: 2.5rem;
+  color: #d1d5db;
+  margin-bottom: 0.5rem;
 }
 
-.empty-state p {
-  color: var(--gray-500);
-  margin-bottom: var(--spacing-4);
-}
-
+/* Mobile */
 @media (max-width: 768px) {
-  .partner-dashboard {
-    padding: var(--spacing-4);
+  .partner-main {
+    margin-left: 0;
   }
   
-  .welcome-section {
-    flex-direction: column;
-    text-align: center;
+  .sidebar-toggle {
+    display: flex;
+  }
+  
+  .page-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .page-content {
+    padding: 1rem;
   }
   
   .stats-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
   
   .quick-actions {
@@ -464,6 +587,12 @@ onMounted(() => {
   .link-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

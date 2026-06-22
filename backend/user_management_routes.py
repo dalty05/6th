@@ -140,7 +140,7 @@ def create_user():
         
         # ========== SEND WELCOME EMAIL WITH PASSWORD ==========
         try:
-            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+            frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
             email_sent = email_service.send_welcome_email(user, temp_password)
             if email_sent:
                 print(f"✅ Welcome email sent to {user.email}")
@@ -203,7 +203,7 @@ def update_user(user_id):
         # If user was approved via this update, send approval email
         if 'is_approved' in data and data['is_approved'] and not user.is_approved:
             try:
-                frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+                frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
                 email_service.send_approval_email(user, frontend_url)
                 print(f"✅ Approval email sent to {user.email}")
             except Exception as e:
@@ -310,7 +310,7 @@ def approve_user(user_id):
         
         # ========== SEND APPROVAL EMAIL ==========
         try:
-            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+            frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
             email_service.send_approval_email(user, frontend_url)
             print(f"✅ Approval email sent to {user.email}")
         except Exception as e:
@@ -362,7 +362,7 @@ def suspend_user(user_id):
         
         # ========== SEND SUSPENSION EMAIL ==========
         try:
-            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+            frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
             login_url = f"{frontend_url}/admin/login"
             
             subject = f"Account Suspended - Meru Dairy Admin Portal"
@@ -466,7 +466,7 @@ def activate_user(user_id):
         
         # ========== SEND ACTIVATION EMAIL ==========
         try:
-            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+            frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
             login_url = f"{frontend_url}/admin/login"
             
             subject = f"Account Reactivated - Meru Dairy Admin Portal"
@@ -565,7 +565,7 @@ def reset_user_password(user_id):
         
         # ========== SEND PASSWORD RESET EMAIL ==========
         try:
-            frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+            frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
             email_sent = email_service.send_password_reset_email_with_new_password(user, new_password, frontend_url)
             if email_sent:
                 print(f"✅ Password reset email sent to {user.email}")

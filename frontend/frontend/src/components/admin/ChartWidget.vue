@@ -1,4 +1,4 @@
-<!-- src/components/admin/ChartWidget.vue -->
+
 <template>
   <div class="chart-widget">
     <canvas ref="chartCanvas"></canvas>

@@ -11,7 +11,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css'
 import Vue3Toastify from 'vue3-toastify'
 import 'vue3-toastify/dist/index.css'
 
-
+import { initReferralTracking } from './utils/simple-tracking'
 
 axios.defaults.withCredentials = true
 
@@ -49,7 +49,7 @@ app.use(Vue3Toastify, {
   theme: 'light'
 })
 
-
+initReferralTracking()
 
 
 

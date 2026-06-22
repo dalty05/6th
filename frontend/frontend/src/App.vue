@@ -1,6 +1,7 @@
 <template>
 <div id="app">
     <Navbar v-if="!isAdminRoute" />
+    
     <router-view />
     <Footer v-if="!isAdminRoute" />
   </div>

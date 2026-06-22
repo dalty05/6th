@@ -4,7 +4,7 @@ from flask_login import current_user
 import re
 from functools import lru_cache
 
-# Public routes - no authentication required
+# Public routes 
 PUBLIC_ROUTES = [
     # Health and static
     '/api/health',
@@ -42,6 +42,35 @@ PUBLIC_ROUTES = [
 
 URL_PERMISSION_MAP = [
     # ========== PRODUCTS ==========
+    
+    {
+    'pattern': r'^/api/referral/analytics/partner$',  
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics/daily$', 
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/recent$',  
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics$',  
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
     {
         'pattern': r'^/api/admin/products$',
         'resource': 'products',
@@ -73,7 +102,7 @@ URL_PERMISSION_MAP = [
         'pattern': r'^/api/admin/blog/(\d+)/publish$',
         'resource': 'blog',
         'methods': {
-            'POST': 'publish'  # ← New action
+            'POST': 'publish'  
         }
     },
 
@@ -257,6 +286,50 @@ URL_PERMISSION_MAP = [
     
     # ========== REFERRALS ==========
     {
+    'pattern': r'^/api/referral/analytics/partner$',
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics/navigation$',
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics/sources$',
+
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics/timeline$',
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics/recent-clicks$',
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+{
+    'pattern': r'^/api/referral/analytics/summary$',
+    'resource': 'referrals',
+    'methods': {
+        'GET': 'read'
+    }
+},
+    
+    {
         'pattern': r'^/api/referral/links$',
         'resource': 'referrals',
         'methods': {
@@ -334,15 +407,7 @@ URL_PERMISSION_MAP = [
         }
     },
     
-    # ========== SETTINGS ==========
-    {
-        'pattern': r'^/api/admin/settings$',
-        'resource': 'settings',
-        'methods': {
-            'GET': 'read',
-            'PUT': 'update'
-        }
-    },
+
     
     # ========== CONTACTS ==========
     {

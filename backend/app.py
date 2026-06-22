@@ -14,6 +14,11 @@ from job_routes import job_bp
 from permission_service import ROLE_PERMISSIONS
 from middleware import permission_middleware
 
+
+
+from newsletter_routes import newsletter_bp
+
+
 import pkgutil
 import importlib.util
 
@@ -43,7 +48,7 @@ from flask_login import current_user
 from flask_login import login_user, logout_user, login_required, current_user
 
 
-from settings_routes import settings_bp
+
 
 
 
@@ -60,8 +65,7 @@ from outlet_routes import outlet_bp
 
 
 
-# Add with other imports
-from settings_routes import settings_bp
+
 
 
 
@@ -95,7 +99,7 @@ app = Flask(__name__, static_folder='../dist', static_url_path='')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///meru_dairy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
@@ -118,14 +122,13 @@ app.register_blueprint(notification_bp, url_prefix='/api')
 app.register_blueprint(activity_bp, url_prefix='/api')
 
 
-app.register_blueprint(settings_bp, url_prefix='/api')
 app.register_blueprint(contact_bp, url_prefix='/api')
 app.register_blueprint(job_bp, url_prefix='/api')
 app.register_blueprint(outlet_bp, url_prefix='/api')
 
 app.register_blueprint(blog_bp, url_prefix='/api')
 
-
+app.register_blueprint(newsletter_bp, url_prefix='/api')
 
 # CORS Configuration
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -184,7 +187,7 @@ def debug_permissions():
     """Get current user's permissions for frontend"""
     from permission_service import has_permission
     
-    resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'settings', 'contacts']
+    resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'contacts']
     actions = ['create', 'read', 'update', 'delete']
     
     permissions = {}
@@ -758,145 +761,6 @@ def admin_delete_product(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
-
-
-# ========== ADMIN BLOG ROUTES ==========
-
-# @app.route('/api/admin/blog', methods=['GET'])
-# @login_required
-# @require_permission('blog', 'create')
-# def get_admin_blog_posts():
-#     """Get all blog posts for admin panel (with author info)"""
-#     try:
-#         # Super admin sees all, regular admin sees only their own
-#         if current_user.role == 'super_admin':
-#             posts = BlogPost.query.order_by(BlogPost.created_at.desc()).all()
-#         else:
-#             posts = BlogPost.query.filter_by(author_id=current_user.id).order_by(BlogPost.created_at.desc()).all()
-        
-#         return jsonify([{
-#             'id': p.id,
-#             'title': p.title,
-#             'slug': p.slug,
-#             'excerpt': p.excerpt,
-#             'content': p.content,
-#             'featured_image': p.featured_image,
-#             'views': p.views,
-#             'status': p.status,
-#             'created_at': p.created_at.isoformat() if p.created_at else None,
-#             'updated_at': p.updated_at.isoformat() if p.updated_at else None,
-#             'author': p.author.full_name if p.author else 'Admin',
-#             'author_id': p.author_id,
-#             'can_edit': current_user.role == 'super_admin' or p.author_id == current_user.id
-#         } for p in posts]), 200
-#     except Exception as e:
-#         print(f"Error in get_admin_blog_posts: {e}")
-#         return jsonify([]), 200
-
-
-
-# @app.route('/api/admin/blog', methods=['POST'])
-# @login_required
-# @require_permission('blog', 'create')
-# def create_blog_post():
-#     """Create a new blog post"""
-#     try:
-#         data = request.json
-        
-#         # Validate required fields
-#         if not data.get('title'):
-#             return jsonify({'error': 'Title is required'}), 400
-#         if not data.get('slug'):
-#             return jsonify({'error': 'Slug is required'}), 400
-#         if not data.get('content'):
-#             return jsonify({'error': 'Content is required'}), 400
-        
-#         # Check if slug already exists
-#         existing = BlogPost.query.filter_by(slug=data['slug']).first()
-#         if existing:
-#             return jsonify({'error': 'Slug already exists. Please use a different slug.'}), 400
-        
-#         post = BlogPost(
-#             title=data['title'],
-#             slug=data['slug'],
-#             excerpt=data.get('excerpt', ''),
-#             content=data['content'],
-#             featured_image=data.get('featured_image', ''),
-#             status=data.get('status', 'draft'),  # Default to draft
-#             author_id=current_user.id  # Set author to current user
-#         )
-        
-#         db.session.add(post)
-#         db.session.commit()
-        
-#         # Log activity
-#         from activity_routes import log_activity
-#         log_activity(
-#             user_id=current_user.id,
-#             user_name=current_user.full_name,
-#             action='create',
-#             resource_type='blog',
-#             resource_id=post.id,
-#             description=f'Created blog post: {post.title}'
-#         )
-        
-#         return jsonify({'message': 'Blog post created', 'id': post.id}), 201
-        
-#     except Exception as e:
-#         db.session.rollback()
-#         print(f"Error creating blog post: {str(e)}")
-#         return jsonify({'error': str(e)}), 500
-
-
-
-# #  update_blog_post function
-
-# @app.route('/api/admin/blog/<int:id>', methods=['PUT'])
-# @login_required
-# @require_permission('blog', 'update')
-# def update_blog_post(id):
-#     """Update an existing blog post (owner or super admin only)"""
-#     try:
-#         post = BlogPost.query.get_or_404(id)
-        
-#         # Check permission: only author or super admin can edit
-#         if current_user.role != 'super_admin' and post.author_id != current_user.id:
-#             return jsonify({'error': 'You can only edit your own blog posts'}), 403
-        
-#         data = request.json
-        
-#         # Update allowed fields
-#         allowed_fields = ['title', 'slug', 'excerpt', 'content', 'featured_image', 'status']
-        
-#         for key, value in data.items():
-#             if key in allowed_fields and hasattr(post, key):
-#                 setattr(post, key, value)
-        
-#         post.updated_at = datetime.utcnow()
-#         db.session.commit()
-        
-#         # Log activity
-#         from activity_routes import log_activity
-#         log_activity(
-#             user_id=current_user.id,
-#             user_name=current_user.full_name,
-#             action='update',
-#             resource_type='blog',
-#             resource_id=post.id,
-#             description=f'Updated blog post: {post.title}'
-#         )
-        
-#         return jsonify({'message': 'Blog post updated'}), 200
-        
-#     except Exception as e:
-#         db.session.rollback()
-#         print(f"Error updating blog post: {str(e)}")
-#         return jsonify({'error': str(e)}), 500
-
-
-
-
 
 
 

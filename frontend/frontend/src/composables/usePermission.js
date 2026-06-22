@@ -11,25 +11,25 @@ export function usePermission() {
         return {
           products: { create: true, read: true, update: true, delete: true },
           blog: { create: true, read: true, update: true, delete: true },
-          jobs: { create: true, read: true, update: true, delete: true },  // ← Added jobs
+          jobs: { create: true, read: true, update: true, delete: true }, 
           users: { create: true, read: true, update: true, delete: true },
           partners: { create: true, read: true, update: true, delete: true },
           referrals: { create: true, read: true, update: true, delete: true },
           statistics: { create: true, read: true, update: true, delete: true },
-          settings: { create: true, read: true, update: true, delete: true },
           contacts: { create: true, read: true, update: true, delete: true },
+          newsletter: { create: true, read: true, update: true, delete: true },
           outlets: { create: true, read: true, update: true, delete: true }
         }
       case 'admin':
         return {
+          newsletter: { create: true, read: true, update: true, delete: false },
           products: { create: true, read: true, update: true, delete: false },
           blog: { create: true, read: true, update: true, delete: false },
-          jobs: { create: true, read: true, update: true, delete: false },  // ← Added jobs (admins can create/edit but not delete)
+          jobs: { create: true, read: true, update: true, delete: false }, 
           users: { create: false, read: true, update: false, delete: false },
           partners: { create: true, read: true, update: true, delete: false },
           referrals: { create: true, read: true, update: true, delete: false },
           statistics: { create: false, read: true, update: false, delete: false },
-          settings: { create: false, read: false, update: false, delete: false },
           contacts: { create: false, read: true, update: true, delete: false },
           outlets: { create: true, read: true, update: true, delete: false }
         }
@@ -42,7 +42,6 @@ export function usePermission() {
           partners: { create: false, read: false, update: false, delete: false },
           referrals: { create: true, read: true, update: true, delete: false },
           statistics: { create: false, read: true, update: false, delete: false },
-          settings: { create: false, read: false, update: false, delete: false },
           contacts: { create: false, read: false, update: false, delete: false }
         }
       default:

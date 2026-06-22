@@ -22,7 +22,7 @@ const props = defineProps({
   resource: {
     type: String,
     required: true,
-    validator: (value) => ['products', 'blog', 'users', 'partners', 'referrals', 'statistics', 'settings'].includes(value)
+    validator: (value) => ['products', 'blog', 'users', 'partners', 'referrals', 'statistics'].includes(value)
   },
   action: {
     type: String,
@@ -49,8 +49,7 @@ const resourceNames = {
   users: 'Users',
   partners: 'Partners',
   referrals: 'Referral Links',
-  statistics: 'Statistics',
-  settings: 'Settings'
+  statistics: 'Statistics'
 }
 
 const actionNames = {

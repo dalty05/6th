@@ -13,7 +13,7 @@ for row in rows:
 
 # Update all to home page
 print("\nUpdating all links to home page...")
-cursor.execute("UPDATE referral_links SET destination_url = 'http://localhost:5173/#products")
+cursor.execute("UPDATE referral_links SET destination_url = 'http://propeller-outclass-parsnip.ngrok-free.dev:5173/#products")
 conn.commit()
 print(f"✅ Updated {cursor.rowcount} links")
 

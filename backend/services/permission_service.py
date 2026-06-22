@@ -15,7 +15,6 @@ ROLE_PERMISSIONS = {
         'partners': {'create': True, 'read': True, 'update': True, 'delete': True},
         'referrals': {'create': True, 'read': True, 'update': True, 'delete': True},
         'statistics': {'create': True, 'read': True, 'update': True, 'delete': True},
-        'settings': {'create': True, 'read': True, 'update': True, 'delete': True},
         'contacts': {'create': True, 'read': True, 'update': True, 'delete': True}
     },
     'admin': {
@@ -27,7 +26,6 @@ ROLE_PERMISSIONS = {
         'partners': {'create': True, 'read': True, 'update': True, 'delete': False},
         'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
         'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
-        'settings': {'create': False, 'read': False, 'update': False, 'delete': False},
         'contacts': {'create': False, 'read': True, 'update': True, 'delete': False}
     },
     'partner': {
@@ -39,7 +37,6 @@ ROLE_PERMISSIONS = {
         'partners': {'create': False, 'read': False, 'update': False, 'delete': False},
         'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
         'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
-        'settings': {'create': False, 'read': False, 'update': False, 'delete': False},
         'contacts': {'create': False, 'read': False, 'update': False, 'delete': False}
     }
 }
@@ -154,7 +151,6 @@ ROLE_PERMISSIONS = {
         'partners': {'create': True, 'read': True, 'update': True, 'delete': True},
         'referrals': {'create': True, 'read': True, 'update': True, 'delete': True},
         'statistics': {'create': True, 'read': True, 'update': True, 'delete': True},
-        'settings': {'create': True, 'read': True, 'update': True, 'delete': True},
         'contacts': {'create': True, 'read': True, 'update': True, 'delete': True}
     },
     'admin': {
@@ -166,7 +162,6 @@ ROLE_PERMISSIONS = {
         'partners': {'create': True, 'read': True, 'update': True, 'delete': False},
         'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
         'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
-        'settings': {'create': False, 'read': False, 'update': False, 'delete': False},
         'contacts': {'create': False, 'read': True, 'update': True, 'delete': False}
     },
     'partner': {
@@ -178,7 +173,6 @@ ROLE_PERMISSIONS = {
         'partners': {'create': False, 'read': False, 'update': False, 'delete': False},
         'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
         'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
-        'settings': {'create': False, 'read': False, 'update': False, 'delete': False},
         'contacts': {'create': False, 'read': False, 'update': False, 'delete': False}
     }
 }

@@ -1,4 +1,4 @@
-// src/services/referral.js
+
 import api from './api'
 
 class ReferralService {
@@ -79,7 +79,7 @@ class ReferralService {
     return response.data
   }
 
-  // Legacy analytics (keep for compatibility)
+  // Legacy analytics 
   async getAnalytics(days = 30) {
     const response = await api.get(`/referral/analytics?days=${days}`)
     return response.data
@@ -87,6 +87,21 @@ class ReferralService {
 
   async getPartnerStats(userId) {
     const response = await api.get(`/referral/partner/${userId}/stats`)
+    return response.data
+  }
+
+  async getPartnerAnalytics(days = 30) {
+    const response = await api.get(`/referral/analytics/partner?days=${days}`)
+    return response.data
+  }
+
+  // Navigation Analytics
+  async getNavigationAnalytics(code = null, days = 30) {
+    const params = new URLSearchParams()
+    if (code) params.append('code', code)
+    params.append('days', days)
+    
+    const response = await api.get(`/referral/analytics/navigation?${params.toString()}`)
     return response.data
   }
 }

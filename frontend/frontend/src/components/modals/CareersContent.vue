@@ -56,48 +56,84 @@
     </div>
     
     <!-- Job Detail Modal -->
-    <div class="modal-overlay" v-if="showJobDetail" @click.self="showJobDetail = false">
-      <div class="modal-container large">
+    <div class="modal-overlay" v-if="showJobDetail" @click.self="closeDetailModal">
+      <div class="modal-container modal-detail">
         <div class="modal-header">
-          <h2>{{ selectedJob?.title }}</h2>
-          <button class="close-btn" @click="showJobDetail = false">&times;</button>
+          <div class="modal-header-content">
+            <h2>{{ selectedJob?.title }}</h2>
+            <div class="modal-job-meta">
+              <span class="job-type" :class="getJobTypeClass(selectedJob?.type)">
+                {{ selectedJob?.type || 'Full-time' }}
+              </span>
+              <span v-if="selectedJob?.location">
+                <i class="fas fa-map-marker-alt"></i> {{ selectedJob.location }}
+              </span>
+              <span v-if="selectedJob?.experience_level">
+                <i class="fas fa-chart-line"></i> {{ selectedJob.experience_level }}
+              </span>
+            </div>
+          </div>
+          <button class="close-btn" @click="closeDetailModal">&times;</button>
         </div>
         
         <div class="modal-body" v-if="selectedJob">
-          <div class="job-badges">
-            <span class="badge" :class="getJobTypeClass(selectedJob.type)">
-              {{ selectedJob.type || 'Full-time' }}
-            </span>
-            <span class="badge" v-if="selectedJob.location">
-              <i class="fas fa-map-marker-alt"></i> {{ selectedJob.location }}
-            </span>
-            <span class="badge" v-if="selectedJob.experience_level">
-              <i class="fas fa-chart-line"></i> {{ selectedJob.experience_level }}
-            </span>
-          </div>
-          
-          <div class="detail-section">
-            <h4><i class="fas fa-align-left"></i> Job Description</h4>
-            <div class="detail-content" v-html="selectedJob.description?.replace(/\n/g, '<br>')"></div>
-          </div>
-          
-          <div class="detail-section">
-            <h4><i class="fas fa-check-circle"></i> Requirements</h4>
-            <div class="detail-content" v-html="selectedJob.requirements?.replace(/\n/g, '<br>')"></div>
-          </div>
-          
-          <div class="detail-section" v-if="selectedJob.responsibilities">
-            <h4><i class="fas fa-tasks"></i> Key Responsibilities</h4>
-            <div class="detail-content" v-html="selectedJob.responsibilities?.replace(/\n/g, '<br>')"></div>
-          </div>
-          
-          <div class="detail-section" v-if="selectedJob.benefits">
-            <h4><i class="fas fa-gift"></i> Benefits</h4>
-            <div class="detail-content" v-html="selectedJob.benefits?.replace(/\n/g, '<br>')"></div>
+          <div class="detail-grid">
+            <!-- Left Column - Main Content -->
+            <div class="detail-main">
+              <!-- Description -->
+              <div class="detail-section" v-if="selectedJob.description">
+                <h4><i class="fas fa-align-left"></i> Job Description</h4>
+                <div class="detail-content description-text" v-html="formatText(selectedJob.description)"></div>
+              </div>
+              
+              <!-- Responsibilities -->
+              <div class="detail-section" v-if="selectedJob.responsibilities">
+                <h4><i class="fas fa-tasks"></i> Key Responsibilities</h4>
+                <div class="detail-content" v-html="formatText(selectedJob.responsibilities)"></div>
+              </div>
+            </div>
+            
+            <!-- Right Column - Sidebar -->
+            <div class="detail-sidebar">
+              <!-- Requirements -->
+              <div class="detail-section" v-if="selectedJob.requirements">
+                <h4><i class="fas fa-check-circle"></i> Requirements</h4>
+                <div class="detail-content requirements-list" v-html="formatText(selectedJob.requirements)"></div>
+              </div>
+              
+              <!-- Benefits -->
+              <div class="detail-section" v-if="selectedJob.benefits">
+                <h4><i class="fas fa-gift"></i> Benefits</h4>
+                <div class="detail-content" v-html="formatText(selectedJob.benefits)"></div>
+              </div>
+              
+              <!-- Quick Info -->
+              <div class="detail-section quick-info">
+                <h4><i class="fas fa-info-circle"></i> Quick Info</h4>
+                <div class="detail-content">
+                  <div class="info-row" v-if="selectedJob.location">
+                    <span class="info-label">Location:</span>
+                    <span class="info-value">{{ selectedJob.location }}</span>
+                  </div>
+                  <div class="info-row" v-if="selectedJob.experience_level">
+                    <span class="info-label">Experience:</span>
+                    <span class="info-value">{{ selectedJob.experience_level }}</span>
+                  </div>
+                  <div class="info-row" v-if="selectedJob.salary_range">
+                    <span class="info-label">Salary:</span>
+                    <span class="info-value">{{ selectedJob.salary_range }}</span>
+                  </div>
+                  <div class="info-row" v-if="selectedJob.application_deadline">
+                    <span class="info-label">Deadline:</span>
+                    <span class="info-value">{{ formatDate(selectedJob.application_deadline) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           
           <div class="apply-actions">
-            <button @click="showJobDetail = false; openApplicationForm(selectedJob)" class="btn-apply-large">
+            <button @click="closeDetailModal; openApplicationForm(selectedJob)" class="btn-apply-large">
               <i class="fas fa-paper-plane"></i> Apply for this Position
             </button>
           </div>
@@ -107,7 +143,7 @@
     
     <!-- Job Application Form Modal -->
     <div class="modal-overlay" v-if="showApplicationForm" @click.self="closeApplicationForm">
-      <div class="modal-container application-modal">
+      <div class="modal-container modal-application">
         <div class="modal-header">
           <h2>Apply for {{ selectedJob?.title }}</h2>
           <button class="close-btn" @click="closeApplicationForm">&times;</button>
@@ -115,6 +151,7 @@
         
         <div class="modal-body">
           <div class="application-info">
+            <i class="fas fa-info-circle"></i>
             <p>Please fill out the form below to apply for this position. All fields marked with <span class="required">*</span> are required.</p>
           </div>
           
@@ -122,18 +159,18 @@
             <div class="form-row">
               <div class="form-group">
                 <label>First Name <span class="required">*</span></label>
-                <input type="text" v-model="application.first_name" required>
+                <input type="text" v-model="application.first_name" placeholder="Enter your first name" required>
               </div>
               <div class="form-group">
                 <label>Last Name <span class="required">*</span></label>
-                <input type="text" v-model="application.last_name" required>
+                <input type="text" v-model="application.last_name" placeholder="Enter your last name" required>
               </div>
             </div>
             
             <div class="form-row">
               <div class="form-group">
                 <label>Email Address <span class="required">*</span></label>
-                <input type="email" v-model="application.email" required>
+                <input type="email" v-model="application.email" placeholder="your@email.com" required>
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
@@ -187,12 +224,12 @@
     
     <!-- Success Modal -->
     <div class="modal-overlay" v-if="showSuccess" @click.self="showSuccess = false">
-      <div class="modal-container success-modal">
+      <div class="modal-container modal-success">
         <div class="success-icon">
           <i class="fas fa-check-circle"></i>
         </div>
         <h2>Application Submitted!</h2>
-        <p>Thank you for applying to {{ successJobTitle }}.</p>
+        <p>Thank you for applying to <strong>{{ successJobTitle }}</strong>.</p>
         <p>We have sent a confirmation email to your inbox. Our HR team will review your application and get back to you within 5-7 business days.</p>
         <button @click="showSuccess = false; closeApplicationForm()" class="btn-success">Done</button>
       </div>
@@ -242,11 +279,17 @@ const loadJobs = async () => {
 const viewJobDetails = (job) => {
   selectedJob.value = job
   showJobDetail.value = true
+  document.body.style.overflow = 'hidden'
+}
+
+const closeDetailModal = () => {
+  showJobDetail.value = false
+  document.body.style.overflow = 'auto'
 }
 
 const openApplicationForm = (job) => {
   selectedJob.value = job
-  showJobDetail.value = false
+  closeDetailModal()
   showApplicationForm.value = true
   application.value = {
     first_name: '',
@@ -259,12 +302,14 @@ const openApplicationForm = (job) => {
   }
   cvFile.value = null
   cvError.value = ''
+  document.body.style.overflow = 'hidden'
 }
 
 const closeApplicationForm = () => {
   showApplicationForm.value = false
   selectedJob.value = null
   cvFile.value = null
+  document.body.style.overflow = 'auto'
 }
 
 const handleCVUpload = (event) => {
@@ -352,6 +397,11 @@ const truncate = (text, length) => {
   if (!text) return ''
   if (text.length <= length) return text
   return text.substring(0, length) + '...'
+}
+
+const formatText = (text) => {
+  if (!text) return ''
+  return text.replace(/\n/g, '<br>')
 }
 
 onMounted(() => {
@@ -548,119 +598,167 @@ onMounted(() => {
   color: white;
 }
 
-/* Modal Overlay & Container */
+/* ========================================
+   MODAL OVERLAY & CONTAINER - FIXED HEIGHT
+   ======================================== */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  backdrop-filter: blur(4px);
+  padding: 1.5rem;
+  animation: fadeIn 0.25s ease;
 }
 
 .modal-container {
   background: white;
   border-radius: 20px;
-  width: 90%;
-  max-width: 700px;
-  max-height: 85vh;
-  overflow-y: auto;
-  animation: fadeInUp 0.3s ease;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+  overflow: hidden;
 }
 
-.modal-container.large {
-  max-width: 800px;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.modal-container.application-modal {
-  max-width: 750px;
-}
-
-.modal-container.success-modal {
-  max-width: 450px;
-  text-align: center;
-  padding: 2rem;
-}
-
-@keyframes fadeInUp {
+@keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
+}
+
+/* ========================================
+   JOB DETAIL MODAL - FIXED HEIGHT
+   ======================================== */
+.modal-detail {
+  max-width: 1000px;
+  width: 100%;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
+  align-items: flex-start;
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid #e5e7eb;
+  flex-shrink: 0;
   background: white;
-  z-index: 10;
 }
 
-.modal-header h2 {
+.modal-header-content h2 {
   color: #1e3a8a;
-  margin: 0;
-  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.6rem;
+}
+
+.modal-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.modal-job-meta i {
+  margin-right: 0.25rem;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 1.8rem;
+  font-size: 2rem;
   cursor: pointer;
   color: #9ca3af;
-  transition: color 0.3s;
+  transition: all 0.3s;
   line-height: 1;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .close-btn:hover {
   color: #ef4444;
+  background: #fee2e2;
 }
 
 .modal-body {
-  padding: 1.5rem;
+  padding: 2rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
-/* Job Details */
-.job-badges {
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Detail Grid - Two Column */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.detail-main {
   display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.35rem 0.75rem;
-  background: #f3f4f6;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  color: #4b5563;
+.detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: sticky;
+  top: 0;
 }
 
 .detail-section {
-  margin-bottom: 1.5rem;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
 }
 
 .detail-section h4 {
   color: #1e3a8a;
   margin: 0 0 0.75rem;
-  font-size: 1rem;
+  font-size: 0.95rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -672,25 +770,65 @@ onMounted(() => {
 
 .detail-content {
   color: #4b5563;
-  line-height: 1.6;
+  line-height: 1.7;
   font-size: 0.9rem;
-  background: #f8fafc;
-  padding: 1rem;
-  border-radius: 12px;
 }
 
+.description-text {
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+
+.requirements-list {
+  padding-left: 0.5rem;
+}
+
+.requirements-list p {
+  margin-bottom: 0.5rem;
+}
+
+/* Quick Info */
+.quick-info .detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.info-value {
+  color: #4b5563;
+  text-align: right;
+}
+
+/* Apply Actions */
 .apply-actions {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e5e7eb;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .btn-apply-large {
   background: #1e3a8a;
   color: white;
   border: none;
-  padding: 0.75rem 2rem;
+  padding: 0.8rem 2.5rem;
   border-radius: 40px;
   cursor: pointer;
   font-size: 1rem;
@@ -706,52 +844,86 @@ onMounted(() => {
   transform: scale(1.02);
 }
 
-/* Application Form */
+/* ========================================
+   APPLICATION FORM MODAL - FIXED HEIGHT
+   ======================================== */
+.modal-application {
+  max-width: 750px;
+  width: 100%;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-application .modal-header {
+  flex-shrink: 0;
+}
+
+.modal-application .modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
 .application-info {
   background: #e0e7ff;
-  padding: 1rem;
+  padding: 1rem 1.25rem;
   border-radius: 12px;
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.application-info i {
+  color: #1e3a8a;
+  font-size: 1.2rem;
+  margin-top: 0.1rem;
 }
 
 .application-info p {
   margin: 0;
   color: #1e3a8a;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
 }
 
 .required {
   color: #ef4444;
 }
 
+.application-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  margin-bottom: 1rem;
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
   font-weight: 500;
   color: #374151;
   font-size: 0.85rem;
 }
 
 .form-group input,
-.form-group textarea,
-.form-group select {
+.form-group textarea {
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.7rem 0.9rem;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   font-size: 0.9rem;
   transition: all 0.3s;
+  font-family: inherit;
 }
 
 .form-group input:focus,
@@ -759,6 +931,11 @@ onMounted(() => {
   outline: none;
   border-color: #f59e0b;
   box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
 }
 
 .file-upload-area {
@@ -789,13 +966,15 @@ onMounted(() => {
 
 .file-upload-area p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: #6b7280;
 }
 
 .file-upload-area small {
   font-size: 0.7rem;
   color: #9ca3af;
+  display: block;
+  margin-top: 0.25rem;
 }
 
 .error-text {
@@ -808,13 +987,16 @@ onMounted(() => {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
 .btn-cancel {
   background: #e5e7eb;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.7rem 1.5rem;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 500;
@@ -829,7 +1011,7 @@ onMounted(() => {
   background: #1e3a8a;
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.7rem 1.5rem;
   border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
@@ -839,7 +1021,7 @@ onMounted(() => {
   transition: all 0.3s;
 }
 
-.btn-submit:hover {
+.btn-submit:hover:not(:disabled) {
   background: #f59e0b;
 }
 
@@ -848,28 +1030,42 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* Success Modal */
+/* ========================================
+   SUCCESS MODAL
+   ======================================== */
+.modal-success {
+  max-width: 450px;
+  width: 100%;
+  text-align: center;
+  padding: 2.5rem;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
 .success-icon {
   font-size: 4rem;
   color: #10b981;
   margin-bottom: 1rem;
 }
 
-.success-modal h2 {
+.modal-success h2 {
   color: #1e3a8a;
   margin: 0 0 0.5rem;
+  font-size: 1.4rem;
 }
 
-.success-modal p {
+.modal-success p {
   color: #6b7280;
   margin: 0.5rem 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .btn-success {
   background: #10b981;
   color: white;
   border: none;
-  padding: 0.75rem 2rem;
+  padding: 0.7rem 2rem;
   border-radius: 40px;
   cursor: pointer;
   font-weight: 600;
@@ -881,8 +1077,46 @@ onMounted(() => {
   background: #059669;
 }
 
-/* Responsive */
-@media (max-width: 640px) {
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 968px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .detail-sidebar {
+    position: static;
+  }
+  
+  .modal-detail {
+    max-width: 95%;
+  }
+  
+  .modal-header {
+    padding: 1rem 1.25rem;
+  }
+  
+  .modal-header-content h2 {
+    font-size: 1.3rem;
+  }
+  
+  .modal-body {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  
+  .modal-application {
+    max-width: 98%;
+  }
+  
   .job-header {
     flex-direction: column;
     align-items: flex-start;
@@ -897,27 +1131,63 @@ onMounted(() => {
     justify-content: center;
   }
   
-  .form-row {
-    grid-template-columns: 1fr;
-    gap: 0;
+  .modal-job-meta {
+    flex-wrap: wrap;
   }
   
-  .modal-header h2 {
-    font-size: 1.1rem;
+  .modal-success {
+    padding: 1.5rem;
+  }
+  
+  .modal-success h2 {
+    font-size: 1.2rem;
+  }
+  
+  .file-upload-area {
+    padding: 1rem;
   }
   
   .modal-container {
-    width: 95%;
+    max-height: 95vh;
   }
   
-  .job-title-section {
-    flex-direction: column;
-    align-items: flex-start;
+  .modal-detail {
+    max-height: 95vh;
   }
   
-  .job-meta {
-    flex-direction: column;
-    gap: 0.5rem;
+  .modal-application {
+    max-height: 95vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-detail {
+    max-width: 100%;
+    border-radius: 12px;
+  }
+  
+  .modal-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .modal-header-content h2 {
+    font-size: 1.1rem;
+  }
+  
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .detail-section {
+    padding: 0.75rem;
+  }
+  
+  .job-card {
+    padding: 1rem;
+  }
+  
+  .modal-overlay {
+    padding: 0.5rem;
   }
 }
 </style>

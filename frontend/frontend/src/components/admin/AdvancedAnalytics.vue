@@ -7,7 +7,7 @@
         <p>Track referral performance and partner activity</p>
       </div>
       <div class="header-actions">
-        <button @click="exportData" class="btn btn-outline">
+        <button @click="openExportModal" class="btn btn-outline">
           <i class="fas fa-download"></i> Export Report
         </button>
         <button @click="refreshData" class="btn btn-outline">
@@ -86,14 +86,6 @@
         </div>
       </div>
 
-      <!-- Performance Chart -->
-      <div class="chart-card">
-        <h3>Clicks Over Time</h3>
-        <div class="chart-container">
-          <canvas ref="chartCanvas"></canvas>
-        </div>
-      </div>
-
       <!-- Two Column Layout -->
       <div class="two-column">
         <!-- Top Performing Partners -->
@@ -123,28 +115,31 @@
           </div>
         </div>
 
-        <!-- Recent Clicks Activity -->
-        <div class="recent-clicks-card">
-          <h3>Recent Clicks Activity</h3>
-          <div class="recent-clicks-list">
-            <div v-for="click in recentClicks" :key="click.id" class="click-item">
-              <div class="click-icon">
-                <i class="fas fa-mouse-pointer"></i>
-              </div>
-              <div class="click-details">
-                <p><strong>{{ click.partner_name || 'Unknown Partner' }}</strong></p>
-                <small>{{ formatDateTime(click.clicked_at) }}</small>
-              </div>
-              <div class="click-location">
-                <i class="fas fa-map-marker-alt"></i> {{ click.ip_address || 'Unknown' }}
-              </div>
+        <!-- Summary Card -->
+        <div class="summary-card">
+          <h3>Summary</h3>
+          <div class="summary-stats">
+            <div class="summary-item">
+              <span class="summary-label">Total Partners</span>
+              <span class="summary-value">{{ formatNumber(totalPartners) }}</span>
             </div>
-            <div v-if="recentClicks.length === 0" class="no-data">No recent clicks</div>
+            <div class="summary-item">
+              <span class="summary-label">Active Partners</span>
+              <span class="summary-value">{{ formatNumber(activePartners) }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Total Links Created</span>
+              <span class="summary-value">{{ formatNumber(totalLinks) }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Avg Clicks per Partner</span>
+              <span class="summary-value">{{ formatNumber(avgClicksPerPartner) }}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Partners Table (Partners Only) -->
+      <!-- Partners Table -->
       <div class="partners-table-card">
         <div class="card-header">
           <h3>All Partners</h3>
@@ -176,7 +171,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="partner in filteredPartners" :key="partner.id">
+              <tr v-for="partner in paginatedPartners" :key="partner.id">
                 <td>
                   <div class="partner-cell">
                     <i class="fas fa-user-circle"></i>
@@ -200,7 +195,7 @@
                   </button>
                 </td>
               </tr>
-              <tr v-if="filteredPartners.length === 0">
+              <tr v-if="paginatedPartners.length === 0">
                 <td colspan="8" class="empty-row">No partners found</td>
               </tr>
             </tbody>
@@ -251,10 +246,6 @@
               <span class="detail-label">Unique Visitors:</span>
               <span class="detail-value">{{ formatNumber(selectedPartner.unique_clicks || 0) }}</span>
             </div>
-            <div class="detail-row">
-              <span class="detail-label">Conversion Rate:</span>
-              <span class="detail-value">{{ selectedPartner.conversion_rate || 0 }}%</span>
-            </div>
           </div>
           <div class="detail-section" v-if="selectedPartner.referral_links?.length">
             <h4>Referral Links</h4>
@@ -277,6 +268,58 @@
       </div>
     </div>
 
+    <!-- Export Modal -->
+    <div class="modal-overlay" v-if="showExportModal" @click.self="closeExportModal">
+      <div class="modal-container">
+        <div class="modal-header">
+          <h2>Export Report</h2>
+          <button class="close-btn" @click="closeExportModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="export-section">
+            <label>Date Range for Export:</label>
+            <div class="export-date-range">
+              <div class="form-group">
+                <label>Start Date</label>
+                <input type="date" v-model="exportDateRange.start" class="date-input">
+              </div>
+              <span>to</span>
+              <div class="form-group">
+                <label>End Date</label>
+                <input type="date" v-model="exportDateRange.end" class="date-input">
+              </div>
+            </div>
+          </div>
+
+          <div class="export-section">
+            <label>Export Options:</label>
+            <div class="export-options">
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="exportOptions.partners">
+                Partner Data
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="exportOptions.links">
+                Link Data
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" v-model="exportOptions.summary">
+                Summary Stats
+              </label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button @click="closeExportModal" class="btn-cancel">Cancel</button>
+            <button @click="generateExcelExport" class="btn-primary" :disabled="exporting">
+              <i v-if="exporting" class="fas fa-spinner fa-spin"></i>
+              {{ exporting ? 'Generating...' : 'Export Excel' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Notification -->
     <div v-if="notification.show" :class="['notification', notification.type]" @click="notification.show = false">
       <i :class="notification.icon"></i>
@@ -288,19 +331,19 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue3-toastify'
-import Chart from 'chart.js/auto'
+import * as XLSX from 'xlsx'
 import api from '@/services/api'
 import authService from '@/services/auth'
+import referralService from '@/services/referral'
 
 // State
 const loading = ref(false)
+const exporting = ref(false)
 const partners = ref([])
 const totalPartners = ref(0)
 const totalLinks = ref(0)
 const totalClicks = ref(0)
 const uniqueVisitors = ref(0)
-const dailyClicks = ref([])
-const recentClicks = ref([])
 const selectedPartnerId = ref('all')
 const partnerSearch = ref('')
 const partnerSort = ref('clicks')
@@ -309,6 +352,18 @@ const itemsPerPage = 15
 
 const showDetailsModal = ref(false)
 const selectedPartner = ref(null)
+const showExportModal = ref(false)
+
+const exportDateRange = ref({
+  start: '',
+  end: ''
+})
+
+const exportOptions = ref({
+  partners: true,
+  links: true,
+  summary: true
+})
 
 // User permissions
 const currentUser = authService.getUser()
@@ -321,8 +376,6 @@ const dateRange = ref({
 })
 
 const leaderboardSort = ref('clicks')
-let chart = null
-const chartCanvas = ref(null)
 
 const notification = ref({
   show: false,
@@ -332,6 +385,16 @@ const notification = ref({
 })
 
 // Computed
+const activePartners = computed(() => {
+  return partners.value.filter(p => p.is_active).length
+})
+
+const avgClicksPerPartner = computed(() => {
+  if (partners.value.length === 0) return 0
+  const total = partners.value.reduce((sum, p) => sum + (p.total_clicks || 0), 0)
+  return Math.round(total / partners.value.length)
+})
+
 const sortedPartners = computed(() => {
   let sorted = [...partners.value]
   if (leaderboardSort.value === 'clicks') {
@@ -415,32 +478,38 @@ const loadAnalytics = async () => {
   loading.value = true
   try {
     const days = getDateRangeDays()
-    const params = { days }
-    if (selectedPartnerId.value !== 'all') params.partner_id = selectedPartnerId.value
     
-    const response = await api.get('/referral/analytics/partner', { params })
-    const data = response.data
+    // Load links for all partners
+    const linksResponse = await referralService.getLinks()
+    const links = Array.isArray(linksResponse) ? linksResponse : []
     
-    totalClicks.value = data.total_clicks || 0
-    uniqueVisitors.value = data.unique_visitors || 0
-    totalLinks.value = data.total_links || 0
-    dailyClicks.value = data.daily_clicks || []
-    recentClicks.value = data.recent_clicks || []
+    // Calculate totals
+    totalLinks.value = links.length
+    totalClicks.value = links.reduce((sum, l) => sum + (l.total_clicks || 0), 0)
+    uniqueVisitors.value = links.reduce((sum, l) => sum + (l.unique_clicks || 0), 0)
     
-    // Update partner stats
-    if (data.partner_stats) {
-      for (const partner of partners.value) {
-        const stats = data.partner_stats.find(p => p.id === partner.id)
-        if (stats) {
-          partner.total_clicks = stats.total_clicks || 0
-          partner.unique_clicks = stats.unique_clicks || 0
-          partner.link_count = stats.link_count || 0
-          partner.referral_links = stats.referral_links || []
+    // Group links by user_id
+    const linksByUser = {}
+    for (const link of links) {
+      // Get user_id from link (might be nested)
+      const userId = link.user_id || link.user?.id
+      if (userId) {
+        if (!linksByUser[userId]) {
+          linksByUser[userId] = []
         }
+        linksByUser[userId].push(link)
       }
     }
     
-    updateChart()
+    // Update each partner's stats
+    for (const partner of partners.value) {
+      const userLinks = linksByUser[partner.id] || []
+      partner.link_count = userLinks.length
+      partner.total_clicks = userLinks.reduce((sum, l) => sum + (l.total_clicks || 0), 0)
+      partner.unique_clicks = userLinks.reduce((sum, l) => sum + (l.unique_clicks || 0), 0)
+      partner.referral_links = userLinks
+    }
+    
   } catch (error) {
     console.error('Error loading analytics:', error)
     showNotification('Failed to load analytics', 'error')
@@ -449,58 +518,18 @@ const loadAnalytics = async () => {
   }
 }
 
-const updateChart = () => {
-  if (chart) chart.destroy()
-  
-  const ctx = chartCanvas.value?.getContext('2d')
-  if (!ctx || !dailyClicks.value.length) return
-  
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: dailyClicks.value.map(d => d.date),
-      datasets: [{
-        label: 'Clicks',
-        data: dailyClicks.value.map(d => d.clicks),
-        borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        fill: true,
-        tension: 0.3,
-        pointBackgroundColor: '#f59e0b',
-        pointBorderColor: '#fff',
-        pointRadius: 4,
-        pointHoverRadius: 6
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'top' },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${ctx.raw.toLocaleString()}`
-          }
-        }
-      },
-      scales: {
-        y: { beginAtZero: true, ticks: { callback: (v) => v.toLocaleString() } }
-      }
-    }
-  })
-}
-
 const viewPartnerDetails = async (partner) => {
   try {
-    const statsRes = await api.get(`/referral/partner/${partner.id}/stats`)
-    partner.link_count = statsRes.data.total_links || 0
-    partner.total_clicks = statsRes.data.total_clicks || 0
-    partner.unique_clicks = statsRes.data.total_unique_clicks || 0
-    partner.referral_links = statsRes.data.links || []
-    partner.conversion_rate = partner.total_clicks ? ((partner.total_conversions || 0) / partner.total_clicks * 100).toFixed(1) : 0
+    // Load partner's links
+    const response = await referralService.getPartnerStats(partner.id)
+    partner.link_count = response.total_links || 0
+    partner.total_clicks = response.total_clicks || 0
+    partner.unique_clicks = response.total_unique_clicks || 0
+    partner.referral_links = response.links || []
     selectedPartner.value = partner
     showDetailsModal.value = true
   } catch (error) {
+    console.error('Error loading partner details:', error)
     showNotification('Failed to load partner details', 'error')
   }
 }
@@ -522,36 +551,131 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-const formatDateTime = (dateString) => {
-  if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
 const prevPage = () => { if (currentPage.value > 1) currentPage.value-- }
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
 
-const exportData = () => {
-  const data = {
-    exported_at: new Date().toISOString(),
-    date_range: dateRange.value,
-    total_clicks: totalClicks.value,
-    unique_visitors: uniqueVisitors.value,
-    total_links: totalLinks.value,
-    partners: partners.value.map(p => ({
-      name: p.full_name,
-      email: p.email,
-      clicks: p.total_clicks,
-      links: p.link_count
-    }))
+// Export Functions
+const openExportModal = () => {
+  // Set default date range for export
+  const today = new Date()
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(today.getDate() - 30)
+  exportDateRange.value.start = thirtyDaysAgo.toISOString().split('T')[0]
+  exportDateRange.value.end = today.toISOString().split('T')[0]
+  showExportModal.value = true
+}
+
+const closeExportModal = () => {
+  showExportModal.value = false
+  exporting.value = false
+}
+
+const generateExcelExport = async () => {
+  if (!exportDateRange.value.start || !exportDateRange.value.end) {
+    showNotification('Please select both start and end dates', 'error')
+    return
   }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `partner_analytics_${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-  showNotification('Report exported')
+
+  exporting.value = true
+  
+  try {
+    // Prepare data for export
+    const workbookData = {}
+    
+    // Summary Stats
+    if (exportOptions.value.summary) {
+      workbookData.Summary = [
+        ['Partner Analytics Report'],
+        [''],
+        ['Generated:', new Date().toLocaleString()],
+        ['Date Range:', `${exportDateRange.value.start} to ${exportDateRange.value.end}`],
+        [''],
+        ['Metric', 'Value'],
+        ['Total Partners', totalPartners.value],
+        ['Active Partners', activePartners.value],
+        ['Total Links', totalLinks.value],
+        ['Total Clicks', totalClicks.value],
+        ['Unique Visitors', uniqueVisitors.value],
+        ['Avg Clicks per Partner', avgClicksPerPartner.value]
+      ]
+    }
+    
+    // Partner Data
+    if (exportOptions.value.partners) {
+      const partnerData = [
+        ['Partner Name', 'Email', 'Referral Code', 'Links', 'Total Clicks', 'Unique Visitors', 'Joined']
+      ]
+      
+      for (const partner of partners.value) {
+        partnerData.push([
+          partner.full_name || 'N/A',
+          partner.email || 'N/A',
+          partner.referral_code || 'N/A',
+          partner.link_count || 0,
+          partner.total_clicks || 0,
+          partner.unique_clicks || 0,
+          formatDate(partner.created_at) || 'N/A'
+        ])
+      }
+      workbookData.Partners = partnerData
+    }
+    
+    // Link Data
+    if (exportOptions.value.links) {
+      const linkData = [
+        ['Link Name', 'Link Code', 'Partner', 'Clicks', 'Unique Clicks', 'Conversions', 'Status', 'Created']
+      ]
+      
+      const linksResponse = await referralService.getLinks()
+      const links = Array.isArray(linksResponse) ? linksResponse : []
+      
+      // Get partner names for links
+      const partnerMap = {}
+      for (const partner of partners.value) {
+        partnerMap[partner.id] = partner.full_name || 'Unknown'
+      }
+      
+      for (const link of links) {
+        const userId = link.user_id || link.user?.id
+        linkData.push([
+          link.name || 'N/A',
+          link.link_code || 'N/A',
+          partnerMap[userId] || 'Unknown',
+          link.total_clicks || 0,
+          link.unique_clicks || 0,
+          link.conversions || 0,
+          link.is_active ? 'Active' : 'Inactive',
+          formatDate(link.created_at) || 'N/A'
+        ])
+      }
+      workbookData.Links = linkData
+    }
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new()
+    
+    for (const [sheetName, data] of Object.entries(workbookData)) {
+      const ws = XLSX.utils.aoa_to_sheet(data)
+      
+      // Set column widths
+      const colWidths = data[0]?.map((_, i) => ({ wch: 20 })) || []
+      ws['!cols'] = colWidths
+      
+      XLSX.utils.book_append_sheet(wb, ws, sheetName)
+    }
+    
+    // Generate file
+    const fileName = `partner_analytics_${new Date().toISOString().split('T')[0]}.xlsx`
+    XLSX.writeFile(wb, fileName)
+    
+    showNotification('Report exported successfully')
+    closeExportModal()
+  } catch (error) {
+    console.error('Error exporting:', error)
+    showNotification('Failed to export report', 'error')
+  } finally {
+    exporting.value = false
+  }
 }
 
 const refreshData = () => { loadPartners(); loadAnalytics() }
@@ -670,24 +794,6 @@ onMounted(() => {
 .kpi-value { font-size: 1.5rem; font-weight: 700; color: #1e3a8a; display: block; }
 .kpi-label { font-size: 0.75rem; color: #6b7280; }
 
-.chart-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid #e5e7eb;
-}
-
-.chart-card h3 {
-  color: #1e3a8a;
-  margin: 0 0 1rem;
-  font-size: 1rem;
-}
-
-.chart-container {
-  height: 300px;
-}
-
 .two-column {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -695,7 +801,7 @@ onMounted(() => {
   margin-bottom: 1.5rem;
 }
 
-.top-partners-card, .recent-clicks-card {
+.top-partners-card, .summary-card {
   background: white;
   border-radius: 12px;
   padding: 1rem;
@@ -711,7 +817,7 @@ onMounted(() => {
   gap: 0.5rem;
 }
 
-.top-partners-card h3, .recent-clicks-card h3 {
+.top-partners-card h3, .summary-card h3 {
   color: #1e3a8a;
   margin: 0;
   font-size: 1rem;
@@ -756,38 +862,34 @@ onMounted(() => {
 .partner-stats .clicks { display: block; font-weight: bold; color: #1e3a8a; font-size: 0.85rem; }
 .partner-stats .links { font-size: 0.7rem; color: #10b981; }
 
-.recent-clicks-list {
-  display: flex;
-  flex-direction: column;
+.summary-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
-  max-height: 350px;
-  overflow-y: auto;
 }
 
-.click-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #e5e7eb;
+.summary-item {
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 8px;
+  text-align: center;
 }
 
-.click-icon {
-  width: 32px;
-  height: 32px;
-  background: #e0e7ff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.summary-label {
+  display: block;
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summary-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: #1e3a8a;
+  margin-top: 0.25rem;
 }
-
-.click-details { flex: 1; }
-.click-details p { margin: 0; font-size: 0.8rem; }
-.click-details small { font-size: 0.7rem; color: #9ca3af; }
-
-.click-location { font-size: 0.7rem; color: #6b7280; }
 
 .partners-table-card {
   background: white;
@@ -1006,6 +1108,95 @@ onMounted(() => {
 .links-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .link-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: #f8fafc; border-radius: 8px; }
 
+/* Export Modal */
+.export-section {
+  margin-bottom: 1.5rem;
+}
+
+.export-section label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.export-date-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.export-date-range .form-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+.export-date-range .form-group label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.export-date-range .date-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.export-date-range span {
+  color: #6b7280;
+  padding-bottom: 0.5rem;
+}
+
+.export-options {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
 .notification {
   position: fixed;
   bottom: 20px;
@@ -1038,5 +1229,8 @@ onMounted(() => {
   .search-box-small input { width: 100%; }
   .table-container { overflow-x: scroll; }
   .data-table { min-width: 700px; }
+  .summary-stats { grid-template-columns: 1fr; }
+  .export-date-range { flex-direction: column; align-items: stretch; }
+  .export-date-range span { display: none; }
 }
 </style>

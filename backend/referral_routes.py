@@ -45,10 +45,9 @@ def log_activity(user_id, user_name, action, resource_type, resource_id, descrip
         db.session.rollback()
 
 # ========== REFERRAL LINK CRUD ==========
+
 @referral_bp.route('/referral/links', methods=['GET'])
 @login_required
-
-
 def get_referral_links():
     """Get all referral links for current user"""
     try:
@@ -64,7 +63,7 @@ def get_referral_links():
         return jsonify([{
             'id': l.id,
             'name': l.name,
-            'link_code': l.link_code,
+            'link_code': l.link_code,  # <-- This should be l.link_code, not link_code
             'full_url': f"{frontend_url}/r/{l.link_code}",
             'destination_url': l.destination_url,
             'campaign_name': l.campaign_name,
@@ -80,6 +79,7 @@ def get_referral_links():
         print(f"Error fetching referral links: {e}")
         return jsonify([]), 200
 
+
 @referral_bp.route('/referral/links', methods=['POST'])
 @login_required
 
@@ -88,7 +88,7 @@ def create_referral_link():
     try:
         data = request.json
         name = data.get('name', '').strip()
-        destination_url = current_app.config.get('REFERRAL_DESTINATION_URL', 'http://localhost:5173/#products')
+        destination_url = current_app.config.get('REFERRAL_DESTINATION_URL', 'http://propeller-outclass-parsnip.ngrok-free.dev:5173/#products')
 
 
         campaign_name = data.get('campaign_name', '').strip()
@@ -99,7 +99,7 @@ def create_referral_link():
             return jsonify({'error': 'Link name is required'}), 400
         if not destination_url:
             
-            destination_url = 'http://localhost:5173/#products'
+            destination_url = 'https://propeller-outclass-parsnip.ngrok-free.dev:5173/#products'
         
         # Validate URL format
         if not re.match(r'^https?://', destination_url):
@@ -128,7 +128,7 @@ def create_referral_link():
         db.session.commit()
         
         # Generate full URL for frontend
-        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
         full_url = f"{frontend_url}/r/{link_code}"
         
         return jsonify({
@@ -942,7 +942,7 @@ def admin_get_all_links():
     try:
         links = ReferralLink.query.order_by(ReferralLink.created_at.desc()).all()
         
-        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
         
         return jsonify([{
             'id': l.id,
@@ -1015,7 +1015,7 @@ def admin_create_partner_link():
         db.session.add(link)
         db.session.commit()
         
-        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
         
         return jsonify({
             'message': f'Referral link created for {partner.full_name}',
@@ -1072,4 +1072,322 @@ def admin_get_partner_stats():
         
     except Exception as e:
         print(f"Error fetching partner stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+
+@referral_bp.route('/referral/analytics/partner', methods=['GET'])
+@login_required
+def get_partner_analytics():
+    """Get analytics for the current partner - matches frontend expectations"""
+    try:
+        days = request.args.get('days', 30, type=int)
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+        
+        # Get all referral links for current user
+        links = ReferralLink.query.filter_by(
+            user_id=current_user.id,
+            is_active=True
+        ).all()
+        
+        link_ids = [l.id for l in links] if links else []
+        
+        # Get clicks within date range
+        clicks = ReferralClick.query.filter(
+            ReferralClick.link_id.in_(link_ids),
+            ReferralClick.clicked_at >= start_date
+        ).all() if link_ids else []
+        
+        # Calculate stats
+        total_referrals = len(links)
+        total_clicks = len(clicks)
+        conversions = sum(1 for c in clicks if c.converted)
+        pending = len([c for c in clicks if not c.converted])
+        
+        # Calculate conversion rate
+        conversion_rate = round((conversions / total_clicks * 100), 2) if total_clicks > 0 else 0
+        
+        # Get recent referrals (last 5 clicks with details)
+        recent_clicks = ReferralClick.query.filter(
+            ReferralClick.link_id.in_(link_ids)
+        ).order_by(ReferralClick.clicked_at.desc()).limit(5).all() if link_ids else []
+        
+        recent_referrals = []
+        for click in recent_clicks:
+            link = next((l for l in links if l.id == click.link_id), None)
+            recent_referrals.append({
+                'id': click.id,
+                'link_name': link.name if link else 'Unknown',
+                'ip_address': click.ip_address,
+                'referrer_url': click.referrer_url or 'Direct',
+                'converted': click.converted,
+                'converted_at': click.clicked_at.isoformat() if click.converted else None,
+                'clicked_at': click.clicked_at.isoformat() if click.clicked_at else None
+            })
+        
+        # Get daily breakdown for chart
+        daily_stats = {}
+        for click in clicks:
+            date_key = click.clicked_at.strftime('%Y-%m-%d')
+            if date_key not in daily_stats:
+                daily_stats[date_key] = {'clicks': 0, 'conversions': 0}
+            daily_stats[date_key]['clicks'] += 1
+            if click.converted:
+                daily_stats[date_key]['conversions'] += 1
+        
+        # Generate full date range for chart
+        chart_data = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_key = current_date.strftime('%Y-%m-%d')
+            stats = daily_stats.get(date_key, {'clicks': 0, 'conversions': 0})
+            chart_data.append({
+                'date': date_key,
+                'clicks': stats['clicks'],
+                'conversions': stats['conversions']
+            })
+            current_date += timedelta(days=1)
+        
+        # Get top performing links
+        top_links = sorted(links, key=lambda l: l.total_clicks, reverse=True)[:5]
+        top_links_data = [{
+            'id': l.id,
+            'name': l.name,
+            'link_code': l.link_code,
+            'total_clicks': l.total_clicks,
+            'unique_clicks': l.unique_clicks,
+            'conversions': l.conversions,
+            'conversion_rate': round((l.conversions / l.total_clicks * 100), 2) if l.total_clicks > 0 else 0
+        } for l in top_links]
+        
+        # Return data matching frontend expectations
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_referrals': total_referrals,
+                'conversions': conversions,
+                'pending': pending,
+                'total_clicks': total_clicks,
+                'conversion_rate': conversion_rate,
+                'chart_data': chart_data,
+                'recent_referrals': recent_referrals,
+                'top_links': top_links_data,
+                'period_days': days
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in get_partner_analytics: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    
+
+
+
+@referral_bp.route('/referral/analytics/partner/summary', methods=['GET'])
+@login_required
+def get_partner_summary():
+    """Get quick summary stats for partner dashboard"""
+    try:
+        # Get total links
+        total_links = ReferralLink.query.filter_by(
+            user_id=current_user.id,
+            is_active=True
+        ).count()
+        
+        # Get total clicks from user model
+        total_clicks = current_user.total_clicks or 0
+        total_conversions = current_user.total_conversions or 0
+        
+        # Get clicks from last 30 days
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_clicks = ReferralClick.query.join(
+            ReferralLink
+        ).filter(
+            ReferralLink.user_id == current_user.id,
+            ReferralClick.clicked_at >= thirty_days_ago
+        ).count()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_links': total_links,
+                'total_clicks': total_clicks,
+                'total_conversions': total_conversions,
+                'recent_clicks': recent_clicks
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@referral_bp.route('/referral/track-nav', methods=['POST'])
+def track_navigation():
+    """Track navigation clicks from referral users"""
+    try:
+        data = request.json
+        referral_code = data.get('referralCode')
+        
+        if not referral_code:
+            return jsonify({'success': False, 'error': 'No referral code'}), 400
+        
+        # Get IP address
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        user_agent = request.headers.get('User-Agent', '')
+        
+        # Create navigation record
+        from models import ReferralNavigation
+        
+        nav = ReferralNavigation(
+            referral_code=referral_code,
+            session_id=data.get('sessionId'),
+            action=data.get('action', 'nav_click'),
+            link_text=data.get('linkText', ''),
+            link_href=data.get('linkHref', ''),
+            link_id=data.get('linkId', ''),
+            link_class=data.get('linkClass', ''),
+            page_url=data.get('pageUrl', ''),
+            page_title=data.get('pageTitle', ''),
+            referrer_url=data.get('referrerUrl', ''),
+            ip_address=ip_address,
+            user_agent=user_agent[:500],  # Limit length
+            screen_size=data.get('screenSize', ''),
+            time_spent=data.get('timeSpent', 0)
+        )
+        
+        db.session.add(nav)
+        db.session.commit()
+        
+        print(f"📊 Referral Navigation: {referral_code} -> {data.get('linkText', 'Unknown')}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Navigation tracked'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error tracking navigation: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@referral_bp.route('/referral/analytics/navigation', methods=['GET'])
+@login_required
+def get_navigation_analytics():
+    """Get navigation analytics for a partner"""
+    try:
+        referral_code = request.args.get('code')
+        days = request.args.get('days', 30, type=int)
+        
+        from models import ReferralNavigation, ReferralLink
+        
+        # If no code provided, get the partner's referral code
+        if not referral_code:
+            link = ReferralLink.query.filter_by(
+                user_id=current_user.id,
+                is_active=True
+            ).first()
+            if link:
+                referral_code = link.link_code
+        
+        if not referral_code:
+            return jsonify({'error': 'No referral code found'}), 404
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=days)
+        
+        # Get navigation data
+        navigations = ReferralNavigation.query.filter(
+            ReferralNavigation.referral_code == referral_code,
+            ReferralNavigation.created_at >= start_date
+        ).order_by(ReferralNavigation.created_at.desc()).all()
+        
+        # Aggregated stats
+        total_clicks = ReferralNavigation.query.filter_by(
+            referral_code=referral_code,
+            action='nav_click'
+        ).count()
+        
+        total_exits = ReferralNavigation.query.filter_by(
+            referral_code=referral_code,
+            action='exit'
+        ).count()
+        
+        # Most visited pages
+        page_stats = db.session.query(
+            ReferralNavigation.page_url,
+            func.count(ReferralNavigation.id).label('visits')
+        ).filter(
+            ReferralNavigation.referral_code == referral_code,
+            ReferralNavigation.page_url != ''
+        ).group_by(
+            ReferralNavigation.page_url
+        ).order_by(
+            func.count(ReferralNavigation.id).desc()
+        ).limit(10).all()
+        
+        # Most clicked links
+        link_stats = db.session.query(
+            ReferralNavigation.link_text,
+            ReferralNavigation.link_href,
+            func.count(ReferralNavigation.id).label('clicks')
+        ).filter(
+            ReferralNavigation.referral_code == referral_code,
+            ReferralNavigation.link_text != ''
+        ).group_by(
+            ReferralNavigation.link_text,
+            ReferralNavigation.link_href
+        ).order_by(
+            func.count(ReferralNavigation.id).desc()
+        ).limit(10).all()
+        
+        # Average time on page
+        avg_time = db.session.query(
+            func.avg(ReferralNavigation.time_spent)
+        ).filter(
+            ReferralNavigation.referral_code == referral_code,
+            ReferralNavigation.action == 'exit',
+            ReferralNavigation.time_spent > 0
+        ).scalar() or 0
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'summary': {
+                    'total_navigations': len(navigations),
+                    'total_clicks': total_clicks,
+                    'total_exits': total_exits,
+                    'avg_time_on_page': round(avg_time, 1),
+                    'period_days': days
+                },
+                'top_pages': [{
+                    'url': p.page_url,
+                    'visits': p.visits
+                } for p in page_stats],
+                'top_links': [{
+                    'text': l.link_text,
+                    'href': l.link_href,
+                    'clicks': l.clicks
+                } for l in link_stats],
+                'recent_activity': [n.to_dict() for n in navigations[:50]]
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error getting navigation analytics: {e}")
         return jsonify({'error': str(e)}), 500

@@ -4,11 +4,11 @@ import authService from '@/services/auth'
 
 // Import existing views
 import Home from '../views/Home.vue'
-import ProductDetail from '../views/ProductDetail.vue'
-import BlogDetail from '../views/BlogDetail.vue'
-import Shop from '../views/Shop.vue'
-import Careers from '../views/Careers.vue'
-import CSR from '../views/CSR.vue'
+
+
+
+
+
 
 // Admin Views
 import AdminLogin from '../views/admin/Login.vue'
@@ -31,9 +31,6 @@ import ReferralRedirect from '../views/ReferralRedirect.vue'
 
 
 
-// jobs
-import Jobs from '../views/Jobs.vue'
-import JobDetail from '../views/JobDetail.vue'
 
 const routes = [
   // Public routes
@@ -43,36 +40,9 @@ const routes = [
     component: Home,
     meta: { title: 'Mount Kenya Milk - Kenya\'s Largest Dairy Co-operative' }
   },
-  {
-    path: '/product/:id',
-    name: 'ProductDetail',
-    component: ProductDetail,
-    meta: { title: 'Product Details | Mount Kenya Milk' }
-  },
-  {
-    path: '/blog/:slug',
-    name: 'BlogDetail',
-    component: BlogDetail,
-    meta: { title: 'Blog Post | Mount Kenya Milk' }
-  },
-  {
-    path: '/shop',
-    name: 'Shop',
-    component: Shop,
-    meta: { title: 'Shop Online | Mount Kenya Milk' }
-  },
-  {
-    path: '/careers',
-    name: 'Careers',
-    component: Careers,
-    meta: { title: 'Careers | Mount Kenya Milk' }
-  },
-  {
-    path: '/csr',
-    name: 'CSR',
-    component: CSR,
-    meta: { title: 'CSR | Mount Kenya Milk' }
-  },
+  
+ 
+
   
   // Auth routes
   {
@@ -198,9 +168,6 @@ const routes = [
     name: 'ReferralRedirect', 
     component: ReferralRedirect 
   },
-
-    { path: '/jobs', name: 'Jobs', component: Jobs },
-  { path: '/jobs/:slug', name: 'JobDetail', component: JobDetail }
 
 
 

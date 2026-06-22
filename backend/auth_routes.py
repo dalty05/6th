@@ -134,7 +134,7 @@ def register():
     db.session.commit()
     
     # Send verification email
-    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
     if not email_service.send_verification_email(user, token_obj.token, frontend_url):
         print(f"Failed to send registration verification email to {user.email}")
         return jsonify({'error': 'Registration succeeded, but verification email could not be sent. Please check SMTP settings.'}), 500
@@ -164,7 +164,7 @@ def verify_email():
     
     # Notify super admins about new registration
     super_admins = User.query.filter_by(role='super_admin', is_active=True).all()
-    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
     
     for super_admin in super_admins:
         # Send notification email to super admins
@@ -316,7 +316,7 @@ def forgot_password():
         db.session.add(token_obj)
         db.session.commit()
         
-        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+        frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
         email_service.send_password_reset_email(user, token_obj.token, frontend_url)
     
     return jsonify({'message': 'If an account exists, you will receive a password reset email.'}), 200
@@ -353,7 +353,7 @@ def logout():
     logout_user()
     return jsonify({'message': 'Logged out successfully'}), 200
 
-# Protected Admin Routes (Super Admin only)
+#  (Super Admin only)
 
 @auth_bp.route('/admin/users', methods=['GET'])
 @login_required
@@ -379,7 +379,7 @@ def approve_user(user_id):
     db.session.commit()
     
     # Send approval email
-    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
     email_service.send_approval_email(user, frontend_url)
     
     return jsonify({'message': f'{user.full_name} has been approved'}), 200
@@ -500,7 +500,7 @@ def check_auth_alias():
     """Alias for legacy admin auth checks"""
     return check_auth()
 
-# Add this to auth_routes.py
+
 @auth_bp.route('/auth/login/test', methods=['POST'])
 def test_login():
     """TEMPORARY: Test login without OTP - Remove in production"""

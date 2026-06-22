@@ -301,7 +301,7 @@ class EmailService:
     
     def send_welcome_email(self, user, password):
         """Send welcome email with credentials (when super admin creates user)"""
-        login_url = f"{os.environ.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev/')}/admin/login"
+        login_url = f"{os.environ.get('FRONTEND_URL', 'http://propeller-outclass-parsnip.ngrok-free.dev:5173/')}/admin/login"
         
         html = f"""
         <!DOCTYPE html>
@@ -432,7 +432,7 @@ class EmailService:
                     </div>
                     
                     <p style="text-align: center;">
-                        <a href="https://propeller-outclass-parsnip.ngrok-free.dev/" class="button">View Application</a>
+                        <a href="https://propeller-outclass-parsnip.ngrok-free.dev:5173/" class="button">View Application</a>
                     </p>
                 </div>
                 <div class="footer">

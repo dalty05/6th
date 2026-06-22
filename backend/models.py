@@ -95,7 +95,6 @@ class User(UserMixin, db.Model):
                 'partners': {'read': True if self.role == 'super_admin' else False},
                 'referrals': {'read': True, 'create': True, 'update': True},
                 'statistics': {'read': True},
-                'settings': {'read': True if self.role == 'super_admin' else False},
                 'contacts': {'read': True if self.role == 'super_admin' else False}
             }
         
@@ -110,11 +109,11 @@ class User(UserMixin, db.Model):
                 'partners': {'create': True, 'read': True, 'update': True, 'delete': True},
                 'referrals': {'create': True, 'read': True, 'update': True, 'delete': True},
                 'statistics': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'settings': {'create': True, 'read': True, 'update': True, 'delete': True},
+                
                 'contacts': {'create': True, 'read': True, 'update': True, 'delete': True}
             }
         
-        resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'settings', 'contacts']
+        resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics',  'contacts']
         actions = ['create', 'read', 'update', 'delete']
         
         permissions = {}
@@ -184,40 +183,6 @@ class User(UserMixin, db.Model):
         self.referral_code = code
         return code
 
-
-# def get_default_permissions(self):
-#         """Get default permissions based on role"""
-#         if self.role == 'super_admin':
-#             return {
-#                 'products': {'create': True, 'read': True, 'update': True, 'delete': True},
-#                 'blog': {'create': True, 'read': True, 'update': True, 'delete': True},
-#                 'users': {'create': True, 'read': True, 'update': True, 'delete': True},
-#                 'partners': {'create': True, 'read': True, 'update': True, 'delete': True},
-#                 'referrals': {'create': True, 'read': True, 'update': True, 'delete': True},
-#                 'statistics': {'create': True, 'read': True, 'update': True, 'delete': True},
-#                 'settings': {'create': True, 'read': True, 'update': True, 'delete': True}
-#             }
-#         elif self.role == 'admin':
-#             return {
-#                 'products': {'create': True, 'read': True, 'update': True, 'delete': False},
-#                 'blog': {'create': True, 'read': True, 'update': True, 'delete': False},
-#                 'users': {'create': False, 'read': True, 'update': False, 'delete': False},
-#                 'partners': {'create': True, 'read': True, 'update': True, 'delete': False},
-#                 'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
-#                 'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
-#                 'settings': {'create': False, 'read': False, 'update': False, 'delete': False}
-#             }
-#         else:  # partner
-#             return {
-#                 'products': {'create': False, 'read': True, 'update': False, 'delete': False},
-#                 'blog': {'create': False, 'read': True, 'update': False, 'delete': False},
-#                 'users': {'create': False, 'read': False, 'update': False, 'delete': False},
-#                 'partners': {'create': False, 'read': False, 'update': False, 'delete': False},
-#                 'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
-#                 'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
-#                 'settings': {'create': False, 'read': False, 'update': False, 'delete': False}
-#             }
-    
 
 
 
@@ -556,24 +521,6 @@ class LoginAttempt(db.Model):
     attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-# class SystemSetting(db.Model):
-#     """System settings stored as key-value pairs"""
-#     __tablename__ = 'system_settings'
-    
-#     id = db.Column(db.Integer, primary_key=True)
-#     key = db.Column(db.String(100), unique=True, nullable=False, index=True)
-#     value = db.Column(db.Text, nullable=True)
-#     group = db.Column(db.String(50), default='general')  # general, email, security, backup, api
-#     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-#     def to_dict(self):
-#         return {
-#             'id': self.id,
-#             'key': self.key,
-#             'value': self.value,
-#             'group': self.group,
-#             'updated_at': self.updated_at.isoformat() if self.updated_at else None
-#         }
 
 
 
@@ -630,18 +577,6 @@ class ActivityLog(db.Model):
         }
     
 
-class SystemSetting(db.Model):
-    """System settings stored as key-value pairs"""
-    __tablename__ = 'system_settings'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
-    value = db.Column(db.Text, nullable=True)
-    group = db.Column(db.String(50), default='general')
-    description = db.Column(db.String(500))  # ← Add this field
-    is_public = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
    
 
 
@@ -763,29 +698,6 @@ class JobApplication(db.Model):
 
 
 
-#outlets
-# class Outlet(db.Model):
-#     __tablename__ = 'outlets'
-
-#     id = db.Column(db.Integer, primary_key=True)
-#     name = db.Column(db.String(200), nullable=False)
-#     slug = db.Column(db.String(200), unique=True, nullable=False)
-#     description = db.Column(db.Text)
-#     logo_url = db.Column(db.String(500))
-#     website_url = db.Column(db.String(500))
-#     email = db.Column(db.String(120))
-#     phone = db.Column(db.String(20))
-#     address = db.Column(db.String(200))
-#     city = db.Column(db.String(100))
-#     state = db.Column(db.String(100))
-#     country = db.Column(db.String(100))
-#     postal_code = db.Column(db.String(20))
-#     is_active = db.Column(db.Boolean, default=True)
-#     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-#     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-
 class Outlet(db.Model):
     __tablename__ = 'outlets'
     
@@ -819,7 +731,7 @@ class Outlet(db.Model):
 
 
 
-# Add these models to your existing models.py
+
 
 class UserPermission(db.Model):
     """User-specific permissions - overrides role defaults"""
@@ -827,7 +739,7 @@ class UserPermission(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    resource = db.Column(db.String(50), nullable=False)  # products, jobs, outlets, blog, referrals, users, contacts, settings
+    resource = db.Column(db.String(50), nullable=False)  # products, jobs, outlets, blog, referrals, users, contacts
     action = db.Column(db.String(20), nullable=False)    # create, read, update, delete
     is_allowed = db.Column(db.Boolean, default=True)
     
@@ -863,3 +775,47 @@ class ResourcePermission(db.Model):
     __table_args__ = (
         db.UniqueConstraint('user_id', 'resource_type', 'resource_id', 'action', name='unique_resource_permission'),
     )
+
+
+
+
+class ReferralNavigation(db.Model):
+    __tablename__ = 'referral_navigations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    referral_code = db.Column(db.String(50), index=True, nullable=False)
+    session_id = db.Column(db.String(100), index=True)
+    
+    # Action details
+    action = db.Column(db.String(20), default='nav_click')  # nav_click, exit, page_view
+    link_text = db.Column(db.String(200))
+    link_href = db.Column(db.String(500))
+    link_id = db.Column(db.String(100))
+    link_class = db.Column(db.String(200))
+    
+    # Page context
+    page_url = db.Column(db.String(500))
+    page_title = db.Column(db.String(200))
+    referrer_url = db.Column(db.String(500))
+    
+    # User context
+    ip_address = db.Column(db.String(50))
+    user_agent = db.Column(db.String(500))
+    screen_size = db.Column(db.String(50))
+    
+    # Time metrics
+    time_spent = db.Column(db.Integer)  # seconds
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'referral_code': self.referral_code,
+            'action': self.action,
+            'link_text': self.link_text,
+            'link_href': self.link_href,
+            'page_url': self.page_url,
+            'page_title': self.page_title,
+            'time_spent': self.time_spent,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

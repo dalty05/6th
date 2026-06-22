@@ -1,4 +1,3 @@
-# backend/permission_routes.py
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from models import db, User, UserPermission
@@ -32,7 +31,7 @@ def get_user_permissions_route(user_id):
     custom_perms = UserPermission.query.filter_by(user_id=user_id).all()
     
     # Get effective permissions using the same logic as middleware
-    resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'settings', 'contacts']
+    resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'contacts']
     actions = ['create', 'read', 'update', 'delete']
     
     effective_permissions = {}
@@ -128,7 +127,6 @@ def get_resources():
         {'name': 'partners', 'label': 'Partners', 'actions': ['create', 'read', 'update', 'delete']},
         {'name': 'referrals', 'label': 'Referrals', 'actions': ['create', 'read', 'update', 'delete']},
         {'name': 'statistics', 'label': 'Statistics', 'actions': ['read']},
-        {'name': 'settings', 'label': 'Settings', 'actions': ['read', 'update']},
         {'name': 'contacts', 'label': 'Contacts', 'actions': ['read', 'update', 'delete']}
     ]
     return jsonify(resources), 200

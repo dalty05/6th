@@ -16,9 +16,7 @@
         <div class="initiative-info">
           <h4>{{ initiative.title }}</h4>
           <p>{{ initiative.shortDescription }}</p>
-          <button @click="showInitiativeDetails(initiative)" class="btn-details">
-            Learn More <i class="fas fa-arrow-right"></i>
-          </button>
+          
         </div>
       </div>
     </div>

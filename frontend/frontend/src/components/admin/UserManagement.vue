@@ -43,10 +43,26 @@
       </div>
     </div>
 
-    <!-- Search -->
-    <div class="search-box">
-      <i class="fas fa-search"></i>
-      <input type="text" v-model="searchQuery" placeholder="Search users by name or email...">
+    <!-- Search and Filter -->
+    <div class="search-section">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" v-model="searchQuery" placeholder="Search users by name or email...">
+      </div>
+      <div class="filter-options">
+        <select v-model="roleFilter" class="filter-select">
+          <option value="">All Roles</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="partner">Partner</option>
+        </select>
+        <select v-model="statusFilter" class="filter-select">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -55,85 +71,104 @@
       <p>Loading users...</p>
     </div>
 
-    <!-- Users Grid -->
-    <div v-else class="users-grid">
-      <div v-for="user in paginatedUsers" :key="user.id" class="user-card">
-        <div class="user-header">
-          <div class="user-avatar">
-            <i class="fas fa-user-circle"></i>
-          </div>
-          <div class="user-info">
-            <h3>{{ user.full_name }}</h3>
-            <span :class="['role-badge', getRoleClass(user.role)]">
-              {{ getRoleLabel(user.role) }}
-            </span>
-          </div>
-          <div class="user-status">
-            <span :class="['status', user.is_active ? 'active' : 'inactive']">
-              {{ user.is_active ? 'Active' : 'Inactive' }}
-            </span>
-            <span v-if="!user.is_approved" class="status pending">
-              Pending
-            </span>
-          </div>
-        </div>
-
-        <div class="user-body">
-          <p><i class="fas fa-envelope"></i> {{ user.email }}</p>
-          <p v-if="user.referral_code"><i class="fas fa-link"></i> Code: {{ user.referral_code }}</p>
-          <p><i class="fas fa-calendar"></i> Joined: {{ formatDate(user.created_at) }}</p>
-          <p v-if="user.last_login"><i class="fas fa-clock"></i> Last login: {{ formatDate(user.last_login) }}</p>
-        </div>
-
-        <div class="user-footer">
-          <div class="referral-stats">
-            <span><i class="fas fa-mouse-pointer"></i> {{ user.total_clicks || 0 }} clicks</span>
-            <span><i class="fas fa-chart-line"></i> {{ user.total_conversions || 0 }} conversions</span>
-          </div>
-
-        <div class="action-buttons">
-  <!-- Edit button -->
-  <button @click="editUser(user)" class="action-btn edit" title="Edit">
-    <i class="fas fa-edit"></i>
-  </button>
-  
-  <!-- Approve button -->
-  <button v-if="!user.is_approved" @click="approveUser(user.id)" class="action-btn approve" title="Approve">
-    <i class="fas fa-check-circle"></i>
-  </button>
-  
-  <!-- Suspend button -->
-  <button v-if="user.is_active && user.id !== currentUserId" @click="suspendUser(user)" class="action-btn suspend" title="Suspend">
-    <i class="fas fa-ban"></i>
-  </button>
-  
-  <!-- Activate button -->
-  <button v-if="!user.is_active && user.id !== currentUserId" @click="activateUser(user.id)" class="action-btn activate" title="Activate">
-    <i class="fas fa-play-circle"></i>
-  </button>
-  
-  <!-- Reset Password button - opens modal -->
-  <button @click="openResetModal(user)" class="action-btn reset" title="Reset Password">
-    <i class="fas fa-key"></i>
-  </button>
-  
-  <!-- Delete button -->
-  <button v-if="user.id !== currentUserId" @click="openDeleteModal(user)" class="action-btn delete" title="Delete">
-    <i class="fas fa-trash-alt"></i>
-  </button>
-</div>
-          
-
-
-        </div>
-      </div>
-    </div>
-
-    <!-- No Results -->
-    <div v-if="!loading && filteredUsers.length === 0" class="no-results">
-      <i class="fas fa-users-slash"></i>
-      <h3>No Users Found</h3>
-      <p>Try adjusting your search</p>
+    <!-- Users Table -->
+    <div v-else class="table-container">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Referral Stats</th>
+            <th>Joined</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="user in paginatedUsers" :key="user.id">
+            <td class="user-cell">
+              <div class="user-avatar">
+                <i class="fas fa-user-circle"></i>
+              </div>
+              <div class="user-details">
+                <div class="user-name">{{ user.full_name }}</div>
+                <div class="user-email">{{ user.email }}</div>
+              </div>
+            </td>
+            <td>
+              <span :class="['role-badge', getRoleClass(user.role)]">
+                {{ getRoleLabel(user.role) }}
+              </span>
+            </td>
+            <td>
+              <div class="status-group">
+                <span :class="['status', user.is_active ? 'active' : 'inactive']">
+                  {{ user.is_active ? 'Active' : 'Inactive' }}
+                </span>
+                <span v-if="!user.is_approved" class="status pending">
+                  Pending
+                </span>
+              </div>
+            </td>
+            <td>
+              <div class="referral-stats">
+                <span><i class="fas fa-mouse-pointer"></i> {{ user.total_clicks || 0 }}</span>
+                <span><i class="fas fa-chart-line"></i> {{ user.total_conversions || 0 }}</span>
+                <span v-if="user.referral_code" class="ref-code">
+                  <i class="fas fa-link"></i> {{ user.referral_code }}
+                </span>
+              </div>
+            </td>
+            <td>
+              <div class="date-info">
+                <div>{{ formatDate(user.created_at) }}</div>
+                <div v-if="user.last_login" class="last-login">
+                  <i class="fas fa-clock"></i> {{ formatDate(user.last_login) }}
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="action-buttons">
+                <!-- Edit -->
+                <button @click="editUser(user)" class="action-btn edit" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                
+                <!-- Approve -->
+                <button v-if="!user.is_approved" @click="approveUser(user.id)" class="action-btn approve" title="Approve">
+                  <i class="fas fa-check-circle"></i>
+                </button>
+                
+                <!-- Suspend -->
+                <button v-if="user.is_active && user.id !== currentUserId" @click="suspendUser(user)" class="action-btn suspend" title="Suspend">
+                  <i class="fas fa-ban"></i>
+                </button>
+                
+                <!-- Activate -->
+                <button v-if="!user.is_active && user.id !== currentUserId" @click="activateUser(user.id)" class="action-btn activate" title="Activate">
+                  <i class="fas fa-play-circle"></i>
+                </button>
+                
+                <!-- Reset Password - FIXED -->
+                <button @click="openResetModal(user)" class="action-btn reset" title="Reset Password">
+                  <i class="fas fa-key"></i>
+                </button>
+                
+                <!-- Delete -->
+                <button v-if="user.id !== currentUserId" @click="openDeleteModal(user)" class="action-btn delete" title="Delete">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr v-if="filteredUsers.length === 0">
+            <td colspan="6" class="no-results">
+              <i class="fas fa-users-slash"></i>
+              <p>No users found matching your search</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Pagination -->
@@ -142,6 +177,7 @@
         <i class="fas fa-chevron-left"></i> Previous
       </button>
       <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+      <span class="items-info">{{ filteredUsers.length }} total users</span>
       <button @click="nextPage" :disabled="currentPage === totalPages" class="page-btn">
         Next <i class="fas fa-chevron-right"></i>
       </button>
@@ -193,91 +229,130 @@
       </div>
     </div>
 
-    <!-- suspend modal -->
+    <!-- Reset Password Modal - FIXED -->
+    <div class="modal-overlay" v-if="showResetModal" @click.self="closeResetModal">
+      <div class="modal-container modal-sm">
+        <div class="modal-header">
+          <h2>Reset Password</h2>
+          <button class="close-btn" @click="closeResetModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="reset-info">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>You are about to reset the password for:</p>
+            <div class="user-info-display">
+              <strong>{{ resetUserData?.full_name }}</strong>
+              <span>{{ resetUserData?.email }}</span>
+            </div>
+          </div>
+          
+          <div class="password-display" v-if="newPassword">
+            <label>New Password:</label>
+            <div class="password-result">
+              <code>{{ newPassword }}</code>
+              <button @click="copyPassword" class="copy-btn" title="Copy password">
+                <i class="fas fa-copy"></i>
+              </button>
+            </div>
+            <p class="warning">Copy this password now. It will not be shown again.</p>
+          </div>
+
+          <div class="form-actions" :class="{ 'justify-center': !!newPassword }">
+            <template v-if="!newPassword">
+              <button @click="closeResetModal" class="btn-cancel">Cancel</button>
+              <button @click="confirmResetPassword" class="btn-warning" :disabled="resetting">
+                <i v-if="resetting" class="fas fa-spinner fa-spin"></i>
+                {{ resetting ? 'Resetting...' : 'Reset Password' }}
+              </button>
+            </template>
+            <template v-else>
+              <button @click="closeResetModal" class="btn-submit">Done</button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suspend Modal -->
     <div class="modal-overlay" v-if="showSuspendModal" @click.self="closeSuspendModal">
-    <div class="modal-container modal-sm">
-      <div class="modal-header">
-        <h2>Suspend User</h2>
-        <button class="close-btn" @click="closeSuspendModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p>You are about to suspend <strong>{{ suspendUserData?.full_name }}</strong></p>
-        <div class="form-group">
-          <label>Reason for suspension *</label>
-          <textarea v-model="suspendReason" rows="4" placeholder="Please provide a reason for suspending this user..."></textarea>
+      <div class="modal-container modal-sm">
+        <div class="modal-header">
+          <h2>Suspend User</h2>
+          <button class="close-btn" @click="closeSuspendModal">&times;</button>
         </div>
-        <div class="form-actions">
-          <button @click="closeSuspendModal" class="btn-cancel">Cancel</button>
-          <button @click="confirmSuspend" class="btn-danger" :disabled="!suspendReason.trim()">
-            Confirm Suspension
-          </button>
+        <div class="modal-body">
+          <p>You are about to suspend <strong>{{ suspendUserData?.full_name }}</strong></p>
+          <div class="form-group">
+            <label>Reason for suspension *</label>
+            <textarea v-model="suspendReason" rows="4" placeholder="Please provide a reason for suspending this user..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button @click="closeSuspendModal" class="btn-cancel">Cancel</button>
+            <button @click="confirmSuspend" class="btn-danger" :disabled="!suspendReason.trim()">
+              Confirm Suspension
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-    
-    <!-- Delete Confirmation Modal -->  
-   <div class="modal-overlay" v-if="showDeleteModal" @click.self="closeDeleteModal">
-    <div class="modal-container modal-sm">
-      <div class="modal-header">
-        <h2 class="delete-title">⚠️ Permanently Delete User</h2>
-        <button class="close-btn" @click="closeDeleteModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="delete-warning">
-          <i class="fas fa-exclamation-triangle"></i>
-          <p>This action <strong>cannot be undone</strong>. This will permanently delete:</p>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" v-if="showDeleteModal" @click.self="closeDeleteModal">
+      <div class="modal-container modal-sm">
+        <div class="modal-header" style="background: linear-gradient(135deg, #dc2626, #b91c1c);">
+          <h2>⚠️ Permanently Delete User</h2>
+          <button class="close-btn" @click="closeDeleteModal">&times;</button>
         </div>
-        
-        <div class="delete-user-info">
-          <div class="user-detail">
-            <span class="label">Name:</span>
-            <span class="value">{{ deleteUserData?.full_name }}</span>
+        <div class="modal-body">
+          <div class="delete-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>This action <strong>cannot be undone</strong>. This will permanently delete:</p>
           </div>
-          <div class="user-detail">
-            <span class="label">Email:</span>
-            <span class="value">{{ deleteUserData?.email }}</span>
+          
+          <div class="delete-user-info">
+            <div class="user-detail">
+              <span class="label">Name:</span>
+              <span class="value">{{ deleteUserData?.full_name }}</span>
+            </div>
+            <div class="user-detail">
+              <span class="label">Email:</span>
+              <span class="value">{{ deleteUserData?.email }}</span>
+            </div>
+            <div class="user-detail">
+              <span class="label">Role:</span>
+              <span class="value">{{ getRoleLabel(deleteUserData?.role) }}</span>
+            </div>
           </div>
-          <div class="user-detail">
-            <span class="label">Role:</span>
-            <span class="value">{{ getRoleLabel(deleteUserData?.role) }}</span>
+          
+          <div class="delete-items-list">
+            <p><strong>The following data will be deleted:</strong></p>
+            <ul>
+              <li><i class="fas fa-link"></i> All referral links and click data</li>
+              <li><i class="fas fa-lock"></i> All custom permissions</li>
+              <li><i class="fas fa-history"></i> All activity logs</li>
+              <li><i class="fas fa-key"></i> Login history and OTP records</li>
+            </ul>
           </div>
-        </div>
-        
-        <div class="delete-items-list">
-          <p><strong>The following data will be deleted:</strong></p>
-          <ul>
-            <li><i class="fas fa-link"></i> All referral links and click data</li>
-            <li><i class="fas fa-lock"></i> All custom permissions</li>
-            <li><i class="fas fa-history"></i> All activity logs</li>
-            <li><i class="fas fa-key"></i> Login history and OTP records</li>
-          </ul>
-        </div>
-        
-        <div class="confirm-input">
-          <label>Type <strong>"DELETE"</strong> to confirm:</label>
-          <input type="text" v-model="deleteConfirmText" placeholder="DELETE" class="delete-confirm-input">
-        </div>
-        
-        <div class="form-actions">
-          <button @click="closeDeleteModal" class="btn-cancel">Cancel</button>
-          <button 
-            @click="confirmDelete" 
-            class="btn-danger" 
-            :disabled="deleteConfirmText !== 'DELETE' || deleting"
-          >
-            <i v-if="deleting" class="fas fa-spinner fa-spin"></i>
-            {{ deleting ? 'Deleting...' : 'Permanently Delete' }}
-          </button>
+          
+          <div class="confirm-input">
+            <label>Type <strong>"DELETE"</strong> to confirm:</label>
+            <input type="text" v-model="deleteConfirmText" placeholder="DELETE" class="delete-confirm-input">
+          </div>
+          
+          <div class="form-actions">
+            <button @click="closeDeleteModal" class="btn-cancel">Cancel</button>
+            <button 
+              @click="confirmDelete" 
+              class="btn-danger" 
+              :disabled="deleteConfirmText !== 'DELETE' || deleting"
+            >
+              <i v-if="deleting" class="fas fa-spinner fa-spin"></i>
+              {{ deleting ? 'Deleting...' : 'Permanently Delete' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-
-
-
-
-
   </div>
 </template>
 
@@ -287,29 +362,36 @@ import { toast } from 'vue3-toastify'
 import api from '@/services/api'
 import authService from '@/services/auth'
 
-
-
-const showDeleteModal = ref(false)
-const deleteUserData = ref(null)
-const deleteConfirmText = ref('')
-const deleting = ref(false)
-
+// ========== STATE ==========
 const users = ref([])
 const loading = ref(false)
+const searchQuery = ref('')
+const roleFilter = ref('')
+const statusFilter = ref('')
+const currentPage = ref(1)
+const itemsPerPage = 10
+
+// Modal states
 const showModal = ref(false)
 const editingUser = ref(null)
 const newUserPassword = ref('')
-const searchQuery = ref('')
-const currentPage = ref(1)
-const itemsPerPage = 12
 
+// Reset Password - FIXED
+const showResetModal = ref(false)
+const resetUserData = ref(null)
+const newPassword = ref('')
+const resetting = ref(false)
 
-
+// Suspend
 const showSuspendModal = ref(false)
 const suspendUserData = ref(null)
 const suspendReason = ref('')
 
-
+// Delete
+const showDeleteModal = ref(false)
+const deleteUserData = ref(null)
+const deleteConfirmText = ref('')
+const deleting = ref(false)
 
 const currentUser = authService.getUser()
 const currentUserId = computed(() => currentUser?.id)
@@ -322,18 +404,38 @@ const form = ref({
   is_approved: true
 })
 
-// Computed
+// ========== COMPUTED ==========
 const activeUsers = computed(() => users.value.filter(u => u.is_active).length)
 const pendingUsers = computed(() => users.value.filter(u => !u.is_approved).length)
 const adminCount = computed(() => users.value.filter(u => u.role === 'admin' || u.role === 'super_admin').length)
 
 const filteredUsers = computed(() => {
-  if (!searchQuery.value) return users.value
-  const query = searchQuery.value.toLowerCase()
-  return users.value.filter(u => 
-    u.full_name.toLowerCase().includes(query) || 
-    u.email.toLowerCase().includes(query)
-  )
+  let result = users.value
+  
+  // Search filter
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(u => 
+      u.full_name.toLowerCase().includes(query) || 
+      u.email.toLowerCase().includes(query)
+    )
+  }
+  
+  // Role filter
+  if (roleFilter.value) {
+    result = result.filter(u => u.role === roleFilter.value)
+  }
+  
+  // Status filter
+  if (statusFilter.value === 'active') {
+    result = result.filter(u => u.is_active && u.is_approved)
+  } else if (statusFilter.value === 'inactive') {
+    result = result.filter(u => !u.is_active)
+  } else if (statusFilter.value === 'pending') {
+    result = result.filter(u => !u.is_approved)
+  }
+  
+  return result
 })
 
 const totalPages = computed(() => Math.ceil(filteredUsers.value.length / itemsPerPage))
@@ -342,7 +444,7 @@ const paginatedUsers = computed(() => {
   return filteredUsers.value.slice(start, start + itemsPerPage)
 })
 
-// Methods
+// ========== METHODS ==========
 const loadUsers = async () => {
   loading.value = true
   try {
@@ -364,6 +466,7 @@ const nextPage = () => {
   if (currentPage.value < totalPages.value) currentPage.value++
 }
 
+// ========== CREATE/EDIT USER ==========
 const openCreateModal = () => {
   editingUser.value = null
   newUserPassword.value = ''
@@ -407,6 +510,13 @@ const saveUser = async () => {
   }
 }
 
+const closeModal = () => {
+  showModal.value = false
+  editingUser.value = null
+  newUserPassword.value = ''
+}
+
+// ========== APPROVE ==========
 const approveUser = async (userId) => {
   try {
     await api.post(`/admin/users/${userId}/approve`)
@@ -417,6 +527,7 @@ const approveUser = async (userId) => {
   }
 }
 
+// ========== SUSPEND ==========
 const suspendUser = (user) => {
   suspendUserData.value = user
   suspendReason.value = ''
@@ -447,7 +558,7 @@ const closeSuspendModal = () => {
   suspendReason.value = ''
 }
 
-
+// ========== ACTIVATE ==========
 const activateUser = async (userId) => {
   if (confirm('Activate this user? They will be able to log in again.')) {
     try {
@@ -460,19 +571,55 @@ const activateUser = async (userId) => {
   }
 }
 
-const resetPassword = async (userId) => {
-  if (confirm('Reset password for this user?')) {
-    try {
-      const response = await api.post(`/admin/users/${userId}/reset-password`)
-      const newPassword = response.data.new_password
-      alert(`New password: ${newPassword}\n\nPlease share this with the user.`)
-      toast.success('Password reset successfully')
-    } catch (error) {
-      toast.error('Failed to reset password')
-    }
+// ========== RESET PASSWORD - FIXED ==========
+const openResetModal = (user) => {
+  resetUserData.value = user
+  newPassword.value = ''
+  resetting.value = false
+  showResetModal.value = true
+}
+
+const closeResetModal = () => {
+  showResetModal.value = false
+  resetUserData.value = null
+  newPassword.value = ''
+  resetting.value = false
+}
+
+const confirmResetPassword = async () => {
+  if (!resetUserData.value) return
+  
+  resetting.value = true
+  try {
+    const response = await api.post(`/admin/users/${resetUserData.value.id}/reset-password`)
+    newPassword.value = response.data.new_password
+    toast.success('Password reset successfully')
+  } catch (error) {
+    console.error('Error resetting password:', error)
+    toast.error(error.response?.data?.error || 'Failed to reset password')
+    resetting.value = false
+  }
+  // Don't set resetting to false here - it stays true until modal closes
+}
+
+const copyPassword = () => {
+  if (newPassword.value) {
+    navigator.clipboard.writeText(newPassword.value).then(() => {
+      toast.success('Password copied to clipboard')
+    }).catch(() => {
+      // Fallback
+      const textArea = document.createElement('textarea')
+      textArea.value = newPassword.value
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      toast.success('Password copied to clipboard')
+    })
   }
 }
 
+// ========== DELETE ==========
 const openDeleteModal = (user) => {
   deleteUserData.value = user
   deleteConfirmText.value = ''
@@ -506,7 +653,7 @@ const confirmDelete = async () => {
   }
 }
 
-
+// ========== HELPERS ==========
 const getRoleLabel = (role) => {
   const roles = {
     super_admin: 'Super Admin',
@@ -531,20 +678,562 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-const closeModal = () => {
-  showModal.value = false
-  editingUser.value = null
-  newUserPassword.value = ''
-}
-
+// ========== LIFECYCLE ==========
 onMounted(() => {
   loadUsers()
 })
 </script>
 
 <style scoped>
-/* delete functionality styles */
+.user-management {
+  padding: 0;
+}
 
+/* ========== HEADER ========== */
+.management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-left h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin: 0 0 0.25rem;
+}
+
+.header-left p {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.btn-create {
+  background: #1e3a8a;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-create:hover {
+  background: #1a2d6e;
+  transform: translateY(-1px);
+}
+
+/* ========== STATS ========== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-icon.blue { background: #e0e7ff; color: #1e3a8a; }
+.stat-icon.green { background: #d1fae5; color: #065f46; }
+.stat-icon.orange { background: #fed7aa; color: #9a3412; }
+.stat-icon.purple { background: #ede9fe; color: #5b21b6; }
+
+.stat-icon i { font-size: 1.25rem; }
+
+.stat-info h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: #1e3a8a;
+}
+
+.stat-info p {
+  font-size: 0.75rem;
+  margin: 0;
+  color: #6b7280;
+}
+
+/* ========== SEARCH ========== */
+.search-section {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  flex: 1;
+  position: relative;
+  min-width: 200px;
+}
+
+.search-box i {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.6rem 0.75rem 0.6rem 2.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.filter-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-select {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: white;
+  cursor: pointer;
+}
+
+/* ========== TABLE ========== */
+.table-container {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table thead {
+  background: #f8fafc;
+}
+
+.users-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.users-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.users-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ========== USER CELL ========== */
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-avatar i {
+  font-size: 2rem;
+  color: #9ca3af;
+}
+
+.user-details .user-name {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.user-details .user-email {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* ========== ROLE BADGE ========== */
+.role-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.role-super { background: #1e3a8a; color: white; }
+.role-admin { background: #f59e0b; color: white; }
+.role-partner { background: #10b981; color: white; }
+
+/* ========== STATUS ========== */
+.status-group {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+.status.active { background: #d1fae5; color: #065f46; }
+.status.inactive { background: #fee2e2; color: #991b1b; }
+.status.pending { background: #fef3c7; color: #92400e; }
+
+/* ========== REFERRAL STATS ========== */
+.referral-stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: #4b5563;
+  flex-wrap: wrap;
+}
+
+.referral-stats i {
+  margin-right: 0.25rem;
+  color: #9ca3af;
+}
+
+.referral-stats .ref-code {
+  font-size: 0.7rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* ========== DATE INFO ========== */
+.date-info {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+.last-login {
+  font-size: 0.7rem;
+  color: #9ca3af;
+}
+
+.last-login i {
+  margin-right: 0.25rem;
+}
+
+/* ========== ACTION BUTTONS ========== */
+.action-buttons {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.action-btn:hover {
+  background: #f1f5f9;
+  transform: scale(1.1);
+}
+
+.action-btn.edit { color: #3b82f6; }
+.action-btn.approve { color: #10b981; }
+.action-btn.suspend { color: #f59e0b; }
+.action-btn.activate { color: #10b981; }
+.action-btn.reset { color: #8b5cf6; }
+.action-btn.delete { color: #ef4444; }
+
+/* ========== LOADING ========== */
+.loading-state {
+  text-align: center;
+  padding: 3rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #1e3a8a;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========== NO RESULTS ========== */
+.no-results {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+}
+
+.no-results i {
+  font-size: 2.5rem;
+  color: #d1d5db;
+  margin-bottom: 0.5rem;
+}
+
+/* ========== PAGINATION ========== */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.page-btn {
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #1e3a8a;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.items-info {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+/* ========== MODALS ========== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-container {
+  width: 100%;
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+  animation: modalPop 0.25s ease;
+}
+
+.modal-sm { max-width: 500px; }
+.modal-md { max-width: 650px; }
+.modal-lg { max-width: 800px; }
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: white;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: white;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.modal-body,
+.user-form {
+  padding: 1.5rem;
+}
+
+.close-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  cursor: pointer;
+  font-size: 1.3rem;
+  transition: 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* ========== RESET PASSWORD MODAL ========== */
+.reset-info {
+  text-align: center;
+  padding: 1rem;
+  background: #fef3c7;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.reset-info i {
+  font-size: 2rem;
+  color: #f59e0b;
+  margin-bottom: 0.5rem;
+}
+
+.reset-info p {
+  margin: 0.5rem 0;
+  color: #92400e;
+}
+
+.user-info-display {
+  background: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.user-info-display strong {
+  display: block;
+  color: #1e3a8a;
+}
+
+.user-info-display span {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.password-display {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.password-display label {
+  font-weight: 600;
+  color: #065f46;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.password-result {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+
+.password-result code {
+  flex: 1;
+  font-size: 1rem;
+  color: #1e3a8a;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: 0.2s;
+}
+
+.copy-btn:hover {
+  background: #f3f4f6;
+  color: #1e3a8a;
+}
+
+.password-display .warning {
+  font-size: 0.8rem;
+  color: #92400e;
+  margin: 0.5rem 0 0;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.btn-warning:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.justify-center {
+  justify-content: center !important;
+}
+
+/* ========== DELETE MODAL ========== */
 .delete-title {
   color: #dc2626 !important;
 }
@@ -651,434 +1340,17 @@ onMounted(() => {
   border-color: #dc2626;
 }
 
-.btn-danger {
-  background: #dc2626;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
-}
-
-.btn-danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-
-/* buttons */
-.btn-danger {
-  background: #dc2626;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.btn-danger:hover {
-  background: #b91c1c;
-}
-
-
-
-
-.user-management {
-  padding: 0;
-}
-
-/* Header */
-.management-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.header-left h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e3a8a;
-  margin: 0 0 0.25rem;
-}
-
-.header-left p {
-  font-size: 0.85rem;
-  color: #6b7280;
-  margin: 0;
-}
-
-.btn-create {
-  background: #1e3a8a;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Stats */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  border: 1px solid #e5e7eb;
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.stat-icon.blue { background: #e0e7ff; color: #1e3a8a; }
-.stat-icon.green { background: #d1fae5; color: #065f46; }
-.stat-icon.orange { background: #fed7aa; color: #9a3412; }
-.stat-icon.purple { background: #e0e7ff; color: #1e3a8a; }
-
-.stat-icon i { font-size: 1.25rem; }
-
-.stat-info h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  color: #1e3a8a;
-}
-
-.stat-info p {
-  font-size: 0.75rem;
-  margin: 0;
-  color: #6b7280;
-}
-
-/* Search */
-.search-box {
-  position: relative;
-  margin-bottom: 1.5rem;
-}
-
-.search-box i {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #9ca3af;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 0.6rem 0.75rem 0.6rem 2.25rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 0.85rem;
-}
-
-/* Loading */
-.loading-state {
-  text-align: center;
-  padding: 3rem;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #1e3a8a;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Users Grid */
-.users-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
-}
-
-.user-card {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  overflow: hidden;
-  transition: all 0.2s;
-}
-
-.user-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.user-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.user-avatar i {
-  font-size: 2.5rem;
-  color: #9ca3af;
-}
-
-.user-info {
-  flex: 1;
-}
-
-.user-info h3 {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #1e3a8a;
-  margin: 0 0 0.25rem;
-}
-
-.role-badge {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.65rem;
-  font-weight: 600;
-}
-
-.role-super { background: #1e3a8a; color: white; }
-.role-admin { background: #f59e0b; color: white; }
-.role-partner { background: #10b981; color: white; }
-
-.user-status {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  align-items: flex-end;
-}
-
-.status {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.65rem;
-}
-
-.status.active { background: #d1fae5; color: #065f46; }
-.status.inactive { background: #fee2e2; color: #991b1b; }
-.status.pending { background: #fef3c7; color: #92400e; }
-
-.user-body {
-  padding: 1rem;
-}
-
-.user-body p {
-  margin: 0.5rem 0;
-  font-size: 0.8rem;
-  color: #4b5563;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.user-body i {
-  width: 20px;
-  color: #9ca3af;
-}
-
-.user-footer {
-  padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border-top: 1px solid #e5e7eb;
-}
-
-.referral-stats {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
-  font-size: 0.7rem;
-  color: #6b7280;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.action-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.35rem;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.action-btn.edit { color: #3b82f6; }
-.action-btn.approve { color: #10b981; }
-.action-btn.suspend { color: #f59e0b; }
-.action-btn.activate { color: #10b981; }
-.action-btn.reset { color: #8b5cf6; }
-.action-btn.delete { color: #ef4444; }
-
-.action-btn:hover {
-  background: #f1f5f9;
-}
-
-/* No Results */
-.no-results {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border-radius: 12px;
-}
-
-.no-results i {
-  font-size: 3rem;
-  color: #9ca3af;
-  margin-bottom: 1rem;
-}
-
-/* Pagination */
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
-.page-btn {
-  background: white;
-  border: 1px solid #e5e7eb;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-/* =========================
-   UNIVERSAL MODAL SYSTEM
-========================= */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(4px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 1rem;
-  z-index: 9999;
-  animation: fadeIn .2s ease;
-}
-
-.modal-container {
-  width: 100%;
-  background: #fff;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow:
-    0 25px 50px rgba(0,0,0,.25),
-    0 10px 25px rgba(0,0,0,.1);
-  animation: modalPop .25s ease;
-}
-
-.modal-sm {
-  max-width: 500px;
-}
-
-.modal-md {
-  max-width: 650px;
-}
-
-.modal-lg {
-  max-width: 800px;
-}
-
-.modal-header {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(
-    135deg,
-    #1e3a8a,
-    #2563eb
-  );
-  color: white;
-}
-
-.modal-header h2 {
-  margin: 0;
-  color: white;
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-
-.modal-body,
-.user-form {
-  padding: 1.5rem;
-}
-
-.close-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,.15);
-  color: white;
-  cursor: pointer;
-  font-size: 1.3rem;
-  transition: .2s;
-}
-
-.close-btn:hover {
-  background: rgba(255,255,255,.25);
-}
-
+/* ========== FORM ========== */
 .form-group {
   margin-bottom: 1rem;
 }
 
 .form-group label {
   display: block;
-  font-size: .85rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: #374151;
-  margin-bottom: .45rem;
+  margin-bottom: 0.45rem;
 }
 
 .form-group input,
@@ -1087,9 +1359,9 @@ onMounted(() => {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 12px;
-  padding: .8rem .9rem;
-  transition: .2s;
-  font-size: .9rem;
+  padding: 0.8rem 0.9rem;
+  transition: 0.2s;
+  font-size: 0.9rem;
 }
 
 .form-group input:focus,
@@ -1097,13 +1369,28 @@ onMounted(() => {
 .form-group textarea:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 4px rgba(37,99,235,.12);
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
+}
+
+.checkbox-group {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1rem 0;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #374151;
+  cursor: pointer;
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: .75rem;
+  gap: 0.75rem;
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
@@ -1114,9 +1401,14 @@ onMounted(() => {
   color: #374151;
   border: none;
   border-radius: 10px;
-  padding: .75rem 1.25rem;
+  padding: 0.75rem 1.25rem;
   font-weight: 600;
   cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
 }
 
 .btn-submit {
@@ -1124,9 +1416,10 @@ onMounted(() => {
   color: white;
   border: none;
   border-radius: 10px;
-  padding: .75rem 1.25rem;
+  padding: 0.75rem 1.25rem;
   font-weight: 600;
   cursor: pointer;
+  transition: 0.2s;
 }
 
 .btn-submit:hover {
@@ -1138,9 +1431,10 @@ onMounted(() => {
   color: white;
   border: none;
   border-radius: 10px;
-  padding: .75rem 1.25rem;
+  padding: 0.75rem 1.25rem;
   font-weight: 600;
   cursor: pointer;
+  transition: 0.2s;
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -1148,23 +1442,50 @@ onMounted(() => {
 }
 
 .btn-danger:disabled {
-  opacity: .6;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
+.password-info {
+  padding: 1rem 1.5rem 1.5rem;
+}
+
+.password-info hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 0 0 1rem;
+}
+
+.password-info h4 {
+  color: #10b981;
+  margin: 0 0 0.5rem;
+}
+
+.password-info code {
+  background: #f3f4f6;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.password-info .warning {
+  font-size: 0.8rem;
+  color: #f59e0b;
+  margin: 0.5rem 0 0;
+}
+
+/* ========== ANIMATIONS ========== */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes modalPop {
   from {
     opacity: 0;
-    transform: translateY(15px) scale(.98);
+    transform: translateY(15px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -1172,9 +1493,9 @@ onMounted(() => {
   }
 }
 
-/* Responsive */
+/* ========== RESPONSIVE ========== */
 @media (max-width: 1024px) {
-  .users-grid {
+  .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -1184,16 +1505,38 @@ onMounted(() => {
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .users-grid {
-    grid-template-columns: 1fr;
+  .search-section {
+    flex-direction: column;
   }
   
-  .user-header {
-    flex-wrap: wrap;
+  .filter-options {
+    width: 100%;
+  }
+  
+  .filter-select {
+    flex: 1;
+  }
+  
+  .table-container {
+    overflow-x: auto;
+  }
+  
+  .users-table {
+    font-size: 0.8rem;
+    min-width: 700px;
+  }
+  
+  .users-table th,
+  .users-table td {
+    padding: 0.5rem;
   }
   
   .action-buttons {
-    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .pagination {
+    flex-wrap: wrap;
   }
 }
 </style>

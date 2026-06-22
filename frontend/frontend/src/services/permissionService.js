@@ -87,8 +87,7 @@ class PermissionService {
   canDeleteReferrals() { return this.canDelete('referrals') }
 
   canViewStatistics() { return this.canView('statistics') }
-  canViewSettings() { return this.canView('settings') }
-  canUpdateSettings() { return this.canUpdate('settings') }
+ 
 
   canViewContacts() { return this.canView('contacts') }
   canUpdateContacts() { return this.canUpdate('contacts') }
@@ -96,6 +95,7 @@ class PermissionService {
 
   canViewPermissions() { return this.userRole === 'super_admin' }
   canManagePermissions() { return this.userRole === 'super_admin' }
+  canViewNewsletter() {  return this.canView('newsletter')}
 }
 
 export default new PermissionService()

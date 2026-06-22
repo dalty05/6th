@@ -146,10 +146,7 @@
           <PartnerManagement @refresh="loadStats" />
         </div>
 
-        <!-- Referrals Tab -->
-        <div v-else-if="activeTab === 'referrals'" class="tab-content">
-          <ReferralAnalytics />
-        </div>
+       
 
         <!-- Statistics Tab -->
         <div v-else-if="activeTab === 'statistics'" class="tab-content">
@@ -161,14 +158,14 @@
           <ContactManagement />
         </div>
 
-        <!-- Settings Tab -->
-        <div v-else-if="activeTab === 'settings'" class="tab-content">
-          <SystemSettings />
-        </div>
 
-        <div v-else-if="activeTab === 'system-settings'" class="tab-content">
-          <SystemSettings />
-        </div>
+        <!-- Newsletter Tab -->
+<div v-else-if="activeTab === 'newsletter'" class="tab-content">
+  <NewsletterManagement />
+</div>
+
+
+
 
 
 
@@ -211,13 +208,13 @@ import UserManagement from '@/components/admin/UserManagement.vue'
 import PartnerManagement from '@/components/admin/PartnerManagement.vue'
 import ReferralAnalytics from '@/components/admin/ReferralAnalytics.vue'
 import AdvancedAnalytics from '@/components/admin/AdvancedAnalytics.vue'
-// import SystemSettings from '@/components/admin/SystemSettings.vue'
-import SystemSettings from '@/views/admin/SystemSettings.vue'
 
 import AdminFooter from '@/components/layout/AdminFooter.vue'
 import ContactManagement from '@/components/admin/ContactManagement.vue'
 import PermissionManager from '@/components/admin/PermissionManager.vue'
 import Profile from '@/views/admin/Profile.vue'
+
+import NewsletterManagement from '@/components/admin/NewsletterManagement.vue'
 
 
 
@@ -263,8 +260,7 @@ const pageTitle = computed(() => {
     referrals: 'Referral Analytics',
     statistics: 'Advanced Analytics',
     contacts: 'Contact Messages',
-    settings: 'System Settings',
-    'system-settings': 'System Settings',
+    newsletter: 'Newsletter Management',
     permissions: 'Permission Manager',
     profile: 'My Profile'
   }
@@ -280,11 +276,9 @@ const pageSubtitle = computed(() => {
     outlets: 'Manage physical shop and depot locations',
     users: 'Control user access and permissions',
     partners: 'Manage marketing partners',
-    referrals: 'Track referral performance',
     statistics: 'Comprehensive analytics and insights',
     contacts: 'View and respond to customer inquiries',
-    settings: 'Configure system preferences',
-    'system-settings': 'System Settings',
+    newsletter: 'Manage subscribers and send email campaigns',
     permissions: 'Manage user permissions and access control',
     profile: 'Manage your account settings and preferences'
   }
@@ -294,28 +288,99 @@ const pageSubtitle = computed(() => {
 // Load stats
 const loadStats = async () => {
   try {
-    const [products, blogs, jobs, outlets, users, referrals] = await Promise.all([
-      api.get('/products').catch(() => ({ data: [] })),
-      api.get('/blog?simple=true&per_page=100').catch(() => ({ data: [] })),
-      canViewJobs.value ? api.get('/admin/jobs').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-      canViewOutlets.value ? api.get('/admin/outlets').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-      isSuperAdmin.value ? api.get('/admin/users').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-      canViewReferrals.value ? api.get('/referral/stats').catch(() => ({ data: { totalClicks: 0 } })) : Promise.resolve({ data: { totalClicks: 0 } })
-    ])
-    
+    // Products - handle paginated response
+    let productCount = 0
+    try {
+      const productsRes = await api.get('/products?per_page=1000')
+      const productsData = productsRes.data
+      
+      if (Array.isArray(productsData)) {
+        productCount = productsData.length
+      } else if (productsData?.data && Array.isArray(productsData.data)) {
+        productCount = productsData.data.length
+      } else if (productsData?.pagination) {
+        productCount = productsData.pagination.total_items || 0
+      } else if (productsData?.items) {
+        productCount = productsData.items.length || 0
+      }
+    } catch (e) {
+      console.warn('Could not fetch products:', e)
+    }
+
+    // Blog - handle paginated response
+    let blogCount = 0
+    try {
+      const blogRes = await api.get('/blog?simple=true&per_page=100')
+      const blogData = blogRes.data
+      
+      if (Array.isArray(blogData)) {
+        blogCount = blogData.length
+      } else if (blogData?.data && Array.isArray(blogData.data)) {
+        blogCount = blogData.data.length
+      } else if (blogData?.pagination) {
+        blogCount = blogData.pagination.total_items || 0
+      }
+    } catch (e) {
+      console.warn('Could not fetch blogs:', e)
+    }
+
+    // Jobs
+    let jobCount = 0
+    if (canViewJobs.value) {
+      try {
+        const jobsRes = await api.get('/admin/jobs')
+        jobCount = jobsRes.data?.length || 0
+      } catch (e) {
+        console.warn('Could not fetch jobs:', e)
+      }
+    }
+
+    // Outlets
+    let outletCount = 0
+    if (canViewOutlets.value) {
+      try {
+        const outletsRes = await api.get('/admin/outlets')
+        outletCount = outletsRes.data?.length || 0
+      } catch (e) {
+        console.warn('Could not fetch outlets:', e)
+      }
+    }
+
+    // Users
+    let userCount = 0
+    if (isSuperAdmin.value) {
+      try {
+        const usersRes = await api.get('/admin/users')
+        userCount = usersRes.data?.length || 0
+      } catch (e) {
+        console.warn('Could not fetch users:', e)
+      }
+    }
+
+    let clickCount = 0
+if (canViewReferrals.value) {
+  try {
+    const referralsRes = await api.get('/referral/stats')
+    clickCount = referralsRes.data?.total_clicks || referralsRes.data?.totalClicks || 0
+  } catch (e) {
+    console.warn('Could not fetch referrals:', e)
+  }
+}
+
+   
+
     stats.value = {
-      totalProducts: products.data.length || 0,
-      totalBlogs: Array.isArray(blogs.data) ? blogs.data.length : 0,
-      totalJobs: jobs.data.length || 0,
-      totalOutlets: outlets.data.length || 0,
-      totalUsers: users.data.length || 0,
-      totalClicks: referrals.data.totalClicks || 0
+      totalProducts: productCount,
+      totalBlogs: blogCount,
+      totalJobs: jobCount,
+      totalOutlets: outletCount,
+      totalUsers: userCount,
+      totalClicks: clickCount
     }
   } catch (error) {
     console.error('Error loading stats:', error)
   }
 }
-
 // Navigation
 const handleNavigate = (tab) => {
   activeTab.value = tab
@@ -332,7 +397,7 @@ const toggleMobileSidebar = () => {
 // Check URL params
 const checkUrlParams = () => {
   const tab = route.query.tab
-  const validTabs = ['overview', 'products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics', 'contacts', 'settings', 'system-settings','permissions', 'profile']
+  const validTabs = ['overview', 'products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'statistics', 'contacts','permissions','newsletter', 'profile']
   if (tab && validTabs.includes(tab)) {
     activeTab.value = tab
   }

@@ -133,6 +133,9 @@
       </div>
     </div>
 
+
+     
+
     <!-- Footer Bottom -->
     <div class="footer-bottom">
       <div class="container">
@@ -159,7 +162,7 @@
             </a>
           </div>
           
-          <div class="payment-methods">
+          <!-- <div class="payment-methods">
             <span class="payment-icon">
               <i class="fab fa-cc-visa"></i> Visa
             </span>
@@ -172,7 +175,7 @@
             <span class="payment-icon">
               <i class="fas fa-money-bill-wave"></i> Cash
             </span>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>
@@ -198,6 +201,21 @@
         <button @click="closeNewsletterSuccess" class="btn-close">Continue</button>
       </div>
     </div>
+
+    <!-- Newsletter Error Modal -->
+<div v-if="showNewsletterError" class="newsletter-success-modal" @click.self="showNewsletterError = false">
+  <div class="success-content" style="border-top: 4px solid #ef4444;">
+    <div class="success-icon" style="background: #fee2e2;">
+      <i class="fas fa-exclamation-circle" style="color: #ef4444;"></i>
+    </div>
+    <h3 style="color: #991b1b;">Subscription Failed</h3>
+    <p>{{ newsletterErrorMessage }}</p>
+    <button @click="showNewsletterError = false" class="btn-close">Try Again</button>
+  </div>
+</div>
+
+
+
   </footer>
 </template>
 
@@ -216,7 +234,9 @@ export default {
       newsletterLoading: false,
       showBackToTop: false,
       showNewsletterSuccess: false,
-      currentYear: new Date().getFullYear()
+      currentYear: new Date().getFullYear(),
+        showNewsletterError: false,
+        newsletterErrorMessage: ''
     }
   },
   mounted() {
@@ -238,40 +258,44 @@ export default {
     handleImageError(e) {
       e.target.style.display = 'none'
     },
-    async submitNewsletter() {
-      // Validate email
-      if (!this.newsletterForm.email.includes('@')) {
-        alert('Please enter a valid email address')
-        return
-      }
 
-      this.newsletterLoading = true
-      
-      try {
-        // API call to backend - will be implemented later
-        // const response = await api.post('/newsletter/subscribe', this.newsletterForm)
-        
-        // Simulate API call for now
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        console.log('Newsletter subscription:', this.newsletterForm)
-        
-        // Show success modal
-        this.showNewsletterSuccess = true
-        this.newsletterForm = { name: '', email: '' }
-        
-        // Auto hide after 5 seconds
-        setTimeout(() => {
-          this.showNewsletterSuccess = false
-        }, 5000)
-        
-      } catch (error) {
-        console.error('Newsletter subscription error:', error)
-        alert('Failed to subscribe. Please try again later.')
-      } finally {
-        this.newsletterLoading = false
-      }
-    },
+
+    async submitNewsletter() {
+  if (!this.newsletterForm.email.includes('@')) {
+    this.newsletterErrorMessage = 'Please enter a valid email address'
+    this.showNewsletterError = true
+    return
+  }
+
+  this.newsletterLoading = true
+  
+  try {
+    const response = await api.post('/newsletter/subscribe', {
+      name: this.newsletterForm.name,
+      email: this.newsletterForm.email
+    })
+    
+    this.showNewsletterSuccess = true
+    this.newsletterForm = { name: '', email: '' }
+    
+    setTimeout(() => {
+      this.showNewsletterSuccess = false
+    }, 5000)
+    
+  } catch (error) {
+    console.error('Newsletter error:', error)
+    this.newsletterErrorMessage = error.response?.data?.error || 'Failed to subscribe. Please try again.'
+    this.showNewsletterError = true
+    
+    // Auto hide error after 5 seconds
+    setTimeout(() => {
+      this.showNewsletterError = false
+    }, 5000)
+  } finally {
+    this.newsletterLoading = false
+  }
+},
+
     closeNewsletterSuccess() {
       this.showNewsletterSuccess = false
     }

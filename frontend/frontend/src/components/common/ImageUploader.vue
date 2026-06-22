@@ -163,8 +163,6 @@ const uploadFile = async (file) => {
         { headers: { 'Content-Type': 'multipart/form-data' } }
       )
     } else {
-      // Generic upload - matches your original /api/upload endpoint
-      // api service has baseURL '/api', so just 'upload' becomes '/api/upload'
       response = await api.post('upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
