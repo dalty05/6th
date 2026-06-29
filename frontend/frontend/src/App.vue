@@ -23,7 +23,11 @@ export default {
     const route = useRoute()
     
     const isAdminRoute = computed(() => {
-      return route.path.startsWith('/admin') || route.path.startsWith('/partner')
+      return (
+        route.path.startsWith('/admin') ||
+        route.path.startsWith('/partner') ||
+        route.path.startsWith('/tour-manager')
+      )
     })
     
     return {

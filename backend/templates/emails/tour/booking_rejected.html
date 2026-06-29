@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Booking Update</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="margin: 0;">❌ Booking Update</h1>
+    </div>
+    <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 8px 8px;">
+        <p>Dear <strong>{{ customer_name }}</strong>,</p>
+        <p>We regret to inform you that your booking <strong>{{ booking_reference }}</strong> has been <strong>rejected</strong>.</p>
+        
+        <div style="background: #fee2e2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+            <h3 style="color: #991b1b; margin-top: 0;">📌 Reason for Rejection</h3>
+            <p style="color: #991b1b;">{{ rejection_reason }}</p>
+        </div>
+        
+        <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="color: #1e3a8a; margin-top: 0;">📊 Booking Summary</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Package:</td>
+                    <td style="padding: 8px 0; font-weight: 500;">{{ package_name }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Date:</td>
+                    <td style="padding: 8px 0; font-weight: 500;">{{ tour_date }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">People:</td>
+                    <td style="padding: 8px 0; font-weight: 500;">{{ people_count }}</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #92400e; margin-top: 0;">💡 What You Can Do</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; color: #78350f;">
+                <li>Contact us to discuss alternative dates</li>
+                <li>Modify your booking request</li>
+                <li>Try a different tour package</li>
+            </ul>
+        </div>
+        
+        <p style="margin-top: 20px;">Questions? Contact us at <a href="mailto:maziwa@merudairy.co.ke" style="color: #f59e0b;">maziwa@merudairy.co.ke</a> or call +254 710 901 376.</p>
+        <p style="margin-top: 20px;"><strong>The Mount Kenya Milk Team</strong></p>
+    </div>
+    <div style="text-align: center; padding: 20px; color: #6b7280; font-size: 12px;">
+        <p>&copy; {{ current_year }} Mount Kenya Milk. All rights reserved.</p>
+        <p>Meru Town, Kenya</p>
+    </div>
+</body>
+</html>

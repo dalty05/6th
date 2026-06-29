@@ -168,6 +168,58 @@ const routes = [
     name: 'ReferralRedirect', 
     component: ReferralRedirect 
   },
+  
+{
+  path: '/tour-manager',
+  component: () => import('@/views/tour-manager/TourManagerLayout.vue'),
+  meta: { 
+    requiresAuth: true,
+    title: 'Tour Manager',
+    allowedRoles: ['tour_manager', 'tour_assistant', 'admin', 'super_admin']
+  },
+  children: [
+    {
+      path: 'dashboard',
+      name: 'TourManagerDashboard',
+      component: () => import('@/views/tour-manager/TourManagerDashboard.vue'),
+      meta: { title: 'Tour Manager Dashboard' }
+    },
+    {
+      path: 'bookings',
+      name: 'TourManagerBookings',
+      component: () => import('@/views/tour-manager/TourManagerBookings.vue'),
+      meta: { title: 'Tour Bookings' }
+    },
+    {
+      path: 'calendar',
+      name: 'TourManagerCalendar',
+      component: () => import('@/views/tour-manager/TourManagerCalendar.vue'),
+      meta: { title: 'Tour Calendar' }
+    },
+    {
+      path: 'packages',
+      name: 'TourManagerPackages',
+      component: () => import('@/views/tour-manager/TourManagerPackages.vue'),
+      meta: { title: 'Tour Packages', requiresManager: true }
+    },
+    {
+      path: 'payments',
+      name: 'TourManagerPayments',
+      component: () => import('@/views/tour-manager/TourManagerPayments.vue'),
+      meta: { title: 'Tour Payments' }
+    },
+    {
+      path: 'reports',
+      name: 'TourManagerReports',
+      component: () => import('@/views/tour-manager/TourManagerReports.vue'),
+      meta: { title: 'Tour Reports', requiresManager: true }
+    },
+    {
+      path: '',
+      redirect: '/tour-manager/dashboard'
+    }
+  ]
+}
 
 
 

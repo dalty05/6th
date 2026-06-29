@@ -26,7 +26,7 @@ import importlib.util
 from permission_routes import permission_bp
 
 from blog_routes import blog_bp
-
+from tour_routes import tour_bp
 
 
 
@@ -64,7 +64,7 @@ from activity_routes import activity_bp
 from outlet_routes import outlet_bp
 
 
-
+from flask_mail import Mail
 
 
 
@@ -130,6 +130,12 @@ app.register_blueprint(blog_bp, url_prefix='/api')
 
 app.register_blueprint(newsletter_bp, url_prefix='/api')
 
+app.register_blueprint(tour_bp, url_prefix='/api')
+
+
+
+
+
 # CORS Configuration
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -160,6 +166,8 @@ def load_user(user_id):
 from auth_routes import auth_bp
 app.register_blueprint(auth_bp, url_prefix='/api')
 
+
+mail = Mail()
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
@@ -603,17 +611,19 @@ def upload_blog_image(id):
         'message': 'Image uploaded successfully'
     }), 200
 
-# Also support plural versions for backward compatibility
+# support plural versions 
 @app.route('/api/admin/products/<int:id>/upload-image', methods=['POST'])
 @login_required
 def upload_product_image_plural(id):
-    """Plural version for backward compatibility"""
+
+
     return upload_product_image(id)
 
 @app.route('/api/admin/blogs/<int:id>/upload-image', methods=['POST'])
 @login_required
 def upload_blog_image_plural(id):
-    """Plural version for backward compatibility"""
+
+
     return upload_blog_image(id)
 
 # Newsletter subscription endpoint
@@ -661,16 +671,7 @@ def subscribe_newsletter():
 
 
 
-# ============================================================================
 # ADMIN CRUD ROUTES
-# ============================================================================
-
-
-
-# NOTE: permission enforcement is implemented in `permission_service.py`.
-# `require_permission` is imported from there; do not redefine it here.
-
-
 
 
 

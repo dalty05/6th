@@ -78,39 +78,6 @@
           </div>
         </div>
       </div>
-      
-      <div class="nav-actions">
-        <!-- Search Button -->
-        <button class="search-btn" @click="toggleSearch" aria-label="Search">
-          <i class="fas fa-search"></i>
-        </button>
-        
-        <!-- Mobile Toggle -->
-        <div class="mobile-toggle" @click="toggleMobileMenu">
-          <span></span><span></span><span></span>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Search Modal -->
-    <div class="search-modal" v-if="showSearch" @click.self="toggleSearch">
-      <div class="search-modal-content">
-        <i class="fas fa-search"></i>
-        <input 
-          type="text" 
-          v-model="searchQuery" 
-          placeholder="Search products..."
-          @keyup.enter="handleSearch"
-          autofocus
-        >
-        <button @click="handleSearch"><i class="fas fa-arrow-right"></i></button>
-      </div>
-      <div class="search-suggestions" v-if="searchSuggestions.length > 0">
-        <div class="suggestion-item" v-for="suggestion in searchSuggestions" :key="suggestion.id" @click="handleSuggestionClick(suggestion)">
-          <i class="fas fa-search"></i>
-          <span>{{ suggestion.name || suggestion.title }}</span>
-        </div>
-      </div>
     </div>
     
     <!-- Admin Login Modal -->
@@ -179,7 +146,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { scrollToSection, handleInitialHash } from '@/utils/scroll'
 import { useSectionObserver } from '@/composables/useSectionObserver'
@@ -199,12 +166,8 @@ export default {
     const router = useRouter()
     const mobileMenuOpen = ref(false)
     const dropdownOpen = ref(false)
-    const userMenuOpen = ref(false)
     const showAdminLogin = ref(false)
-    const showSearch = ref(false)
-    const searchQuery = ref('')
-    const searchSuggestions = ref([])
-    const cartCount = ref(0)
+
     const loginStep = ref(1)
     const loginForm = ref({ email: '', password: '' })
     const otpCodes = ref(['', '', '', '', '', ''])
@@ -219,10 +182,6 @@ export default {
     const { activeSection } = useSectionObserver(['home', 'about', 'products', 'blog', 'contact'])
     
     const isAuthenticated = computed(() => authService.isAuthenticated())
-    const userName = computed(() => {
-      const user = authService.getUser()
-      return user?.full_name?.split(' ')[0] || 'Admin'
-    })
     
     const openCareersModal = () => {
       showCareersModal.value = true
@@ -234,16 +193,11 @@ export default {
       closeMenu()
     }
     
-    // Close dropdowns when clicking outside
     const handleClickOutside = (event) => {
       const dropdown = document.querySelector('.dropdown')
-      const userMenu = document.querySelector('.user-menu')
       
       if (dropdown && !dropdown.contains(event.target) && dropdownOpen.value) {
         dropdownOpen.value = false
-      }
-      if (userMenu && !userMenu.contains(event.target) && userMenuOpen.value) {
-        userMenuOpen.value = false
       }
     }
     
@@ -255,60 +209,7 @@ export default {
     const scrollToHome = () => {
       scrollToSection('home', 0)
     }
-    
-    const goToShop = () => {
-      router.push('/shop')
-    }
-    
-    const toggleSearch = () => {
-      showSearch.value = !showSearch.value
-      if (!showSearch.value) {
-        searchQuery.value = ''
-        searchSuggestions.value = []
-      }
-    }
-    
-    const handleSearch = async () => {
-      if (!searchQuery.value.trim()) return
-      
-      router.push(`/products?search=${encodeURIComponent(searchQuery.value)}`)
-      showSearch.value = false
-      searchQuery.value = ''
-    }
-    
-    const handleSuggestionClick = (item) => {
-      if (item.type === 'product') {
-        router.push(`/product/${item.id}`)
-      } else if (item.type === 'blog') {
-        router.push(`/blog/${item.slug}`)
-      }
-      showSearch.value = false
-      searchQuery.value = ''
-    }
-    
-    // Watch for search input to show suggestions
-    watch(searchQuery, async (newQuery) => {
-      if (newQuery.length > 2) {
-        try {
-          const productRes = await fetch(`/api/products?search=${newQuery}&per_page=3`)
-          const productData = await productRes.json()
-          
-          const blogRes = await fetch(`/api/blog?simple=true&per_page=3`)
-          const blogData = await blogRes.json()
-          
-          const suggestions = [
-            ...(productData.data || []).map(p => ({ ...p, type: 'product' })),
-            ...(Array.isArray(blogData) ? blogData.slice(0, 3).map(b => ({ ...b, type: 'blog' })) : [])
-          ]
-          searchSuggestions.value = suggestions.slice(0, 5)
-        } catch (error) {
-          console.error('Error fetching suggestions:', error)
-        }
-      } else {
-        searchSuggestions.value = []
-      }
-    })
-    
+  
     const handleScroll = () => {
       isScrolled.value = window.scrollY > 50
     }
@@ -391,32 +292,13 @@ export default {
       }
     }
     
-    const toggleMobileMenu = () => {
-      mobileMenuOpen.value = !mobileMenuOpen.value
-      if (mobileMenuOpen.value) {
-        dropdownOpen.value = false
-        userMenuOpen.value = false
-      }
-    }
-    
     const toggleDropdown = () => {
       dropdownOpen.value = !dropdownOpen.value
-      if (dropdownOpen.value) {
-        userMenuOpen.value = false
-      }
-    }
-    
-    const toggleUserMenu = () => {
-      userMenuOpen.value = !userMenuOpen.value
-      if (userMenuOpen.value) {
-        dropdownOpen.value = false
-      }
     }
     
     const closeMenu = () => {
       mobileMenuOpen.value = false
       dropdownOpen.value = false
-      userMenuOpen.value = false
     }
     
     const closeLoginModal = () => {
@@ -451,12 +333,7 @@ export default {
     return {
       mobileMenuOpen,
       dropdownOpen,
-      userMenuOpen,
       showAdminLogin,
-      showSearch,
-      searchQuery,
-      searchSuggestions,
-      cartCount,
       loginStep,
       loginForm,
       otpCodes,
@@ -467,25 +344,18 @@ export default {
       isScrolled,
       activeSection,
       isAuthenticated,
-      userName,
       showCareersModal,
       showCSRModal,
       openCareersModal,
       openCSRModal,
       scrollTo,
       scrollToHome,
-      goToShop,
-      toggleSearch,
-      handleSearch,
-      handleSuggestionClick,
       handleStep1,
       handleStep2,
       handleOtpInput,
       handleOtpKeyup,
       resendOtp,
-      toggleMobileMenu,
       toggleDropdown,
-      toggleUserMenu,
       closeMenu,
       closeLoginModal,
       handleLogout,
@@ -496,7 +366,7 @@ export default {
 </script>
 
 <style scoped>
-/* ========== BASE NAVBAR STYLES ========== */
+/* ========== BASE NAVBAR ========== */
 .navbar {
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(10px);
@@ -535,6 +405,7 @@ export default {
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -558,11 +429,14 @@ export default {
   font-size: 1rem;
 }
 
-/* ========== NAVIGATION MENU ========== */
+/* ========== NAVIGATION - CENTERED ========== */
 .navbar-menu {
   display: flex;
   gap: 1.5rem;
   align-items: center;
+  justify-content: center;  /* ✅ Centering the menu */
+  flex: 1;  /* ✅ Takes available space */
+  margin: 0 2rem;  /* ✅ Spacing from brand and edges */
 }
 
 .nav-link {
@@ -575,6 +449,8 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 0.25rem 0;
+  white-space: nowrap;
 }
 
 .nav-link i {
@@ -613,20 +489,23 @@ export default {
   font-weight: 500;
   cursor: pointer;
   font-size: 1rem;
-  padding: 0;
+  padding: 0.25rem 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  color: #333;
+  transition: color 0.3s;
 }
 
-.dropdown-btn i {
-  font-size: 0.9rem;
+.dropdown-btn:hover {
+  color: #f59e0b;
 }
 
 .dropdown-content {
   position: absolute;
   top: 100%;
-  left: 0;
+  left: 50%;  /* ✅ Center the dropdown under the button */
+  transform: translateX(-50%);  /* ✅ Align center */
   background: white;
   min-width: 220px;
   box-shadow: 0 8px 25px rgba(0,0,0,0.15);
@@ -640,11 +519,11 @@ export default {
 @keyframes fadeInDown {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateX(-50%) translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -687,136 +566,24 @@ export default {
   color: #dc2626;
 }
 
-/* ========== NAV ACTIONS ========== */
-.nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.search-btn {
-  background: none;
-  border: none;
-  color: #333;
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: all 0.3s;
-  position: relative;
-  padding: 6px;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-btn:hover {
-  background: #f8fafc;
-  color: #f59e0b;
-}
-
-/* ========== SEARCH MODAL ========== */
-.search-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.9);
-  z-index: 2000;
-  display: flex;
+/* ========== MOBILE TOGGLE ========== */
+.mobile-toggle {
+  display: none;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(5px);
-}
-
-.search-modal-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: white;
-  padding: 1rem 1.5rem;
-  border-radius: 60px;
-  width: 90%;
-  max-width: 600px;
-  animation: slideInUp 0.3s ease;
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.search-modal-content i {
-  font-size: 1.2rem;
-  color: #666;
-}
-
-.search-modal-content input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 1rem;
-  padding: 0.5rem 0;
-}
-
-.search-modal-content button {
-  background: #f59e0b;
-  border: none;
-  color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.3s;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.search-modal-content button:hover {
-  background: #d97706;
-  transform: scale(1.05);
+.mobile-toggle span {
+  width: 25px;
+  height: 3px;
+  background: #1e3a8a;
+  transition: 0.3s;
+  border-radius: 3px;
 }
 
-.search-suggestions {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 600px;
-  margin-top: 1rem;
-  overflow: hidden;
-  animation: fadeInUp 0.3s ease;
-}
-
-.suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-  cursor: pointer;
-  transition: background 0.3s;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.suggestion-item:last-child {
-  border-bottom: none;
-}
-
-.suggestion-item:hover {
-  background: #f8fafc;
-}
-
-.suggestion-item i {
-  color: #666;
-}
-
-/* ========== MODAL STYLES ========== */
+/* ========== MODAL ========== */
 .modal {
   position: fixed;
   top: 0;
@@ -839,6 +606,17 @@ export default {
   max-width: 420px;
   position: relative;
   animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-icon {
@@ -901,7 +679,13 @@ export default {
   color: #ef4444;
 }
 
-/* OTP Inputs */
+.otp-instruction {
+  text-align: center;
+  color: #666;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
 .otp-inputs {
   display: flex;
   gap: 0.5rem;
@@ -924,6 +708,30 @@ export default {
   border-color: #f59e0b;
   outline: none;
   box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
+}
+
+.btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-primary {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-resend, .btn-back {
@@ -978,30 +786,19 @@ export default {
   gap: 8px;
 }
 
-/* ========== MOBILE TOGGLE ========== */
-.mobile-toggle {
-  display: none;
-  flex-direction: column;
-  cursor: pointer;
-  gap: 4px;
-}
-
-.mobile-toggle span {
-  width: 25px;
-  height: 3px;
-  background: #1e3a8a;
-  transition: 0.3s;
-  border-radius: 3px;
-}
-
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1024px) {
   .navbar-menu {
     gap: 1rem;
+    margin: 0 1rem;
   }
 }
 
 @media (max-width: 768px) {
+  .mobile-toggle {
+    display: flex;
+  }
+  
   .navbar-menu {
     display: none;
     position: absolute;
@@ -1011,47 +808,62 @@ export default {
     background: white;
     flex-direction: column;
     padding: 1rem;
+    gap: 0.75rem;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     max-height: calc(100vh - 70px);
     overflow-y: auto;
+    justify-content: flex-start;  /* ✅ Left align on mobile */
+    margin: 0;
+    flex: none;
   }
   
   .navbar-menu.is-active {
     display: flex;
   }
   
-  .mobile-toggle {
-    display: flex;
+  .nav-link {
+    width: 100%;
+    padding: 0.5rem 0;
   }
   
-  .dropdown-content {
-    position: static;
-    box-shadow: none;
-    padding-left: 1rem;
-    margin-top: 0;
-    background: #f8fafc;
+  .dropdown {
+    width: 100%;
   }
   
   .dropdown-btn {
     width: 100%;
     justify-content: space-between;
+    padding: 0.5rem 0;
   }
   
-  .nav-actions {
-    gap: 0.5rem;
+  .dropdown-content {
+    position: static;
+    left: 0;
+    transform: none;
+    box-shadow: none;
+    padding-left: 1rem;
+    margin-top: 0.25rem;
+    background: #f8fafc;
+    border-radius: 8px;
   }
   
-  .search-btn {
-    width: 32px;
-    height: 32px;
-  }
-  
-  .navbar.scrolled .container {
-    padding: 0.5rem 20px;
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   
   .brand-name {
     display: none;
+  }
+  
+  .modal-content {
+    padding: 1.5rem;
   }
 }
 
@@ -1064,20 +876,18 @@ export default {
     height: 40px;
   }
   
-  .search-btn {
-    width: 28px;
-    height: 28px;
-    font-size: 0.9rem;
-  }
-  
-  .modal-content {
-    padding: 1.5rem;
+  .navbar.scrolled .container {
+    padding: 0.5rem 15px;
   }
   
   .otp-input {
     width: 40px;
     height: 40px;
     font-size: 1.2rem;
+  }
+  
+  .modal-content {
+    padding: 1.25rem;
   }
 }
 </style>

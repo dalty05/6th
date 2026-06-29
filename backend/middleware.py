@@ -1,8 +1,8 @@
-# backend/middleware.py
 from flask import request, jsonify, current_app
 from flask_login import current_user
 import re
 from functools import lru_cache
+from permission_service import has_permission
 
 # Public routes 
 PUBLIC_ROUTES = [
@@ -36,41 +36,43 @@ PUBLIC_ROUTES = [
     
     # Referral tracking (public)
     '/api/r/',
+    # Tour public routes
+    '/api/tour/packages',
+    '/api/tour/availability',
+    '/api/tour/booking',
 ]
 
 # URL to permission mapping
-
 URL_PERMISSION_MAP = [
     # ========== PRODUCTS ==========
-    
     {
-    'pattern': r'^/api/referral/analytics/partner$',  
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics/daily$', 
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/recent$',  
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics$',  
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
+        'pattern': r'^/api/referral/analytics/partner$',  
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics/daily$', 
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/recent$',  
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics$',  
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
     {
         'pattern': r'^/api/admin/products$',
         'resource': 'products',
@@ -97,7 +99,6 @@ URL_PERMISSION_MAP = [
     },
     
     # ========== BLOG ==========
-        # Blog - Publish (Super Admin only)
     {
         'pattern': r'^/api/admin/blog/(\d+)/publish$',
         'resource': 'blog',
@@ -105,18 +106,13 @@ URL_PERMISSION_MAP = [
             'POST': 'publish'  
         }
     },
-
-        {
+    {
         'pattern': r'^/api/admin/blog/(\d+)/unpublish$',
         'resource': 'blog',
         'methods': {
             'POST': 'publish'
         }
     },
-
-
-
-
     {
         'pattern': r'^/api/admin/blog$',
         'resource': 'blog',
@@ -286,49 +282,47 @@ URL_PERMISSION_MAP = [
     
     # ========== REFERRALS ==========
     {
-    'pattern': r'^/api/referral/analytics/partner$',
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics/navigation$',
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics/sources$',
-
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics/timeline$',
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics/recent-clicks$',
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-{
-    'pattern': r'^/api/referral/analytics/summary$',
-    'resource': 'referrals',
-    'methods': {
-        'GET': 'read'
-    }
-},
-    
+        'pattern': r'^/api/referral/analytics/partner$',
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics/navigation$',
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics/sources$',
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics/timeline$',
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics/recent-clicks$',
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/referral/analytics/summary$',
+        'resource': 'referrals',
+        'methods': {
+            'GET': 'read'
+        }
+    },
     {
         'pattern': r'^/api/referral/links$',
         'resource': 'referrals',
@@ -407,8 +401,6 @@ URL_PERMISSION_MAP = [
         }
     },
     
-
-    
     # ========== CONTACTS ==========
     {
         'pattern': r'^/api/admin/contacts$',
@@ -453,6 +445,129 @@ URL_PERMISSION_MAP = [
             'POST': 'create'
         }
     },
+ 
+    # ========== TOUR MANAGEMENT - SPECIFIC ROUTES ==========
+    # Tour Packages
+    {
+        'pattern': r'^/api/tour/admin/packages$',
+        'resource': 'tours',
+        'methods': {
+            'GET': 'read',
+            'POST': 'create'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/packages/(\d+)$',
+        'resource': 'tours',
+        'methods': {
+            'GET': 'read',
+            'PUT': 'update',
+            'DELETE': 'delete'
+        }
+    },
+    
+    # Tour Bookings
+    {
+        'pattern': r'^/api/tour/admin/bookings$',
+        'resource': 'bookings',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/bookings/(\d+)$',
+        'resource': 'bookings',
+        'methods': {
+            'GET': 'read',
+            'PUT': 'update'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/bookings/(\d+)/status$',
+        'resource': 'bookings',
+        'methods': {
+            'PUT': 'update'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/bookings/(\d+)/change-request$',
+        'resource': 'bookings',
+        'methods': {
+            'POST': 'update'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/bookings/(\d+)/payment$',
+        'resource': 'bookings',
+        'methods': {
+            'PUT': 'update'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/bookings/(\d+)/certificate$',
+        'resource': 'bookings',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    
+    # Tour Availability
+    {
+        'pattern': r'^/api/tour/admin/availability$',
+        'resource': 'tours',
+        'methods': {
+            'PUT': 'update'
+        }
+    },
+    
+    # Tour Dashboard & Reports
+    {
+        'pattern': r'^/api/tour/admin/dashboard/stats$',
+        'resource': 'tours',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/reports/summary$',
+        'resource': 'tours',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/reports/export$',
+        'resource': 'tours',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    
+    # Tour Payments
+    {
+        'pattern': r'^/api/tour/admin/payments$',
+        'resource': 'bookings',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    {
+        'pattern': r'^/api/tour/admin/payments/(\d+)$',
+        'resource': 'bookings',
+        'methods': {
+            'GET': 'read'
+        }
+    },
+    
+    # Tour Invoices
+    {
+        'pattern': r'^/api/tour/admin/invoices/(\d+)$',
+        'resource': 'bookings',
+        'methods': {
+            'GET': 'read',
+            'POST': 'create'
+        }
+    },
 ]
 
 def is_public_route(path):
@@ -475,14 +590,10 @@ def match_url_permission(path, method):
     return None, False
 
 def permission_middleware():
-    """
-    Middleware to check permissions before request is processed.
-    Returns None if allowed, or a Flask response if denied.
-    """
     path = request.path
     method = request.method
     
-    # Log for debugging (optional - remove in production)
+    # Log for debugging
     current_app.logger.debug(f"Permission check: {method} {path}")
     
     # 1. Check public routes
@@ -497,6 +608,10 @@ def permission_middleware():
     if not current_user.is_authenticated:
         current_app.logger.warning(f"Unauthenticated access attempt: {method} {path}")
         return jsonify({'error': 'Authentication required'}), 401
+    
+    # ============================================================
+    # REGULAR PERMISSION CHECK - All routes now use this
+    # ============================================================
     
     # 4. Find matching permission rule
     rule, require_super_admin = match_url_permission(path, method)
@@ -514,8 +629,6 @@ def permission_middleware():
         return jsonify({'error': 'Super admin access required'}), 403
     
     # 7. Check permission using the permission service
-    from permission_service import has_permission
-    
     resource = rule['resource']
     action = rule['methods'][method]
     

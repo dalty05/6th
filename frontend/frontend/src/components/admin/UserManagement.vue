@@ -54,6 +54,8 @@
           <option value="">All Roles</option>
           <option value="super_admin">Super Admin</option>
           <option value="admin">Admin</option>
+          <option value="tour_manager">Tour Manager</option>
+          <option value="tour_assistant">Tour Assistant</option>
           <option value="partner">Partner</option>
         </select>
         <select v-model="statusFilter" class="filter-select">
@@ -149,7 +151,7 @@
                   <i class="fas fa-play-circle"></i>
                 </button>
                 
-                <!-- Reset Password - FIXED -->
+                <!-- Reset Password -->
                 <button @click="openResetModal(user)" class="action-btn reset" title="Reset Password">
                   <i class="fas fa-key"></i>
                 </button>
@@ -204,6 +206,8 @@
             <select v-model="form.role" required>
               <option value="super_admin">Super Admin</option>
               <option value="admin">Admin</option>
+              <option value="tour_manager">Tour Manager</option>
+              <option value="tour_assistant">Tour Assistant</option>
               <option value="partner">Partner</option>
             </select>
           </div>
@@ -229,7 +233,7 @@
       </div>
     </div>
 
-    <!-- Reset Password Modal - FIXED -->
+    <!-- Reset Password Modal -->
     <div class="modal-overlay" v-if="showResetModal" @click.self="closeResetModal">
       <div class="modal-container modal-sm">
         <div class="modal-header">
@@ -376,7 +380,7 @@ const showModal = ref(false)
 const editingUser = ref(null)
 const newUserPassword = ref('')
 
-// Reset Password - FIXED
+// Reset Password
 const showResetModal = ref(false)
 const resetUserData = ref(null)
 const newPassword = ref('')
@@ -571,7 +575,7 @@ const activateUser = async (userId) => {
   }
 }
 
-// ========== RESET PASSWORD - FIXED ==========
+// ========== RESET PASSWORD ==========
 const openResetModal = (user) => {
   resetUserData.value = user
   newPassword.value = ''
@@ -599,7 +603,6 @@ const confirmResetPassword = async () => {
     toast.error(error.response?.data?.error || 'Failed to reset password')
     resetting.value = false
   }
-  // Don't set resetting to false here - it stays true until modal closes
 }
 
 const copyPassword = () => {
@@ -607,7 +610,6 @@ const copyPassword = () => {
     navigator.clipboard.writeText(newPassword.value).then(() => {
       toast.success('Password copied to clipboard')
     }).catch(() => {
-      // Fallback
       const textArea = document.createElement('textarea')
       textArea.value = newPassword.value
       document.body.appendChild(textArea)
@@ -658,6 +660,8 @@ const getRoleLabel = (role) => {
   const roles = {
     super_admin: 'Super Admin',
     admin: 'Admin',
+    tour_manager: 'Tour Manager',
+    tour_assistant: 'Tour Assistant',
     partner: 'Partner'
   }
   return roles[role] || role
@@ -667,6 +671,8 @@ const getRoleClass = (role) => {
   const classes = {
     super_admin: 'role-super',
     admin: 'role-admin',
+    tour_manager: 'role-tour-manager',
+    tour_assistant: 'role-tour-assistant',
     partner: 'role-partner'
   }
   return classes[role] || ''
@@ -685,6 +691,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ========== ALL EXISTING STYLES REMAIN THE SAME ========== */
 .user-management {
   padding: 0;
 }
@@ -883,7 +890,7 @@ onMounted(() => {
   color: #6b7280;
 }
 
-/* ========== ROLE BADGE ========== */
+/* ========== ROLE BADGE - UPDATED ========== */
 .role-badge {
   display: inline-block;
   padding: 0.25rem 0.6rem;
@@ -894,6 +901,8 @@ onMounted(() => {
 
 .role-super { background: #1e3a8a; color: white; }
 .role-admin { background: #f59e0b; color: white; }
+.role-tour-manager { background: #8b5cf6; color: white; }
+.role-tour-assistant { background: #06b6d4; color: white; }
 .role-partner { background: #10b981; color: white; }
 
 /* ========== STATUS ========== */
@@ -1118,228 +1127,6 @@ onMounted(() => {
   background: rgba(255,255,255,0.25);
 }
 
-/* ========== RESET PASSWORD MODAL ========== */
-.reset-info {
-  text-align: center;
-  padding: 1rem;
-  background: #fef3c7;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-.reset-info i {
-  font-size: 2rem;
-  color: #f59e0b;
-  margin-bottom: 0.5rem;
-}
-
-.reset-info p {
-  margin: 0.5rem 0;
-  color: #92400e;
-}
-
-.user-info-display {
-  background: white;
-  padding: 0.75rem;
-  border-radius: 6px;
-  margin-top: 0.5rem;
-}
-
-.user-info-display strong {
-  display: block;
-  color: #1e3a8a;
-}
-
-.user-info-display span {
-  font-size: 0.85rem;
-  color: #6b7280;
-}
-
-.password-display {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  padding: 1rem;
-  margin: 1rem 0;
-}
-
-.password-display label {
-  font-weight: 600;
-  color: #065f46;
-  display: block;
-  margin-bottom: 0.5rem;
-}
-
-.password-result {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: white;
-  padding: 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-}
-
-.password-result code {
-  flex: 1;
-  font-size: 1rem;
-  color: #1e3a8a;
-  font-weight: 600;
-  word-break: break-all;
-}
-
-.copy-btn {
-  background: none;
-  border: none;
-  color: #6b7280;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  transition: 0.2s;
-}
-
-.copy-btn:hover {
-  background: #f3f4f6;
-  color: #1e3a8a;
-}
-
-.password-display .warning {
-  font-size: 0.8rem;
-  color: #92400e;
-  margin: 0.5rem 0 0;
-}
-
-.btn-warning {
-  background: #f59e0b;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  padding: 0.75rem 1.25rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.2s;
-}
-
-.btn-warning:hover:not(:disabled) {
-  background: #d97706;
-}
-
-.btn-warning:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.justify-center {
-  justify-content: center !important;
-}
-
-/* ========== DELETE MODAL ========== */
-.delete-title {
-  color: #dc2626 !important;
-}
-
-.delete-warning {
-  text-align: center;
-  padding: 1rem;
-  background: #fef2f2;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
-
-.delete-warning i {
-  font-size: 2rem;
-  color: #dc2626;
-  margin-bottom: 0.5rem;
-}
-
-.delete-warning p {
-  margin: 0;
-  color: #991b1b;
-}
-
-.delete-user-info {
-  background: #f8fafc;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.user-detail {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.user-detail:last-child {
-  border-bottom: none;
-}
-
-.user-detail .label {
-  font-weight: 600;
-  color: #374151;
-}
-
-.user-detail .value {
-  color: #1e3a8a;
-  font-weight: 500;
-}
-
-.delete-items-list {
-  background: #fef3c7;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.delete-items-list p {
-  margin: 0 0 0.5rem;
-  color: #92400e;
-}
-
-.delete-items-list ul {
-  margin: 0;
-  padding-left: 1.5rem;
-}
-
-.delete-items-list li {
-  margin: 0.25rem 0;
-  color: #78350f;
-  font-size: 0.85rem;
-}
-
-.delete-items-list li i {
-  margin-right: 0.5rem;
-  width: 16px;
-}
-
-.confirm-input {
-  margin-bottom: 1rem;
-}
-
-.confirm-input label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
-  color: #374151;
-}
-
-.delete-confirm-input {
-  width: 100%;
-  padding: 0.6rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 1rem;
-  text-align: center;
-  font-weight: bold;
-  letter-spacing: 2px;
-}
-
-.delete-confirm-input:focus {
-  outline: none;
-  border-color: #dc2626;
-}
-
 /* ========== FORM ========== */
 .form-group {
   margin-bottom: 1rem;
@@ -1446,6 +1233,30 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.btn-warning:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.justify-center {
+  justify-content: center !important;
+}
+
 .password-info {
   padding: 1rem 1.5rem 1.5rem;
 }
@@ -1474,6 +1285,200 @@ onMounted(() => {
   font-size: 0.8rem;
   color: #f59e0b;
   margin: 0.5rem 0 0;
+}
+
+/* ========== RESET PASSWORD MODAL ========== */
+.reset-info {
+  text-align: center;
+  padding: 1rem;
+  background: #fef3c7;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.reset-info i {
+  font-size: 2rem;
+  color: #f59e0b;
+  margin-bottom: 0.5rem;
+}
+
+.reset-info p {
+  margin: 0.5rem 0;
+  color: #92400e;
+}
+
+.user-info-display {
+  background: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.user-info-display strong {
+  display: block;
+  color: #1e3a8a;
+}
+
+.user-info-display span {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.password-display {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.password-display label {
+  font-weight: 600;
+  color: #065f46;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.password-result {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+
+.password-result code {
+  flex: 1;
+  font-size: 1rem;
+  color: #1e3a8a;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: 0.2s;
+}
+
+.copy-btn:hover {
+  background: #f3f4f6;
+  color: #1e3a8a;
+}
+
+.password-display .warning {
+  font-size: 0.8rem;
+  color: #92400e;
+  margin: 0.5rem 0 0;
+}
+
+/* ========== DELETE MODAL ========== */
+.delete-warning {
+  text-align: center;
+  padding: 1rem;
+  background: #fef2f2;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.delete-warning i {
+  font-size: 2rem;
+  color: #dc2626;
+  margin-bottom: 0.5rem;
+}
+
+.delete-warning p {
+  margin: 0;
+  color: #991b1b;
+}
+
+.delete-user-info {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.user-detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.user-detail:last-child {
+  border-bottom: none;
+}
+
+.user-detail .label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.user-detail .value {
+  color: #1e3a8a;
+  font-weight: 500;
+}
+
+.delete-items-list {
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.delete-items-list p {
+  margin: 0 0 0.5rem;
+  color: #92400e;
+}
+
+.delete-items-list ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.delete-items-list li {
+  margin: 0.25rem 0;
+  color: #78350f;
+  font-size: 0.85rem;
+}
+
+.delete-items-list li i {
+  margin-right: 0.5rem;
+  width: 16px;
+}
+
+.confirm-input {
+  margin-bottom: 1rem;
+}
+
+.confirm-input label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.delete-confirm-input {
+  width: 100%;
+  padding: 0.6rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.delete-confirm-input:focus {
+  outline: none;
+  border-color: #dc2626;
 }
 
 /* ========== ANIMATIONS ========== */

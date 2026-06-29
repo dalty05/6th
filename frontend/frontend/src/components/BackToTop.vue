@@ -4,7 +4,7 @@
       v-show="visible" 
       @click="scrollToTop" 
       class="back-to-top"
-      aria-label="Back to top"
+      
     >
       <div class="back-to-top-icon">
         <span>↑</span>
@@ -47,10 +47,10 @@ export default {
 }
 </script>
 
-<!-- <style scoped>
-.back-to-top {
+<style scoped>
+/* .back-to-top {
   position: fixed;
-  bottom: 30px;
+  bottom: 0.1%;
   right: 30px;
   background: rgba(30,58,138,0.95);
   backdrop-filter: blur(10px);
@@ -64,7 +64,7 @@ export default {
   transition: all 0.3s;
   z-index: 999;
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
+} */
 
 .back-to-top:hover {
   background: #f59e0b;
@@ -109,4 +109,4 @@ export default {
     font-size: 1rem;
   }
 }
-</style> -->
+</style> 

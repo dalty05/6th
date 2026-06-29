@@ -58,8 +58,8 @@ export default {
 
 .scroll-percentage {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  top: 20px;
+  right: 30px;
   background: rgba(30,58,138,0.9);
   backdrop-filter: blur(10px);
   color: white;

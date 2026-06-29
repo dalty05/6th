@@ -15,7 +15,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), default='partner')  # super_admin, admin, partner
+    role = db.Column(db.String(20), default='partner')
     is_active = db.Column(db.Boolean, default=True)
     is_approved = db.Column(db.Boolean, default=False)
     email_verified = db.Column(db.Boolean, default=False)
@@ -25,6 +25,10 @@ class User(UserMixin, db.Model):
     referral_code = db.Column(db.String(50), unique=True)
     total_clicks = db.Column(db.Integer, default=0)
     total_conversions = db.Column(db.Integer, default=0)
+    
+    # ✅ Tour management fields (COLUMNS)
+    is_tour_manager = db.Column(db.Boolean, default=False)
+    is_tour_assistant = db.Column(db.Boolean, default=False)
     
     # Permission JSON field
     permissions = db.Column(db.Text, default='{}')
@@ -52,7 +56,17 @@ class User(UserMixin, db.Model):
     
     def is_partner(self):
         return self.role == 'partner'
-
+    
+    # ✅ RENAMED METHODS (no longer conflict with columns)
+    def has_tour_manager_role(self):
+        return self.role == 'tour_manager' or self.is_tour_manager
+    
+    def has_tour_assistant_role(self):
+        return self.role == 'tour_assistant' or self.is_tour_assistant
+    
+    def is_tour_staff(self):
+        return self.has_tour_manager_role() or self.has_tour_assistant_role()
+    
     def to_dict(self, include_permissions=False):
         """Convert user object to dictionary for API responses"""
         data = {
@@ -66,6 +80,8 @@ class User(UserMixin, db.Model):
             'referral_code': self.referral_code,
             'total_clicks': self.total_clicks,
             'total_conversions': self.total_conversions,
+            'is_tour_manager': self.is_tour_manager,  # ✅ Column value
+            'is_tour_assistant': self.is_tour_assistant,  # ✅ Column value
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
@@ -78,174 +94,392 @@ class User(UserMixin, db.Model):
 
         return data
 
-    # ========== PERMISSION METHODS - MUST BE INSIDE THE CLASS ==========
-    
-    def get_permissions(self):
-        """Get permissions for this user"""
-        try:
-            from permission_service import has_permission
-        except ImportError:
-            # Fallback if permission_service not available
-            return {
-                'products': {'read': True},
-                'blog': {'read': True},
-                'jobs': {'read': True},
-                'outlets': {'read': True},
-                'users': {'read': True if self.role == 'super_admin' else False},
-                'partners': {'read': True if self.role == 'super_admin' else False},
-                'referrals': {'read': True, 'create': True, 'update': True},
-                'statistics': {'read': True},
-                'contacts': {'read': True if self.role == 'super_admin' else False}
-            }
-        
-        # Super admin has all permissions
-        if self.role == 'super_admin':
-            return {
-                'products': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'blog': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'jobs': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'outlets': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'users': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'partners': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'referrals': {'create': True, 'read': True, 'update': True, 'delete': True},
-                'statistics': {'create': True, 'read': True, 'update': True, 'delete': True},
-                
-                'contacts': {'create': True, 'read': True, 'update': True, 'delete': True}
-            }
-        
-        resources = ['products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'referrals', 'statistics',  'contacts']
-        actions = ['create', 'read', 'update', 'delete']
-        
-        permissions = {}
-        for resource in resources:
-            permissions[resource] = {}
-            for action in actions:
-                permissions[resource][action] = has_permission(self, resource, action)
-        
-        return permissions
+    # ... rest of your User methods ...
 
-    def has_permission(self, resource, action):
-        """Check if user has specific permission"""
-        # Super admin bypass
-        if self.role == 'super_admin':
+
+# ============================================================
+# TOUR MODELS
+# ============================================================
+
+
+
+class TourPackage(db.Model):
+    """Main tour packages with manager-configurable settings"""
+    __tablename__ = 'tour_packages'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    slug = db.Column(db.String(120), unique=True, nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    short_description = db.Column(db.String(200))
+    
+    # Pricing
+    base_price = db.Column(db.Float, nullable=False)
+    min_people = db.Column(db.Integer, default=1)
+    max_people = db.Column(db.Integer, default=300)
+    commitment_percentage = db.Column(db.Float, default=30.0)
+    discount_tiers = db.Column(db.JSON, default={
+        '1-50': 0.05,
+        '51-100': 0.10,
+        '101-150': 0.15,
+        '151-200': 0.20,
+        '201+': 0.25
+    })
+    
+    
+    
+    # Tour details
+    duration_hours = db.Column(db.Integer, default=2)
+    includes = db.Column(db.JSON, default=[])
+    excludes = db.Column(db.JSON, default=[])
+    
+    # Media
+    image_url = db.Column(db.String(255))
+    gallery_images = db.Column(db.JSON)
+    
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+    is_featured = db.Column(db.Boolean, default=False)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    bookings = db.relationship('TourBooking', back_populates='package', lazy='dynamic')
+    availability = db.relationship('TourAvailability', back_populates='package', lazy='dynamic')
+    
+    def get_price_for_people(self, people_count):
+        """Calculate price based on number of people"""
+        discount = 0
+        
+        for tier, discount_rate in self.discount_tiers.items():
+            if '-' in tier:
+                min_p, max_p = map(int, tier.split('-'))
+                if min_p <= people_count <= max_p:
+                    discount = discount_rate
+                    break
+            elif tier.endswith('+'):
+                min_p = int(tier[:-1])
+                if people_count >= min_p:
+                    discount = discount_rate
+                    break
+        
+        subtotal = self.base_price * people_count
+        discount_amount = subtotal * discount
+        total = subtotal - discount_amount
+        
+        return {
+            'base_price': self.base_price,
+            'people_count': people_count,
+            'subtotal': subtotal,
+            'discount_percentage': discount * 100,
+            'discount_amount': discount_amount,
+            'total': total,
+            'tier_applied': self._get_tier_label(people_count)
+        }
+    
+    def _get_tier_label(self, people_count):
+        for tier, discount_rate in self.discount_tiers.items():
+            if '-' in tier:
+                min_p, max_p = map(int, tier.split('-'))
+                if min_p <= people_count <= max_p:
+                    return f'{tier} ({discount_rate * 100}%)'
+            elif tier.endswith('+'):
+                min_p = int(tier[:-1])
+                if people_count >= min_p:
+                    return f'{tier} ({discount_rate * 100}%)'
+        return 'No discount'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'slug': self.slug,
+            'description': self.description,
+            'short_description': self.short_description,
+            'base_price': self.base_price,
+            'min_people': self.min_people,
+            'max_people': self.max_people,
+            'commitment_percentage': self.commitment_percentage,
+            'discount_tiers': self.discount_tiers,
+            'duration_hours': self.duration_hours,
+            'includes': self.includes,
+            'excludes': self.excludes,
+            'image_url': self.image_url,
+            'gallery_images': self.gallery_images,
+            'is_active': self.is_active,
+            'is_featured': self.is_featured,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class TourBooking(db.Model):
+    """Complete booking lifecycle"""
+    __tablename__ = 'tour_bookings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    
+    # Booking details
+    package_id = db.Column(db.Integer, db.ForeignKey('tour_packages.id'), nullable=False)
+    tour_date = db.Column(db.DateTime, nullable=False)
+    people_count = db.Column(db.Integer, nullable=False)
+    
+    # Customer details
+    customer_name = db.Column(db.String(100), nullable=False)
+    customer_email = db.Column(db.String(120), nullable=False, index=True)
+    customer_phone = db.Column(db.String(20), nullable=False)
+    
+    # Optional details
+    special_requirements = db.Column(db.Text)
+    preferred_language = db.Column(db.String(20), default='English')
+    group_name = db.Column(db.String(100))
+    
+    # Pricing
+    price_per_person = db.Column(db.Float, nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+    discount_applied = db.Column(db.Float, default=0)
+    total_amount = db.Column(db.Float, nullable=False)
+    
+    # Payment tracking
+    payment_status = db.Column(db.String(20), default='pending')
+    commitment_amount = db.Column(db.Float, default=0)
+    commitment_paid = db.Column(db.Boolean, default=False)
+    commitment_paid_date = db.Column(db.DateTime)
+    full_payment_date = db.Column(db.DateTime)
+    payment_notes = db.Column(db.Text)
+    
+    # Booking status
+    status = db.Column(db.String(20), default='pending')  # pending, confirmed, commitment_pending, cleared, completed, cancelled, rejected
+    
+    # Change requests
+    change_requested_date = db.Column(db.DateTime)
+    change_request_new_date = db.Column(db.DateTime)
+    change_request_reason = db.Column(db.Text)
+    change_request_status = db.Column(db.String(20))  # pending, approved, rejected
+    
+    # Audit
+    notes = db.Column(db.Text)
+    cancellation_reason = db.Column(db.Text)
+    cancellation_date = db.Column(db.DateTime)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Foreign keys
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    customer_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # Relationships
+    package = db.relationship('TourPackage', back_populates='bookings')
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    customer_user = db.relationship('User', foreign_keys=[customer_user_id])
+    payments = db.relationship('TourPayment', back_populates='booking', lazy='dynamic')
+    invoice = db.relationship('TourInvoice', back_populates='booking', uselist=False)
+    
+    def generate_reference(self):
+        import random
+        import string
+        year = datetime.utcnow().year
+        random_digits = ''.join(random.choices(string.digits, k=5))
+        self.reference = f"TU-{year}-{random_digits}"
+        return self.reference
+    
+    def calculate_price(self):
+        if self.package:
+            price_data = self.package.get_price_for_people(self.people_count)
+            self.price_per_person = price_data['base_price']
+            self.subtotal = price_data['subtotal']
+            self.discount_applied = price_data['discount_amount']
+            self.total_amount = price_data['total']
+            return price_data
+        return None
+    
+    def can_edit(self):
+        return self.status in ['pending', 'confirmed', 'commitment_pending']
+    
+    def can_cancel(self):
+        return self.status not in ['completed', 'cancelled', 'rejected']
+    
+    def request_date_change(self, new_date, reason):
+        self.change_requested_date = datetime.utcnow()
+        self.change_request_new_date = new_date
+        self.change_request_reason = reason
+        self.change_request_status = 'pending'
+        self.status = 'change_requested'
+    
+    def approve_date_change(self):
+        if self.change_request_status == 'pending':
+            self.tour_date = self.change_request_new_date
+            self.change_request_status = 'approved'
+            self.status = 'confirmed'
             return True
+        return False
+    
+    def reject_date_change(self):
+        if self.change_request_status == 'pending':
+            self.change_request_status = 'rejected'
+            self.status = 'confirmed'
+            return True
+        return False
+    
+
+    def to_dict(self, include_package=False):
+        data = {
+            'id': self.id,
+            'reference': self.reference,
+            'tour_date': self.tour_date.isoformat() if self.tour_date else None,
+            'people_count': self.people_count,
+            'customer_name': self.customer_name,
+            'customer_email': self.customer_email,
+            'customer_phone': self.customer_phone,
+            'special_requirements': self.special_requirements,
+            'group_name': self.group_name,
+            'price_per_person': self.price_per_person,
+            'subtotal': self.subtotal,
+            'discount_applied': self.discount_applied,
+            'total_amount': self.total_amount,
+            'payment_status': self.payment_status,
+            'commitment_amount': self.commitment_amount,
+            'commitment_paid': self.commitment_paid,
+            'status': self.status,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
         
-        # First check UserPermission table (most specific)
-        from models import UserPermission
-        custom_perm = UserPermission.query.filter_by(
-            user_id=self.id, 
-            resource=resource, 
-            action=action
-        ).first()
-        if custom_perm:
-            return custom_perm.is_allowed
+        if include_package and self.package:
+            data['package'] = self.package.to_dict()
         
-        # Then check JSON permissions field
-        perms = self.get_permissions()
-        return perms.get(resource, {}).get(action, False)
+        return data
+
+
+
+class TourAvailability(db.Model):
+    """Tour availability - simplified (no capacity, only blocking)"""
+    __tablename__ = 'tour_availability'
     
-    def can_view(self, resource):
-        return self.has_permission(resource, 'read')
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey('tour_packages.id'), nullable=False)
     
-    def can_create(self, resource):
-        return self.has_permission(resource, 'create')
+    date = db.Column(db.Date, nullable=False, index=True)
     
-    def can_update(self, resource):
-        return self.has_permission(resource, 'update')
+
+
+    is_blocked = db.Column(db.Boolean, default=False)
+    block_reason = db.Column(db.String(200))
     
-    def can_delete(self, resource):
-        return self.has_permission(resource, 'delete')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    def set_permission(self, resource, action, value):
-        """Set specific permission for a user (super admin only)"""
-        if self.role == 'super_admin':
-            return False
-        
-        perms = self.get_permissions()
-        if resource not in perms:
-            perms[resource] = {'create': False, 'read': False, 'update': False, 'delete': False}
-        perms[resource][action] = value
-        self.permissions = json.dumps(perms)
-        return True
+    # Relationships
+    package = db.relationship('TourPackage', back_populates='availability')
     
-    def set_permissions_bulk(self, permissions_dict):
-        """Set multiple permissions at once"""
-        if self.role == 'super_admin':
-            return False
-        self.permissions = json.dumps(permissions_dict)
-        return True
+    @property
+    def is_available(self):
+        """Check if the date is available"""
+        return not self.is_blocked
     
-    def generate_referral_code(self):
-        """Generate unique referral code for partner"""
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'date': self.date.isoformat() if self.date else None,
+            'is_blocked': self.is_blocked,
+            'block_reason': self.block_reason,
+            'is_available': self.is_available
+        }
+
+
+
+class TourPayment(db.Model):
+    """Payment tracking (manual for now)"""
+    __tablename__ = 'tour_payments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('tour_bookings.id'), nullable=False)
+    
+    amount = db.Column(db.Float, nullable=False)
+    payment_type = db.Column(db.String(20), nullable=False)  # commitment, balance, full
+    payment_method = db.Column(db.String(20), default='manual')  # manual, mpesa, bank_transfer
+    payment_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Manual payment tracking
+    reference_number = db.Column(db.String(100))
+    payment_proof_url = db.Column(db.String(255))
+    verified_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    verification_date = db.Column(db.DateTime)
+    verification_notes = db.Column(db.Text)
+    
+    status = db.Column(db.String(20), default='pending')  # pending, verified, rejected
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    booking = db.relationship('TourBooking', back_populates='payments')
+    verified_by = db.relationship('User', foreign_keys=[verified_by_id])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'booking_id': self.booking_id,
+            'amount': self.amount,
+            'payment_type': self.payment_type,
+            'payment_method': self.payment_method,
+            'payment_date': self.payment_date.isoformat() if self.payment_date else None,
+            'reference_number': self.reference_number,
+            'status': self.status,
+            'verification_notes': self.verification_notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class TourInvoice(db.Model):
+    """PDF certificate/invoice tracking"""
+    __tablename__ = 'tour_invoices'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('tour_bookings.id'), nullable=False)
+    
+    invoice_number = db.Column(db.String(50), unique=True, nullable=False)
+    pdf_url = db.Column(db.String(255))
+    qr_code_url = db.Column(db.String(255))
+    
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    download_count = db.Column(db.Integer, default=0)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    booking = db.relationship('TourBooking', back_populates='invoice')
+    
+    def generate_invoice_number(self):
         import random
         import string
-        code = f"PARTNER-{self.id}-{''.join(random.choices(string.ascii_uppercase + string.digits, k=6))}"
-        self.referral_code = code
-        return code
+        year = datetime.utcnow().year
+        random_digits = ''.join(random.choices(string.digits, k=6))
+        self.invoice_number = f"INV-{year}-{random_digits}"
+        return self.invoice_number
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'booking_id': self.booking_id,
+            'invoice_number': self.invoice_number,
+            'pdf_url': self.pdf_url,
+            'qr_code_url': self.qr_code_url,
+            'generated_at': self.generated_at.isoformat() if self.generated_at else None,
+            'download_count': self.download_count
+        }
 
 
-
-
-
-def has_permission(self, resource, action):
-    """Check if user has specific permission"""
-    # Super admin bypass
-    if self.role == 'super_admin':
-        return True
-    
-    # First check UserPermission table (most specific)
-    from models import UserPermission
-    custom_perm = UserPermission.query.filter_by(
-        user_id=self.id, 
-        resource=resource, 
-        action=action
-    ).first()
-    if custom_perm:
-        return custom_perm.is_allowed
-    
-    # Then check JSON permissions field
-    perms = self.get_permissions()
-    return perms.get(resource, {}).get(action, False)
-    
-def can_view(self, resource):
-        return self.has_permission(resource, 'read')
-    
-def can_create(self, resource):
-        return self.has_permission(resource, 'create')
-    
-def can_update(self, resource):
-        return self.has_permission(resource, 'update')
-    
-def can_delete(self, resource):
-        return self.has_permission(resource, 'delete')
-    
-def set_permission(self, resource, action, value):
-        """Set specific permission for a user (super admin only)"""
-        if self.role == 'super_admin':
-            return False
-        
-        perms = self.get_permissions()
-        if resource not in perms:
-            perms[resource] = {'create': False, 'read': False, 'update': False, 'delete': False}
-        perms[resource][action] = value
-        self.permissions = json.dumps(perms)
-        return True
-    
-def set_permissions_bulk(self, permissions_dict):
-        """Set multiple permissions at once"""
-        if self.role == 'super_admin':
-            return False
-        self.permissions = json.dumps(permissions_dict)
-        return True
-    
-def generate_referral_code(self):
-        """Generate unique referral code for partner"""
-        import random
-        import string
-        code = f"PARTNER-{self.id}-{''.join(random.choices(string.ascii_uppercase + string.digits, k=6))}"
-        self.referral_code = code
-        return code
-    
+# ============================================================
+# EXISTING MODELS (Keep all your existing models below)
+# ============================================================
 
 class ReferralLink(db.Model):
     __tablename__ = 'referral_links'
@@ -264,7 +498,7 @@ class ReferralLink(db.Model):
     expires_at = db.Column(db.DateTime, nullable=True)
     
     # Relationships
-    user = db.relationship('User', backref=db.backref('referral_links', lazy='dynamic',cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('referral_links', lazy='dynamic', cascade='all, delete-orphan'))
     clicks = db.relationship('ReferralClick', backref='link', lazy='dynamic', cascade='all, delete-orphan')
     
     def generate_code(self):
@@ -286,7 +520,6 @@ class ReferralLink(db.Model):
         db.session.add(click)
         self.total_clicks += 1
         
-        # Check for unique click (same IP within 24 hours)
         recent_click = ReferralClick.query.filter(
             ReferralClick.link_id == self.id,
             ReferralClick.ip_address == ip_address,
@@ -296,7 +529,6 @@ class ReferralLink(db.Model):
         if not recent_click:
             self.unique_clicks += 1
         
-        # Update user total
         self.user.total_clicks += 1
         db.session.commit()
         return click
@@ -353,7 +585,7 @@ class PermissionTemplate(db.Model):
     name = db.Column(db.String(50), unique=True, nullable=False)
     display_name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(200))
-    permissions = db.Column(db.Text, nullable=False)  # JSON string
+    permissions = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     @staticmethod
@@ -521,13 +753,6 @@ class LoginAttempt(db.Model):
     attempted_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-
-
-
-
-
-
-
 class EmailVerificationToken(db.Model):
     __tablename__ = 'email_verification_tokens'
     
@@ -545,17 +770,18 @@ class EmailVerificationToken(db.Model):
     def is_valid(self):
         return not self.used and datetime.utcnow() < self.expires_at
 
+
 class ActivityLog(db.Model):
     __tablename__ = 'activity_logs'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     user_name = db.Column(db.String(100))
-    action = db.Column(db.String(50), nullable=False)  # create, update, delete, login, logout, approve, suspend, regenerate
-    resource_type = db.Column(db.String(50), nullable=False)  # product, blog, user, partner, referral
+    action = db.Column(db.String(50), nullable=False)
+    resource_type = db.Column(db.String(50), nullable=False)
     resource_id = db.Column(db.Integer)
     description = db.Column(db.String(500))
-    details = db.Column(db.Text)  # JSON string of changes
+    details = db.Column(db.Text)
     ip_address = db.Column(db.String(50))
     user_agent = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -575,12 +801,8 @@ class ActivityLog(db.Model):
             'ip_address': self.ip_address,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
-
-   
 
 
-   #newsletter settings
 class NewsletterSubscriber(db.Model):
     __tablename__ = 'newsletter_subscribers'
     
@@ -590,7 +812,6 @@ class NewsletterSubscriber(db.Model):
     subscribed_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
     last_sent = db.Column(db.DateTime)
-
 
 
 class ContactMessage(db.Model):
@@ -614,10 +835,7 @@ class ContactMessage(db.Model):
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-        
 
-
-# job applications
 
 class JobCategory(db.Model):
     __tablename__ = 'job_categories'
@@ -632,6 +850,7 @@ class JobCategory(db.Model):
     
     jobs = db.relationship('Job', backref='category', lazy=True)
 
+
 class Job(db.Model):
     __tablename__ = 'jobs'
     
@@ -640,8 +859,8 @@ class Job(db.Model):
     slug = db.Column(db.String(200), unique=True, nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey('job_categories.id'))
     location = db.Column(db.String(200))
-    type = db.Column(db.String(50))  # Full-time, Part-time, Remote, Contract, Internship
-    experience_level = db.Column(db.String(50))  # Entry, Intermediate, Senior, Expert
+    type = db.Column(db.String(50))
+    experience_level = db.Column(db.String(50))
     salary_range = db.Column(db.String(100))
     description = db.Column(db.Text, nullable=False)
     requirements = db.Column(db.Text, nullable=False)
@@ -659,13 +878,13 @@ class Job(db.Model):
     created_by_user = db.relationship('User', backref='jobs_created')
     applications = db.relationship('JobApplication', backref='job', lazy=True, cascade='all, delete-orphan')
 
+
 class JobApplication(db.Model):
     __tablename__ = 'job_applications'
     
     id = db.Column(db.Integer, primary_key=True)
     job_id = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
     
-    # Applicant information
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), nullable=False)
@@ -675,17 +894,14 @@ class JobApplication(db.Model):
     portfolio_url = db.Column(db.String(500))
     linkedin_url = db.Column(db.String(500))
     
-    # Status tracking
-    status = db.Column(db.String(50), default='pending')  # pending, reviewed, shortlisted, rejected, hired
+    status = db.Column(db.String(50), default='pending')
     admin_notes = db.Column(db.Text)
-    rating = db.Column(db.Integer)  # 1-5 star rating from admin
+    rating = db.Column(db.Integer)
     
-    # Communication
     admin_reply = db.Column(db.Text)
     replied_at = db.Column(db.DateTime)
     replied_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     
-    # Metadata
     ip_address = db.Column(db.String(50))
     user_agent = db.Column(db.String(500))
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -697,13 +913,12 @@ class JobApplication(db.Model):
         return f"{self.first_name} {self.last_name}"
 
 
-
 class Outlet(db.Model):
     __tablename__ = 'outlets'
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
-    category = db.Column(db.String(50), nullable=False)  # office_branch, depot, outlet
+    category = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
     address = db.Column(db.String(500), nullable=False)
     city = db.Column(db.String(100))
@@ -712,7 +927,7 @@ class Outlet(db.Model):
     phone = db.Column(db.String(50))
     email = db.Column(db.String(120))
     working_hours = db.Column(db.String(500))
-    services = db.Column(db.Text)  # JSON string of services
+    services = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
     display_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -729,18 +944,13 @@ class Outlet(db.Model):
         self.services = json.dumps(services_list)
 
 
-
-
-
-
 class UserPermission(db.Model):
-    """User-specific permissions - overrides role defaults"""
     __tablename__ = 'user_permissions'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    resource = db.Column(db.String(50), nullable=False)  # products, jobs, outlets, blog, referrals, users, contacts
-    action = db.Column(db.String(20), nullable=False)    # create, read, update, delete
+    resource = db.Column(db.String(50), nullable=False)
+    action = db.Column(db.String(20), nullable=False)
     is_allowed = db.Column(db.Boolean, default=True)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -754,15 +964,15 @@ class UserPermission(db.Model):
         db.UniqueConstraint('user_id', 'resource', 'action', name='unique_user_permission'),
     )
 
+
 class ResourcePermission(db.Model):
-    """Resource-level permissions - control access to specific items"""
     __tablename__ = 'resource_permissions'
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    resource_type = db.Column(db.String(50), nullable=False)  # product, job, outlet, blog_post
-    resource_id = db.Column(db.Integer, nullable=False)       # specific item ID
-    action = db.Column(db.String(20), nullable=False)         # read, update, delete
+    resource_type = db.Column(db.String(50), nullable=False)
+    resource_id = db.Column(db.Integer, nullable=False)
+    action = db.Column(db.String(20), nullable=False)
     is_allowed = db.Column(db.Boolean, default=True)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -777,8 +987,6 @@ class ResourcePermission(db.Model):
     )
 
 
-
-
 class ReferralNavigation(db.Model):
     __tablename__ = 'referral_navigations'
     
@@ -786,25 +994,21 @@ class ReferralNavigation(db.Model):
     referral_code = db.Column(db.String(50), index=True, nullable=False)
     session_id = db.Column(db.String(100), index=True)
     
-    # Action details
-    action = db.Column(db.String(20), default='nav_click')  # nav_click, exit, page_view
+    action = db.Column(db.String(20), default='nav_click')
     link_text = db.Column(db.String(200))
     link_href = db.Column(db.String(500))
     link_id = db.Column(db.String(100))
     link_class = db.Column(db.String(200))
     
-    # Page context
     page_url = db.Column(db.String(500))
     page_title = db.Column(db.String(200))
     referrer_url = db.Column(db.String(500))
     
-    # User context
     ip_address = db.Column(db.String(50))
     user_agent = db.Column(db.String(500))
     screen_size = db.Column(db.String(50))
     
-    # Time metrics
-    time_spent = db.Column(db.Integer)  # seconds
+    time_spent = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def to_dict(self):

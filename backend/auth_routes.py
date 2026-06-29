@@ -1,19 +1,10 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, session
 from flask_login import login_user, logout_user, login_required, current_user
 from models import db, User, OTP, PasswordResetToken, EmailVerificationToken, LoginAttempt
 from email_service import EmailService
 from datetime import datetime, timedelta
 import re
 from functools import wraps
-
-from flask import Blueprint, request, jsonify, current_app, session
-from flask_login import login_user, logout_user, login_required, current_user
-from models import db, User, OTP, PasswordResetToken, EmailVerificationToken, LoginAttempt
-
-
-
-
-
 
 auth_bp = Blueprint('auth', __name__)
 email_service = EmailService()
@@ -80,7 +71,9 @@ def role_required(*roles):
         return decorated_function
     return decorator
 
-# Public Routes
+# ============================================================
+# PUBLIC ROUTES
+# ============================================================
 
 @auth_bp.route('/auth/register', methods=['POST'])
 def register():
@@ -167,7 +160,6 @@ def verify_email():
     frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
     
     for super_admin in super_admins:
-        # Send notification email to super admins
         email_service.send_approval_email(user, frontend_url)
     
     return jsonify({'message': 'Email verified successfully. Waiting for admin approval.'}), 200
@@ -212,7 +204,6 @@ def login_step1():
     db.session.commit()
     
     # Send OTP email
-    # ========== SEND OTP EMAIL ==========
     try:
         from email_service import EmailService
         email_service = EmailService()
@@ -221,9 +212,6 @@ def login_step1():
     except Exception as e:
         print(f"❌ Failed to send OTP email: {e}")
 
-
-
-  
     print(f"\n{'='*50}")
     print(f"🔐 OTP LOGIN CODE FOR {email}")
     print(f"📱 CODE: {otp_code}")
@@ -231,7 +219,6 @@ def login_step1():
     print(f"{'='*50}\n")
     
     # Store email in session for step 2
-    from flask import session
     session['login_email'] = email
     
     return jsonify({
@@ -247,7 +234,6 @@ def login_step2():
     ip_address = request.remote_addr
     remember = data.get('remember', False)
     
-    from flask import session
     email = session.get('login_email')
     
     if not email:
@@ -283,18 +269,21 @@ def login_step2():
     
     record_login_attempt(email, ip_address, True, user.id)
     
+    #  Return user with tour flags
     return jsonify({
         'message': 'Login successful',
         'user': {
-    'id': user.id,
-    'email': user.email,
-    'full_name': user.full_name,
-    'role': user.role,
-    'is_active': user.is_active,
-    'is_approved': user.is_approved,
-    'created_at': user.created_at.isoformat() if user.created_at else None,
-    'last_login': user.last_login.isoformat() if user.last_login else None
-},
+            'id': user.id,
+            'email': user.email,
+            'full_name': user.full_name,
+            'role': user.role,
+            'is_active': user.is_active,
+            'is_approved': user.is_approved,
+            'is_tour_manager': user.is_tour_manager,
+            'is_tour_assistant': user.is_tour_assistant,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+            'last_login': user.last_login.isoformat() if user.last_login else None
+        },
         'is_super_admin': user.is_super_admin()
     }), 200
 
@@ -353,7 +342,9 @@ def logout():
     logout_user()
     return jsonify({'message': 'Logged out successfully'}), 200
 
-#  (Super Admin only)
+# ============================================================
+# SUPER ADMIN ONLY ROUTES
+# ============================================================
 
 @auth_bp.route('/admin/users', methods=['GET'])
 @login_required
@@ -362,6 +353,98 @@ def get_users():
     """Get all users (super admin only)"""
     users = User.query.all()
     return jsonify([user.to_dict() for user in users]), 200
+
+@auth_bp.route('/admin/users', methods=['POST'])
+@login_required
+@role_required('super_admin')
+def create_user():
+    """Create a new user (super admin only)"""
+    data = request.json
+    email = data.get('email', '').lower().strip()
+    full_name = data.get('full_name', '').strip()
+    password = data.get('password')
+    role = data.get('role', 'partner')
+    is_active = data.get('is_active', True)
+    is_approved = data.get('is_approved', True)
+    
+    # Validate input
+    if not all([email, full_name, password]):
+        return jsonify({'error': 'All fields are required'}), 400
+    
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return jsonify({'error': 'Invalid email format'}), 400
+    
+    # Check if user exists
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        return jsonify({'error': 'Email already registered'}), 400
+    
+    # Validate password strength
+    valid, message = validate_password(password)
+    if not valid:
+        return jsonify({'error': message}), 400
+    
+    # Determine tour role flags
+    is_tour_manager = role == 'tour_manager'
+    is_tour_assistant = role == 'tour_assistant'
+    
+    # Create user
+    user = User(
+        email=email,
+        full_name=full_name,
+        role=role,
+        is_active=is_active,
+        is_approved=is_approved,
+        is_tour_manager=is_tour_manager,
+        is_tour_assistant=is_tour_assistant,
+        email_verified=True  # Auto-verified for admin-created users
+    )
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'User created successfully',
+        'user': user.to_dict(),
+        'temporary_password': password  # Only shown once
+    }), 201
+
+@auth_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
+@login_required
+@role_required('super_admin')
+def update_user(user_id):
+    """Update user (super admin only)"""
+    user = User.query.get_or_404(user_id)
+    data = request.json
+    
+    if data.get('full_name'):
+        user.full_name = data['full_name']
+    
+    if data.get('role'):
+        user.role = data['role']
+        # Update tour flags based on role
+        user.is_tour_manager = user.role == 'tour_manager'
+        user.is_tour_assistant = user.role == 'tour_assistant'
+    
+    if 'is_active' in data:
+        user.is_active = data['is_active']
+    
+    if 'is_approved' in data:
+        user.is_approved = data['is_approved']
+    
+    # Allow manual override of tour flags if needed
+    if 'is_tour_manager' in data:
+        user.is_tour_manager = data['is_tour_manager']
+    
+    if 'is_tour_assistant' in data:
+        user.is_tour_assistant = data['is_tour_assistant']
+    
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'User updated successfully',
+        'user': user.to_dict()
+    }), 200
 
 @auth_bp.route('/admin/users/<int:user_id>/approve', methods=['PUT'])
 @login_required
@@ -407,26 +490,40 @@ def suspend_user(user_id):
     status = 'suspended' if not is_active else 'activated'
     return jsonify({'message': f'User {status} successfully'}), 200
 
-@auth_bp.route('/admin/users/<int:user_id>/role', methods=['PUT'])
+@auth_bp.route('/admin/users/<int:user_id>/activate', methods=['POST'])
 @login_required
 @role_required('super_admin')
-def change_user_role(user_id):
-    """Change user role (super admin only)"""
+def activate_user(user_id):
+    """Activate a suspended user (super admin only)"""
     user = User.query.get_or_404(user_id)
     
     if user.id == current_user.id:
-        return jsonify({'error': 'Cannot change your own role'}), 400
+        return jsonify({'error': 'Cannot activate yourself'}), 400
     
-    data = request.json
-    new_role = data.get('role')
-    
-    if new_role not in ['super_admin', 'admin', 'viewer']:
-        return jsonify({'error': 'Invalid role'}), 400
-    
-    user.role = new_role
+    user.is_active = True
     db.session.commit()
     
-    return jsonify({'message': f'Role changed to {new_role}'}), 200
+    return jsonify({'message': f'User {user.full_name} activated successfully'}), 200
+
+@auth_bp.route('/admin/users/<int:user_id>/reset-password', methods=['POST'])
+@login_required
+@role_required('super_admin')
+def reset_user_password(user_id):
+    """Reset user password (super admin only)"""
+    user = User.query.get_or_404(user_id)
+    
+    # Generate random password
+    import random
+    import string
+    new_password = ''.join(random.choices(string.ascii_letters + string.digits, k=12))
+    
+    user.set_password(new_password)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Password reset successfully',
+        'new_password': new_password
+    }), 200
 
 @auth_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
 @login_required
@@ -443,7 +540,9 @@ def delete_user(user_id):
     
     return jsonify({'message': 'User deleted successfully'}), 200
 
-# Self-service routes
+# ============================================================
+# SELF-SERVICE ROUTES
+# ============================================================
 
 @auth_bp.route('/admin/profile', methods=['GET'])
 @login_required
@@ -500,12 +599,14 @@ def check_auth_alias():
     """Alias for legacy admin auth checks"""
     return check_auth()
 
+# ============================================================
+# TEST ROUTE (REMOVE IN PRODUCTION)
+# ============================================================
 
 @auth_bp.route('/auth/login/test', methods=['POST'])
 def test_login():
     """TEMPORARY: Test login without OTP - Remove in production"""
     from flask_login import login_user
-    from flask import session
     
     data = request.json
     email = data.get('email', '').lower().strip()
@@ -536,15 +637,16 @@ def test_login():
     return jsonify({
         'message': 'Login successful',
         'user': {
-    'id': user.id,
-    'email': user.email,
-    'full_name': user.full_name,
-    'role': user.role,
-    'is_active': user.is_active,
-    'is_approved': user.is_approved,
-    'created_at': user.created_at.isoformat() if user.created_at else None,
-    'last_login': user.last_login.isoformat() if user.last_login else None
-},
+            'id': user.id,
+            'email': user.email,
+            'full_name': user.full_name,
+            'role': user.role,
+            'is_active': user.is_active,
+            'is_approved': user.is_approved,
+            'is_tour_manager': user.is_tour_manager,
+            'is_tour_assistant': user.is_tour_assistant,
+            'created_at': user.created_at.isoformat() if user.created_at else None,
+            'last_login': user.last_login.isoformat() if user.last_login else None
+        },
         'is_super_admin': user.is_super_admin()
     }), 200
-

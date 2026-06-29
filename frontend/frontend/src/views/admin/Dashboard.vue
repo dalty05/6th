@@ -20,98 +20,73 @@
           <!-- Stats Grid -->
           <div class="stats-grid">
             <div class="stat-card">
-              <div class="stat-icon">
-                <i class="fas fa-boxes"></i>
-              </div>
-              <div class="stat-info">
-                <h3>{{ stats.totalProducts || 0 }}</h3>
-                <p>Products</p>
-              </div>
+              <div class="stat-icon"><i class="fas fa-boxes"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalProducts || 0 }}</h3><p>Products</p></div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon">
-                <i class="fas fa-newspaper"></i>
-              </div>
-              <div class="stat-info">
-                <h3>{{ stats.totalBlogs || 0 }}</h3>
-                <p>Blog Posts</p>
-              </div>
+              <div class="stat-icon"><i class="fas fa-newspaper"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalBlogs || 0 }}</h3><p>Blog Posts</p></div>
             </div>
             <div class="stat-card" v-if="canViewJobs">
-              <div class="stat-icon">
-                <i class="fas fa-briefcase"></i>
-              </div>
-              <div class="stat-info">
-                <h3>{{ stats.totalJobs || 0 }}</h3>
-                <p>Job Openings</p>
-              </div>
+              <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalJobs || 0 }}</h3><p>Job Openings</p></div>
             </div>
             <div class="stat-card" v-if="canViewOutlets">
-              <div class="stat-icon">
-                <i class="fas fa-map-marker-alt"></i>
-              </div>
-              <div class="stat-info">
-                <h3>{{ stats.totalOutlets || 0 }}</h3>
-                <p>Outlet Locations</p>
-              </div>
+              <div class="stat-icon"><i class="fas fa-map-marker-alt"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalOutlets || 0 }}</h3><p>Outlet Locations</p></div>
             </div>
-
-
-            
-
-              <div v-if="isSuperAdmin" class="stat-card">
-                <div class="stat-icon">
-                  <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-info">
-                  <h3>{{ stats.totalUsers || 0 }}</h3>
-                  <p>Users</p>
-                </div>
-              </div>
-
-
+            <div v-if="isSuperAdmin" class="stat-card">
+              <div class="stat-icon"><i class="fas fa-users"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalUsers || 0 }}</h3><p>Users</p></div>
+            </div>
             <div class="stat-card" v-if="canViewReferrals">
-              <div class="stat-icon">
-                <i class="fas fa-link"></i>
-              </div>
-              <div class="stat-info">
-                <h3>{{ stats.totalClicks || 0 }}</h3>
-                <p>Referral Clicks</p>
-              </div>
+              <div class="stat-icon"><i class="fas fa-link"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalClicks || 0 }}</h3><p>Referral Clicks</p></div>
+            </div>
+            <div class="stat-card" v-if="canViewTours">
+              <div class="stat-icon" style="background: #fef3c7;"><i class="fas fa-factory" style="color: #f59e0b;"></i></div>
+              <div class="stat-info"><h3>{{ stats.totalTours || 0 }}</h3><p>Tour Bookings</p></div>
             </div>
           </div>
 
-          <!-- Quick Actions -->
           <div class="quick-actions-grid">
             <div class="quick-action-card" v-if="canViewProducts" @click="activeTab = 'products'">
-              <i class="fas fa-box-open"></i>
-              <h4>Manage Products</h4>
-              <p>Add, edit, or remove products</p>
+              <i class="fas fa-box-open"></i><h4>Manage Products</h4><p>Add, edit, or remove products</p>
             </div>
             <div class="quick-action-card" v-if="canViewBlog" @click="activeTab = 'blog'">
-              <i class="fas fa-newspaper"></i>
-              <h4>Manage Blog</h4>
-              <p>Create and edit blog posts</p>
+              <i class="fas fa-newspaper"></i><h4>Manage Blog</h4><p>Create and edit blog posts</p>
             </div>
             <div class="quick-action-card" v-if="canViewJobs" @click="activeTab = 'jobs'">
-              <i class="fas fa-briefcase"></i>
-              <h4>Manage Jobs</h4>
-              <p>Post and manage job openings</p>
+              <i class="fas fa-briefcase"></i><h4>Manage Jobs</h4><p>Post and manage job openings</p>
             </div>
             <div class="quick-action-card" v-if="canViewOutlets" @click="activeTab = 'outlets'">
-              <i class="fas fa-map-marker-alt"></i>
-              <h4>Manage Outlets</h4>
-              <p>Add and manage physical locations</p>
+              <i class="fas fa-map-marker-alt"></i><h4>Manage Outlets</h4><p>Add and manage physical locations</p>
             </div>
             <div class="quick-action-card" v-if="isSuperAdmin" @click="activeTab = 'users'">
-              <i class="fas fa-users-cog"></i>
-              <h4>Manage Users</h4>
-              <p>Control user access</p>
+              <i class="fas fa-users-cog"></i><h4>Manage Users</h4><p>Control user access</p>
             </div>
             <div class="quick-action-card" v-if="canViewStatistics" @click="activeTab = 'statistics'">
-              <i class="fas fa-chart-line"></i>
-              <h4>View Analytics</h4>
-              <p>Track performance</p>
+              <i class="fas fa-chart-line"></i><h4>View Analytics</h4><p>Track performance</p>
+            </div>
+            
+            <!-- Tour Quick Actions -->
+            <div class="quick-action-card" v-if="canViewTours" @click="activeTab = 'tours'">
+              <i class="fas fa-factory"></i><h4>Tour Bookings</h4><p>Manage all tour bookings</p>
+            </div>
+            <div class="quick-action-card" v-if="canManageTours" @click="activeTab = 'tour-packages'">
+              <i class="fas fa-tag"></i><h4>Tour Packages</h4><p>Manage tour packages & pricing</p>
+            </div>
+            <div class="quick-action-card" v-if="canManageTours" @click="activeTab = 'tour-calendar'">
+              <i class="fas fa-calendar-alt"></i><h4>Tour Calendar</h4><p>Manage availability & schedule</p>
+            </div>
+            <div class="quick-action-card" v-if="canManageTours" @click="activeTab = 'tour-payments'">
+              <i class="fas fa-money-bill-wave"></i><h4>Tour Payments</h4><p>Process and track payments</p>
+            </div>
+            <div class="quick-action-card" v-if="canManageTours" @click="activeTab = 'tour-reports'">
+              <i class="fas fa-chart-bar"></i><h4>Tour Reports</h4><p>Analytics and reports</p>
+            </div>
+            <div class="quick-action-card" v-if="isSuperAdmin" @click="activeTab = 'tour-staff'">
+              <i class="fas fa-user-tie"></i><h4>Tour Staff</h4><p>Manage tour managers & assistants</p>
             </div>
           </div>
         </div>
@@ -146,8 +121,6 @@
           <PartnerManagement @refresh="loadStats" />
         </div>
 
-       
-
         <!-- Statistics Tab -->
         <div v-else-if="activeTab === 'statistics'" class="tab-content">
           <AdvancedAnalytics />
@@ -158,31 +131,45 @@
           <ContactManagement />
         </div>
 
-
         <!-- Newsletter Tab -->
-<div v-else-if="activeTab === 'newsletter'" class="tab-content">
-  <NewsletterManagement />
-</div>
-
-
-
-
-
-
-
+        <div v-else-if="activeTab === 'newsletter'" class="tab-content">
+          <NewsletterManagement />
+        </div>
 
         <!-- Permissions Tab -->
         <div v-else-if="activeTab === 'permissions'" class="tab-content">
           <PermissionManager />
         </div>
 
+        <!-- Profile Tab -->
         <div v-else-if="activeTab === 'profile'" class="tab-content">
           <Profile />
         </div>
 
+        <!-- TOUR TABS -->
+        <div v-else-if="activeTab === 'tours'" class="tab-content">
+          <TourManagerBookings />
+        </div>
+        
+        <div v-else-if="activeTab === 'tour-packages'" class="tab-content">
+          <TourManagerPackages />
+        </div>
+        
+        <div v-else-if="activeTab === 'tour-calendar'" class="tab-content">
+          <TourManagerCalendar />
+        </div>
 
+        <div v-else-if="activeTab === 'tour-payments'" class="tab-content">
+          <TourManagerPayments />
+        </div>
 
+        <div v-else-if="activeTab === 'tour-reports'" class="tab-content">
+          <TourManagerReports />
+        </div>
 
+        <div v-else-if="activeTab === 'tour-staff'" class="tab-content">
+          <TourStaffManagement />
+        </div>
       </div>
       
       <AdminFooter />
@@ -197,7 +184,7 @@ import authService from '@/services/auth'
 import permissionService from '@/services/permissionService'
 import api from '@/services/api'
 
-// Components
+// Admin Components
 import AdminNavbar from '@/components/layout/AdminNavbar.vue'
 import AdminSidebar from '@/components/admin/AdminSidebar.vue'
 import ProductsManagement from '@/components/admin/ProductsManagement.vue'
@@ -206,19 +193,20 @@ import JobManagement from '@/components/admin/JobManagement.vue'
 import OutletManagement from '@/components/admin/OutletManagement.vue'
 import UserManagement from '@/components/admin/UserManagement.vue'
 import PartnerManagement from '@/components/admin/PartnerManagement.vue'
-import ReferralAnalytics from '@/components/admin/ReferralAnalytics.vue'
 import AdvancedAnalytics from '@/components/admin/AdvancedAnalytics.vue'
-
 import AdminFooter from '@/components/layout/AdminFooter.vue'
 import ContactManagement from '@/components/admin/ContactManagement.vue'
 import PermissionManager from '@/components/admin/PermissionManager.vue'
 import Profile from '@/views/admin/Profile.vue'
-
 import NewsletterManagement from '@/components/admin/NewsletterManagement.vue'
 
-
-
-
+// Tour Components
+import TourManagerBookings from '@/views/tour-manager/TourManagerBookings.vue'
+import TourManagerPackages from '@/views/tour-manager/TourManagerPackages.vue'
+import TourManagerCalendar from '@/views/tour-manager/TourManagerCalendar.vue'
+import TourManagerPayments from '@/views/tour-manager/TourManagerPayments.vue'
+import TourManagerReports from '@/views/tour-manager/TourManagerReports.vue'
+import TourStaffManagement from '@/components/admin/TourStaffManagement.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -229,24 +217,87 @@ const sidebarCollapsed = ref(false)
 const mobileSidebarOpen = ref(false)
 const sidebarRef = ref(null)
 const user = ref(null)
+const permissionsLoaded = ref(false)
 const stats = ref({
   totalProducts: 0,
   totalBlogs: 0,
   totalJobs: 0,
   totalOutlets: 0,
   totalUsers: 0,
-  totalClicks: 0
+  totalClicks: 0,
+  totalTours: 0
 })
 
-// Permission computed properties from permissionService
-const canViewProducts = computed(() => permissionService.canViewProducts())
-const canViewBlog = computed(() => permissionService.canViewBlog())
-const canViewJobs = computed(() => permissionService.canViewJobs())
-const canViewOutlets = computed(() => permissionService.canViewOutlets())
-const canViewReferrals = computed(() => permissionService.canViewReferrals())
-const canViewStatistics = computed(() => permissionService.canViewStatistics())
-// const isSuperAdmin = computed(() => permissionService.userRole === 'super_admin')
+// Check if permissions are loaded
+const checkPermissions = async () => {
+  if (!permissionService.loaded) {
+    await permissionService.loadPermissions()
+  }
+  permissionsLoaded.value = true
+}
+
+// Permissions - Only return true if permissions are loaded
+const canViewProducts = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewProducts()
+})
+
+const canViewBlog = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewBlog()
+})
+
+const canViewJobs = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewJobs()
+})
+
+const canViewOutlets = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewOutlets()
+})
+
+const canViewReferrals = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewReferrals()
+})
+
+const canViewStatistics = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewStatistics()
+})
+
 const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
+
+const canViewTours = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewTours()
+})
+
+const canViewBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewBookings()
+})
+
+const canManageTours = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canManageTours()
+})
+
+const canManageBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canManageBookings()
+})
+
+const canApproveBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canApproveBookings()
+})
+
+const canViewTourPackages = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewTours()
+})
 
 const pageTitle = computed(() => {
   const titles = {
@@ -257,12 +308,17 @@ const pageTitle = computed(() => {
     outlets: 'Outlet Management',
     users: 'User Management',
     partners: 'Partner Management',
-    referrals: 'Referral Analytics',
     statistics: 'Advanced Analytics',
     contacts: 'Contact Messages',
     newsletter: 'Newsletter Management',
     permissions: 'Permission Manager',
-    profile: 'My Profile'
+    profile: 'My Profile',
+    tours: 'Tour Bookings',
+    'tour-packages': 'Tour Packages',
+    'tour-calendar': 'Tour Calendar',
+    'tour-payments': 'Tour Payments',
+    'tour-reports': 'Tour Reports',
+    'tour-staff': 'Tour Staff Management'
   }
   return titles[activeTab.value] || 'Dashboard'
 })
@@ -280,7 +336,13 @@ const pageSubtitle = computed(() => {
     contacts: 'View and respond to customer inquiries',
     newsletter: 'Manage subscribers and send email campaigns',
     permissions: 'Manage user permissions and access control',
-    profile: 'Manage your account settings and preferences'
+    profile: 'Manage your account settings and preferences',
+    tours: 'Manage factory tour bookings and availability',
+    'tour-packages': 'Create and manage tour packages',
+    'tour-calendar': 'View and manage tour calendar',
+    'tour-payments': 'Process and track tour payments',
+    'tour-reports': 'Tour analytics and reports',
+    'tour-staff': 'Create and manage tour managers and assistants'
   }
   return subtitles[activeTab.value] || ''
 })
@@ -288,31 +350,23 @@ const pageSubtitle = computed(() => {
 // Load stats
 const loadStats = async () => {
   try {
-    // Products - handle paginated response
     let productCount = 0
     try {
       const productsRes = await api.get('/products?per_page=1000')
       const productsData = productsRes.data
-      
       if (Array.isArray(productsData)) {
         productCount = productsData.length
       } else if (productsData?.data && Array.isArray(productsData.data)) {
         productCount = productsData.data.length
       } else if (productsData?.pagination) {
         productCount = productsData.pagination.total_items || 0
-      } else if (productsData?.items) {
-        productCount = productsData.items.length || 0
       }
-    } catch (e) {
-      console.warn('Could not fetch products:', e)
-    }
+    } catch (e) { console.warn('Could not fetch products:', e) }
 
-    // Blog - handle paginated response
     let blogCount = 0
     try {
       const blogRes = await api.get('/blog?simple=true&per_page=100')
       const blogData = blogRes.data
-      
       if (Array.isArray(blogData)) {
         blogCount = blogData.length
       } else if (blogData?.data && Array.isArray(blogData.data)) {
@@ -320,54 +374,47 @@ const loadStats = async () => {
       } else if (blogData?.pagination) {
         blogCount = blogData.pagination.total_items || 0
       }
-    } catch (e) {
-      console.warn('Could not fetch blogs:', e)
-    }
+    } catch (e) { console.warn('Could not fetch blogs:', e) }
 
-    // Jobs
     let jobCount = 0
     if (canViewJobs.value) {
       try {
         const jobsRes = await api.get('/admin/jobs')
         jobCount = jobsRes.data?.length || 0
-      } catch (e) {
-        console.warn('Could not fetch jobs:', e)
-      }
+      } catch (e) { console.warn('Could not fetch jobs:', e) }
     }
 
-    // Outlets
     let outletCount = 0
     if (canViewOutlets.value) {
       try {
         const outletsRes = await api.get('/admin/outlets')
         outletCount = outletsRes.data?.length || 0
-      } catch (e) {
-        console.warn('Could not fetch outlets:', e)
-      }
+      } catch (e) { console.warn('Could not fetch outlets:', e) }
     }
 
-    // Users
     let userCount = 0
     if (isSuperAdmin.value) {
       try {
         const usersRes = await api.get('/admin/users')
         userCount = usersRes.data?.length || 0
-      } catch (e) {
-        console.warn('Could not fetch users:', e)
-      }
+      } catch (e) { console.warn('Could not fetch users:', e) }
     }
 
     let clickCount = 0
-if (canViewReferrals.value) {
-  try {
-    const referralsRes = await api.get('/referral/stats')
-    clickCount = referralsRes.data?.total_clicks || referralsRes.data?.totalClicks || 0
-  } catch (e) {
-    console.warn('Could not fetch referrals:', e)
-  }
-}
+    if (canViewReferrals.value) {
+      try {
+        const referralsRes = await api.get('/referral/stats')
+        clickCount = referralsRes.data?.total_clicks || referralsRes.data?.totalClicks || 0
+      } catch (e) { console.warn('Could not fetch referrals:', e) }
+    }
 
-   
+    let tourCount = 0
+    if (canViewTours.value) {
+      try {
+        const tourRes = await api.get('/tour/admin/dashboard/stats')
+        tourCount = tourRes.data?.total_bookings || 0
+      } catch (e) { console.warn('Could not fetch tour stats:', e) }
+    }
 
     stats.value = {
       totalProducts: productCount,
@@ -375,13 +422,14 @@ if (canViewReferrals.value) {
       totalJobs: jobCount,
       totalOutlets: outletCount,
       totalUsers: userCount,
-      totalClicks: clickCount
+      totalClicks: clickCount,
+      totalTours: tourCount
     }
   } catch (error) {
     console.error('Error loading stats:', error)
   }
 }
-// Navigation
+
 const handleNavigate = (tab) => {
   activeTab.value = tab
   router.push({ path: '/admin/dashboard', query: { tab } })
@@ -394,28 +442,31 @@ const toggleMobileSidebar = () => {
   }
 }
 
-// Check URL params
 const checkUrlParams = () => {
   const tab = route.query.tab
-  const validTabs = ['overview', 'products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'statistics', 'contacts','permissions','newsletter', 'profile']
+  const validTabs = ['overview', 'products', 'blog', 'jobs', 'outlets', 'users', 'partners', 'statistics', 'contacts', 'permissions', 'newsletter', 'profile', 'tours', 'tour-packages', 'tour-calendar', 'tour-payments', 'tour-reports', 'tour-staff']
   if (tab && validTabs.includes(tab)) {
     activeTab.value = tab
   }
 }
 
-
-
-onMounted(() => {
+onMounted(async () => {
   user.value = authService.getUser()
-
   
-  loadStats()
+  // Load permissions first
+  await checkPermissions()
+  
+  // Then load stats
+  await loadStats()
+  
+  // Check URL params
   checkUrlParams()
 })
 </script>
 
+
 <style scoped>
-/* Your existing styles remain the same */
+
 .admin-dashboard {
   min-height: 100vh;
   background: #f8fafc;
@@ -452,7 +503,7 @@ onMounted(() => {
 }
 
 .page-header p {
-  color: #666;
+  color: #6b7280;
   margin: 0;
 }
 
@@ -472,6 +523,11 @@ onMounted(() => {
   align-items: center;
   gap: 1rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
 }
 
 .stat-icon {
@@ -482,6 +538,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .stat-icon i {
@@ -497,7 +554,7 @@ onMounted(() => {
 
 .stat-info p {
   margin: 0;
-  color: #666;
+  color: #6b7280;
   font-size: 0.8rem;
 }
 
@@ -536,7 +593,7 @@ onMounted(() => {
 }
 
 .quick-action-card p {
-  color: #666;
+  color: #6b7280;
   margin: 0;
   font-size: 0.8rem;
 }
@@ -577,3 +634,5 @@ onMounted(() => {
   }
 }
 </style>
+
+

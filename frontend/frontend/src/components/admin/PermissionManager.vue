@@ -42,7 +42,8 @@
       </div>
 
       <div class="permissions-grid">
-        <div v-for="resource in resources" :key="resource.name" class="resource-card">
+        <!-- Core Resources -->
+        <div v-for="resource in coreResources" :key="resource.name" class="resource-card">
           <div class="resource-header">
             <h4>{{ resource.label }}</h4>
             <span class="resource-name">{{ resource.name }}</span>
@@ -59,6 +60,81 @@
               </label>
               <span class="role-default-badge">
                 Default: {{ getRoleDefault(resource.name, action) ? '✓' : '✗' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 🆕 TOUR RESOURCES -->
+        <div class="resource-section-divider">
+          <h3>Tour Management</h3>
+          <p>Permissions for factory tour management</p>
+        </div>
+
+        <!-- Tours Resource -->
+        <div class="resource-card tour-resource">
+          <div class="resource-header tour-header">
+            <h4>🏭 Tours</h4>
+            <span class="resource-name">tours</span>
+          </div>
+          <div class="actions-list">
+            <div v-for="action in ['create', 'read', 'update', 'delete']" :key="action" class="action-row">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isCustomAllowed('tours', action)"
+                  @change="togglePermission('tours', action, $event.target.checked)"
+                >
+                <span class="action-name">{{ action }}</span>
+              </label>
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault('tours', action) ? '✓' : '✗' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bookings Resource -->
+        <div class="resource-card tour-resource">
+          <div class="resource-header tour-header">
+            <h4>📋 Bookings</h4>
+            <span class="resource-name">bookings</span>
+          </div>
+          <div class="actions-list">
+            <div v-for="action in ['create', 'read', 'update', 'delete', 'approve', 'reject']" :key="action" class="action-row">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isCustomAllowed('bookings', action)"
+                  @change="togglePermission('bookings', action, $event.target.checked)"
+                >
+                <span class="action-name">{{ action }}</span>
+              </label>
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault('bookings', action) ? '✓' : '✗' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tour Settings Resource -->
+        <div class="resource-card tour-resource">
+          <div class="resource-header tour-header">
+            <h4>⚙️ Tour Settings</h4>
+            <span class="resource-name">tour_settings</span>
+          </div>
+          <div class="actions-list">
+            <div v-for="action in ['read', 'update']" :key="action" class="action-row">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isCustomAllowed('tour_settings', action)"
+                  @change="togglePermission('tour_settings', action, $event.target.checked)"
+                >
+                <span class="action-name">{{ action }}</span>
+              </label>
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault('tour_settings', action) ? '✓' : '✗' }}
               </span>
             </div>
           </div>
@@ -103,6 +179,20 @@ const saving = ref(false)
 const currentUser = authService.getUser()
 const isSuperAdmin = computed(() => currentUser?.role === 'super_admin')
 
+// Core resources (without tour resources)
+const coreResources = [
+  { name: 'products', label: 'Products', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'blog', label: 'Blog Posts', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'jobs', label: 'Job Management', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'outlets', label: 'Outlet Locations', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'users', label: 'User Management', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'partners', label: 'Partners', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'referrals', label: 'Referrals', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'statistics', label: 'Statistics', actions: ['read'] },
+  { name: 'contacts', label: 'Contact Messages', actions: ['read', 'update', 'delete'] },
+  { name: 'newsletter', label: 'Newsletter', actions: ['create', 'read', 'update', 'delete'] }
+]
+
 // Load all users
 const loadUsers = async () => {
   if (!isSuperAdmin.value) return
@@ -116,12 +206,11 @@ const loadUsers = async () => {
   }
 }
 
-// Load available resources - FIXED ENDPOINT
+// Load available resources
 const loadResources = async () => {
   if (!isSuperAdmin.value) return
   
   try {
-    // Use the correct endpoint: /permissions/resources (not resources-list)
     const response = await api.get('/permissions/resources')
     resources.value = response.data
   } catch (error) {
@@ -194,6 +283,7 @@ const savePermissions = async () => {
   saving.value = true
   
   try {
+    // Save each custom permission
     for (const perm of customPermissions.value) {
       await api.post(`/permissions/users/${selectedUserId.value}`, {
         resource: perm.resource,
@@ -220,6 +310,7 @@ const resetToRoleDefaults = async () => {
   
   saving.value = true
   try {
+    // Delete all custom permissions for this user
     for (const perm of customPermissions.value) {
       if (perm.id) {
         await api.delete(`/permissions/users/${selectedUserId.value}/${perm.id}`)
@@ -370,11 +461,42 @@ onMounted(() => {
   margin-bottom: 1.5rem;
 }
 
+/* 🆕 Resource Section Divider */
+.resource-section-divider {
+  grid-column: 1 / -1;
+  padding: 1rem 0 0.5rem;
+  border-top: 2px solid #e5e7eb;
+  margin-top: 0.5rem;
+}
+
+.resource-section-divider h3 {
+  color: #1e3a8a;
+  margin: 0 0 0.25rem;
+  font-size: 1.2rem;
+}
+
+.resource-section-divider p {
+  color: #6b7280;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .resource-card {
   background: white;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
+}
+
+/* 🆕 Tour Resource Styling */
+.resource-card.tour-resource {
+  border-color: #f59e0b;
+  border-width: 2px;
+}
+
+.resource-header.tour-header {
+  background: #fef3c7;
+  border-bottom-color: #f59e0b;
 }
 
 .resource-header {
@@ -442,6 +564,16 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-save:hover:not(:disabled) {
+  background: #f59e0b;
+}
+
+.btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-reset {
@@ -452,14 +584,16 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
+  transition: background 0.2s;
 }
 
-.btn-save:hover {
-  background: #f59e0b;
-}
-
-.btn-reset:hover {
+.btn-reset:hover:not(:disabled) {
   background: #d1d5db;
+}
+
+.btn-reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty-state {

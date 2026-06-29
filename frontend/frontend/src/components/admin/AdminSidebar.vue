@@ -106,7 +106,6 @@
           <span v-if="isCollapsed" class="tooltip">Partners</span>
         </button>
 
-
         <button
           v-if="canViewStatistics"
           class="nav-item"
@@ -129,21 +128,75 @@
           <span v-if="isCollapsed" class="tooltip">Contact Messages</span>
         </button>
 
+        <button
+          v-if="canViewNewsletter"
+          class="nav-item"
+          :class="{ active: activeTab === 'newsletter' }"
+          @click="navigate('newsletter')"
+        >
+          <i class="fas fa-envelope-open-text"></i>
+          <span v-if="!isCollapsed">Newsletter</span>
+          <span v-if="isCollapsed" class="tooltip">Newsletter</span>
+        </button>
 
+        <!-- TOUR MANAGEMENT -->
+        <div class="nav-divider" v-if="canViewTours && !isCollapsed"></div>
+        
+        <button
+          v-if="canViewTours"
+          class="nav-item"
+          :class="{ active: activeTab === 'tours' }"
+          @click="navigate('tours')"
+        >
+          <i class="fas fa-factory"></i>
+          <span v-if="!isCollapsed">Tour Bookings</span>
+          <span v-if="isCollapsed" class="tooltip">Tour Bookings</span>
+          <span v-if="pendingTourCount > 0" class="badge">{{ pendingTourCount }}</span>
+        </button>
 
         <button
-  v-if="canViewNewsletter"
-  class="nav-item"
-  :class="{ active: activeTab === 'newsletter' }"
-  @click="navigate('newsletter')"
->
-  <i class="fas fa-envelope-open-text"></i>
-  <span v-if="!isCollapsed">Newsletter</span>
-  <span v-if="isCollapsed" class="tooltip">Newsletter</span>
-</button>
+          v-if="canManageTours"
+          class="nav-item"
+          :class="{ active: activeTab === 'tour-packages' }"
+          @click="navigate('tour-packages')"
+        >
+          <i class="fas fa-tag"></i>
+          <span v-if="!isCollapsed">Tour Packages</span>
+          <span v-if="isCollapsed" class="tooltip">Tour Packages</span>
+        </button>
 
+        <button
+          v-if="canManageTours"
+          class="nav-item"
+          :class="{ active: activeTab === 'tour-calendar' }"
+          @click="navigate('tour-calendar')"
+        >
+          <i class="fas fa-calendar-alt"></i>
+          <span v-if="!isCollapsed">Tour Calendar</span>
+          <span v-if="isCollapsed" class="tooltip">Tour Calendar</span>
+        </button>
 
+        <button
+          v-if="canManageTours"
+          class="nav-item"
+          :class="{ active: activeTab === 'tour-payments' }"
+          @click="navigate('tour-payments')"
+        >
+          <i class="fas fa-money-bill-wave"></i>
+          <span v-if="!isCollapsed">Tour Payments</span>
+          <span v-if="isCollapsed" class="tooltip">Tour Payments</span>
+        </button>
 
+        <button
+          v-if="canManageTours"
+          class="nav-item"
+          :class="{ active: activeTab === 'tour-reports' }"
+          @click="navigate('tour-reports')"
+        >
+          <i class="fas fa-chart-bar"></i>
+          <span v-if="!isCollapsed">Tour Reports</span>
+          <span v-if="isCollapsed" class="tooltip">Tour Reports</span>
+        </button>
 
         <button
           v-if="canManagePermissions"
@@ -157,14 +210,9 @@
         </button>
       </div>
 
-
-
-
-
       <div class="nav-section" v-if="!isCollapsed">
         <div class="nav-section-title">Account</div>
         
-        <!-- PROFILE BUTTON -->
         <button
           class="nav-item"
           :class="{ active: activeTab === 'profile' }"
@@ -196,6 +244,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import authService from '@/services/auth'
+import permissionService from '@/services/permissionService'
+import axios from 'axios'
 
 const props = defineProps({
   activeTab: {
@@ -211,32 +261,138 @@ const user = ref(null)
 const isCollapsed = ref(false)
 const isMobile = ref(false)
 const isOpen = ref(false)
+const pendingTourCount = ref(0)
+const permissionsLoaded = ref(false)
 
-// Simple role-based permissions (or use your permission service)
+// Simple role-based permissions
 const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
 const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
 const isPartner = computed(() => user.value?.role === 'partner')
 
-const canViewProducts = computed(() => isAdmin.value)
-const canViewBlog = computed(() => isAdmin.value)
-const canViewJobs = computed(() => isAdmin.value)
-const canViewOutlets = computed(() => isAdmin.value)
-const canViewUsers = computed(() => isSuperAdmin.value)
-const canViewPartners = computed(() => isSuperAdmin.value)
+// Check if permissions are loaded
+const checkPermissions = async () => {
+  if (!permissionService.loaded) {
+    await permissionService.loadPermissions()
+  }
+  permissionsLoaded.value = true
+}
 
-const canViewStatistics = computed(() => isAdmin.value)
-const canViewContacts = computed(() => isAdmin.value)
-const canManagePermissions = computed(() => isSuperAdmin.value)
+// Existing permissions - Only return true if permissions are loaded
+const canViewProducts = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewProducts()
+})
+
+const canViewBlog = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewBlog()
+})
+
+const canViewJobs = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewJobs()
+})
+
+const canViewOutlets = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewOutlets()
+})
+
+const canViewUsers = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewUsers()
+})
+
+const canViewPartners = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewPartners()
+})
+
+const canViewStatistics = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewStatistics()
+})
+
+const canViewContacts = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewContacts()
+})
+
+const canManagePermissions = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canManagePermissions()
+})
 
 const canViewNewsletter = computed(() => {
-  return user.value?.role === 'super_admin' || user.value?.role === 'admin'
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewNewsletter()
 })
+
+// Tour permissions - Using permission service
+const canViewTours = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewTours()
+})
+
+const canViewBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewBookings()
+})
+
+const canViewTourPackages = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canViewTours()
+})
+
+const canManageTours = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canManageTours()
+})
+
+const canManageBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canManageBookings()
+})
+
+const canApproveBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canApproveBookings()
+})
+
+const canRejectBookings = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canRejectBookings()
+})
+
+const canUpdateAvailability = computed(() => {
+  if (!permissionsLoaded.value) return false
+  return permissionService.canUpdateAvailability()
+})
+
+const canManageTourStaff = computed(() => {
+  // Only super admin can manage tour staff
+  return user.value?.role === 'super_admin'
+})
+
+// Fetch pending tour count
+const fetchPendingTours = async () => {
+  if (!canViewTours.value) return
+  
+  try {
+    const response = await axios.get('/api/tour/admin/bookings?status=pending')
+    pendingTourCount.value = response.data.count || 0
+  } catch (error) {
+    console.error('Error fetching pending tours:', error)
+  }
+}
 
 const formatRole = (role) => {
   const roles = {
     super_admin: 'Super Admin',
     admin: 'Admin',
-    partner: 'Partner'
+    partner: 'Partner',
+    tour_manager: 'Tour Manager',
+    tour_assistant: 'Tour Assistant'
   }
   return roles[role] || role
 }
@@ -270,8 +426,19 @@ const checkScreenSize = () => {
   }
 }
 
-onMounted(() => {
+// Setup interval for pending count
+let intervalId = null
+
+onMounted(async () => {
   user.value = authService.getUser()
+  
+  // Load permissions before rendering
+  await checkPermissions()
+  
+  // Now fetch pending tours
+  if (canViewTours.value) {
+    fetchPendingTours()
+  }
   
   const saved = localStorage.getItem('admin_sidebar_collapsed')
   if (saved !== null) {
@@ -279,15 +446,26 @@ onMounted(() => {
   }
   checkScreenSize()
   window.addEventListener('resize', checkScreenSize)
+  
+  // Refresh every 30 seconds
+  intervalId = setInterval(() => {
+    if (canViewTours.value) {
+      fetchPendingTours()
+    }
+  }, 30000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkScreenSize)
+  if (intervalId) {
+    clearInterval(intervalId)
+  }
 })
 </script>
 
+
+
 <style scoped>
-/* Your existing styles remain the same */
 .admin-sidebar {
   position: fixed;
   left: 0;

@@ -1,4 +1,5 @@
-# backend/email_service.py - Complete file
+
+
 
 import smtplib
 from email.mime.text import MIMEText

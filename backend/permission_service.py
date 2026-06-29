@@ -4,45 +4,90 @@ from flask_login import current_user
 
 ROLE_PERMISSIONS = {
     'super_admin': {
-        'products': ['create', 'read', 'update', 'delete'],
-        'blog': ['create', 'read', 'update', 'delete', 'publish'],
-        'jobs': ['create', 'read', 'update', 'delete'],
-        'outlets': ['create', 'read', 'update', 'delete'],
-        'users': ['create', 'read', 'update', 'delete'],
-        'partners': ['create', 'read', 'update', 'delete'],
-        'referrals': ['create', 'read', 'update', 'delete'],
-        'statistics': ['read', 'update'],
-        
-        'contacts': ['read', 'update', 'delete'],
-        'uploads': ['create'],
-        'permissions': ['read', 'create', 'update', 'delete']
+        'products': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'blog': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'jobs': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'outlets': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'users': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'partners': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'referrals': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'statistics': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'contacts': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'newsletter': {'create': True, 'read': True, 'update': True, 'delete': True},
+        # ========== NEW TOUR PERMISSIONS ==========
+        'tours': {'create': True, 'read': True, 'update': True, 'delete': True},
+        'bookings': {'create': True, 'read': True, 'update': True, 'delete': True, 'approve': True, 'reject': True},
+        'tour_settings': {'create': True, 'read': True, 'update': True, 'delete': True},
     },
     'admin': {
-        'products': ['create', 'read', 'update'],
-        'blog': ['create', 'read', 'update'], 
-        'jobs': ['create', 'read', 'update'],
-        'outlets': ['create', 'read', 'update'],
-        'users': ['read'],
-        'partners': ['create', 'read', 'update'],
-        'referrals': ['create', 'read', 'update'],
-        'statistics': ['read'],
-        'contacts': ['read', 'update'],
-        'uploads': ['create'],
-        'permissions': []
+        'products': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'blog': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'jobs': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'outlets': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'users': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'partners': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'contacts': {'create': False, 'read': True, 'update': True, 'delete': False},
+        'newsletter': {'create': True, 'read': True, 'update': True, 'delete': False},
+        # ========== NEW TOUR PERMISSIONS ==========
+        'tours': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'bookings': {'create': True, 'read': True, 'update': True, 'delete': False, 'approve': True, 'reject': True},
+        'tour_settings': {'create': False, 'read': True, 'update': False, 'delete': False},
+    },
+    'tour_manager': {
+        # ========== TOUR MANAGER PERMISSIONS ==========
+        'tours': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'bookings': {'create': False, 'read': True, 'update': True, 'delete': False, 'approve': True, 'reject': True},
+        'tour_settings': {'create': False, 'read': True, 'update': False, 'delete': False},
+        # Tour managers can view these but not modify
+        'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'contacts': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'products': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'blog': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'jobs': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'outlets': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'users': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'partners': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'referrals': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'newsletter': {'create': False, 'read': False, 'update': False, 'delete': False},
+    },
+    'tour_assistant': {
+        # ========== TOUR ASSISTANT PERMISSIONS ==========
+        'tours': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'bookings': {'create': False, 'read': True, 'update': True, 'delete': False, 'approve': False, 'reject': False},
+        'tour_settings': {'create': False, 'read': True, 'update': False, 'delete': False},
+        # Tour assistants can view statistics
+        'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
+        # All other resources: no access
+        'products': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'blog': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'jobs': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'outlets': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'users': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'partners': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'referrals': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'contacts': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'newsletter': {'create': False, 'read': False, 'update': False, 'delete': False},
     },
     'partner': {
-        'products': ['read'],
-        'blog': ['read'], 
-        'jobs': ['read'],
-        'outlets': ['read'],
-        'users': [],
-        'partners': [],
-        'referrals': ['create', 'read', 'update'],
-        'contacts': [],
-        'uploads': [],
-        'permissions': []
+        'products': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'blog': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'jobs': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'outlets': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'users': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'partners': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'referrals': {'create': True, 'read': True, 'update': True, 'delete': False},
+        'statistics': {'create': False, 'read': True, 'update': False, 'delete': False},
+        'contacts': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'newsletter': {'create': False, 'read': False, 'update': False, 'delete': False},
+        # ========== NEW TOUR PERMISSIONS ==========
+        'tours': {'create': False, 'read': False, 'update': False, 'delete': False},
+        'bookings': {'create': False, 'read': False, 'update': False, 'delete': False, 'approve': False, 'reject': False},
+        'tour_settings': {'create': False, 'read': False, 'update': False, 'delete': False},
     }
 }
+
 
 def has_permission(user, resource, action):
     """Check if user has a specific permission"""

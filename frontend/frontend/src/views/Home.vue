@@ -1,3 +1,4 @@
+
 <template>
   <main>
     <!-- Scroll Progress Indicator -->
@@ -37,6 +38,9 @@
                   <button @click="scrollToAbout" class="btn btn-outline-light btn-large">
                     Learn More <i class="fas fa-play-circle"></i>
                   </button>
+                  <button v-if="slide.id === 4" @click="openBookingModal" class="btn btn-tour btn-large">
+                    <i class="fas fa-factory"></i> Book a Factory Tour
+                  </button>
                 </div>
               </div>
             </div>
@@ -44,6 +48,7 @@
         </swiper-slide>
       </swiper>
 
+      <!-- Hero Stats - Moved down for better spacing -->
       <div class="hero-stats-container">
         <div class="container">
           <div class="hero-stats">
@@ -55,10 +60,10 @@
         </div>
       </div>
 
-      <div class="scroll-indicator">
+      <!-- <div class="scroll-indicator">
         <span>Scroll to explore</span>
         <div class="scroll-mouse"></div>
-      </div>
+      </div> -->
     </section>
 
     <!-- About Section -->
@@ -73,6 +78,11 @@
               to become Kenya's biggest dairy processor, empowering over 120,000 farmers 
               and serving millions of customers nationwide.
             </p>
+            <div style="margin-top: 24px;">
+              <button @click="openBookingModal" class="btn btn-primary btn-large">
+                <i class="fas fa-calendar-plus"></i> Schedule Your Factory Tour
+              </button>
+            </div>
           </div>
           <div class="section-header-image">
             <img src="/images/about-header.jpeg" alt="About Meru Dairy" @error="setImagePlaceholder">
@@ -321,12 +331,14 @@
             <button @click="scrollToContact" class="shop-link">Learn More <i class="fas fa-arrow-right"></i></button>
           </div>
           
-          <!-- <div class="shop-card glass-card">
-            <div class="shop-icon"><i class="fas fa-shield-alt"></i></div>
-            <h3>Secure Payments</h3>
-            <p>Pay via M-Pesa, Credit Card, or Cash on Delivery</p>
-            <button @click="scrollToContact" class="shop-link">Payment Options <i class="fas fa-arrow-right"></i></button>
-          </div> -->
+          <div class="shop-card glass-card tour-card">
+            <div class="shop-icon"><i class="fas fa-factory"></i></div>
+            <h3>Factory Tour</h3>
+            <p>Experience the magic of dairy production with a guided factory tour</p>
+            <button @click="openBookingModal" class="shop-link tour-link">
+              Book a Tour <i class="fas fa-arrow-right"></i>
+            </button>
+          </div>
         </div>
         
         <div class="physical-shops-section">
@@ -404,7 +416,6 @@
               <div class="blog-info">
                 <div class="blog-meta">
                   <span><i class="fas fa-calendar-alt"></i> {{ formatDate(post.created_at) }}</span>
-                  <!-- <span><i class="fas fa-user"></i> {{ post.author || 'Admin' }}</span> -->
                 </div>
                 <h3>{{ truncate(post.title, 50) }}</h3>
                 <p class="blog-excerpt">{{ truncate(post.excerpt || post.content, 100) }}</p>
@@ -431,7 +442,7 @@
       </div>
     </section>
 
-    <!-- Blog Modal  -->
+    <!-- Blog Modal -->
     <div v-if="showBlogModal && selectedBlog" class="modal-overlay" @click.self="closeBlogModal">
       <div class="modal-container modal-blog-large">
         <button class="modal-close" @click="closeBlogModal">
@@ -439,7 +450,6 @@
         </button>
 
         <div class="modal-blog-content-large">
-          <!-- Image Section -->
           <div class="modal-blog-image-large">
             <img 
               :src="selectedBlog.featured_image || '/images/blog-placeholder.jpg'" 
@@ -448,7 +458,6 @@
             />
           </div>
 
-          <!-- Content Section - Full width scrollable -->
           <div class="modal-blog-body-large">
             <div class="modal-blog-header-large">
               <div class="blog-meta-modal">
@@ -571,6 +580,22 @@
         </div>
       </div>
     </section>
+
+    <!-- Tour Booking Modal -->
+    <TourBookingModal 
+      :is-open="showBookingModal"
+      @close="closeBookingModal"
+    />
+
+    <!-- Floating Book a Tour Button -->
+    <button 
+      class="book-tour-float" 
+      @click="openBookingModal"
+      aria-label="Book a Factory Tour"
+    >
+      <i class="fas fa-factory"></i>
+      <span>Book a Tour</span>
+    </button>
   </main>
 </template>
 
@@ -588,6 +613,7 @@ import { scrollToSection } from '@/utils/scroll'
 import ScrollProgress from '@/components/ScrollProgress.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import OutletsModal from '@/components/modals/OutletsModal.vue'
+import TourBookingModal from '@/components/TourBookingModal.vue'
 
 export default {
   name: 'Home',
@@ -596,7 +622,8 @@ export default {
     BackToTop,
     OutletsModal,
     Swiper,
-    SwiperSlide
+    SwiperSlide,
+    TourBookingModal
   },
   data() {
     return {
@@ -623,6 +650,13 @@ export default {
           badge: 'Empowering Farmers',
           title: 'Supporting <span class="highlight">120,000+</span><br>Local Farmers',
           description: 'Building a sustainable future for Kenyan dairy farmers and their communities.'
+        },
+        {
+          id: 4,
+          image: '/images/hero/tour-hero.jpg',
+          badge: 'Experience Dairy Magic',
+          title: 'Book a <span class="highlight">Factory Tour</span><br>Today!',
+          description: 'Come behind the scenes and see how we transform fresh milk into Kenya\'s favorite dairy products.'
         }
       ],
       
@@ -655,6 +689,9 @@ export default {
       showBlogModal: false,
       selectedBlog: null,
       blogModalLoading: false,
+
+      // Tour Modal
+      showBookingModal: false,
 
       // Contact
       contactForm: {
@@ -690,8 +727,23 @@ export default {
     this.fetchProducts()
     this.fetchBlogs()
     this.setupAOS()
+    // Fetch tour packages for dynamic pricing
+    this.fetchTourPackages()
   },
   methods: {
+    // Tour Packages - Fetch for dynamic pricing display
+    async fetchTourPackages() {
+      try {
+        const response = await axios.get('/api/tour/packages')
+        this.tourPackages = response.data.packages || []
+        if (this.tourPackages.length > 0) {
+          this.featuredTourPackage = this.tourPackages[0]
+        }
+      } catch (error) {
+        console.error('Error fetching tour packages:', error)
+      }
+    },
+    
     // Products
     async fetchProducts(reset = true) {
       try {
@@ -795,6 +847,17 @@ export default {
       document.body.style.overflow = 'auto'
     },
 
+    // Tour Modal Methods
+    openBookingModal() {
+      this.showBookingModal = true
+      document.body.style.overflow = 'hidden'
+    },
+
+    closeBookingModal() {
+      this.showBookingModal = false
+      document.body.style.overflow = 'auto'
+    },
+
     shareBlog() {
       if (this.selectedBlog) {
         const url = `${window.location.origin}/blog/${this.selectedBlog.slug}`
@@ -879,6 +942,10 @@ export default {
 }
 </script>
 
+
+
+
+
 <style scoped>
 /* ========================================
    GLOBAL & CONTAINER
@@ -887,6 +954,661 @@ export default {
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 20px;
+}
+
+/* ========================================
+   BUTTONS
+   ======================================== */
+.btn {
+  border: none;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-large {
+  padding: 14px 32px;
+  font-size: 1rem;
+}
+
+.btn-primary {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #d97706;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.btn-outline-light {
+  background: transparent;
+  color: white;
+  border: 2px solid white;
+}
+
+.btn-outline-light:hover {
+  background: white;
+  color: #1e3a8a;
+  transform: translateY(-2px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #1e3a8a;
+  border: 2px solid #1e3a8a;
+  border-radius: 50px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-outline:hover {
+  background: #1e3a8a;
+  color: white;
+}
+
+.btn-icon {
+  transition: transform 0.3s;
+}
+
+.btn-large:hover .btn-icon {
+  transform: translateX(5px);
+}
+
+.btn-load-more {
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  border: none;
+  color: white;
+  padding: 12px 28px;
+  border-radius: 50px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.btn-load-more:hover:not(:disabled) {
+  background: #1e3a8a;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.btn-load-more:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-outlets {
+  background: #1e3a8a;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 50px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+}
+
+.btn-outlets:hover {
+  background: #f59e0b;
+  transform: translateY(-2px);
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 14px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #d97706;
+  transform: translateY(-2px);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-close {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 10px 30px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.btn-close:hover {
+  background: #d97706;
+  transform: translateY(-2px);
+}
+
+/* ========================================
+   GLASS CARD EFFECT
+   ======================================== */
+.glass-card {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* ========================================
+   SECTION HEADERS
+   ======================================== */
+.section-header-with-image {
+  display: flex;
+  align-items: center;
+  gap: 50px;
+  margin-bottom: 60px;
+}
+
+.section-header-with-image.reverse {
+  flex-direction: row-reverse;
+}
+
+.section-header-content {
+  flex: 1;
+}
+
+.section-header-image {
+  flex: 1;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.section-header-image img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.section-header-image:hover img {
+  transform: scale(1.05);
+}
+
+.image-overlay-text {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(245,158,11,0.9);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.section-badge i {
+  margin-right: 8px;
+}
+
+.section-title {
+  font-size: 2.5rem;
+  color: #1e3a8a;
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.section-subtitle {
+  color: #666;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* ========================================
+   HERO SECTION - FIXED SPACING
+   ======================================== */
+.hero-section {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.hero-swiper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.slide-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+}
+
+.slide-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slide-content {
+  position: relative;
+  z-index: 2;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  margin-top: 0px;
+}
+
+.hero-text {
+  max-width: 700px;
+  color: white;
+  padding-bottom: 30px; /* Extra space before stats */
+}
+
+.hero-badge {
+  display: inline-block;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(10px);
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  color: white;
+  margin-bottom: 20px;
+}
+
+.hero-badge i {
+  margin-right: 8px;
+}
+
+.hero-title {
+  font-size: 4rem;
+  font-weight: 800;
+  color: white;
+  line-height: 1.2;
+  margin-bottom: 20px;
+}
+
+.hero-title .highlight {
+  color: #f59e0b;
+}
+
+.hero-description {
+  font-size: 1.2rem;
+  color: rgba(255,255,255,0.9);
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* Hero Stats Container - Better spacing */
+.hero-stats-container {
+  position: absolute;
+  bottom: 5%; /* Increased from 100px for more space */
+  left: 0;
+  right: 0;
+  z-index: 3;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 30px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.stat-card {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  margin-bottom: 5px;
+}
+
+.stat-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.scroll-indicator {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  color: white;
+  z-index: 3;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.scroll-indicator span {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 10px;
+  opacity: 0.8;
+}
+
+.scroll-mouse {
+  width: 26px;
+  height: 40px;
+  border: 2px solid white;
+  border-radius: 20px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.scroll-mouse::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 8px;
+  background: white;
+  border-radius: 2px;
+  animation: scroll 2s infinite;
+}
+
+@keyframes scroll {
+  0% { transform: translate(-50%, 0); opacity: 1; }
+  100% { transform: translate(-50%, 15px); opacity: 0; }
+}
+
+/* Swiper Custom Styles */
+:deep(.swiper-button-next),
+:deep(.swiper-button-prev) {
+  color: white;
+  background: rgba(0,0,0,0.3);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+:deep(.swiper-button-next:hover),
+:deep(.swiper-button-prev:hover) {
+  background: rgba(245,158,11,0.8);
+}
+
+:deep(.swiper-pagination-bullet) {
+  background: white;
+  opacity: 0.6;
+}
+
+:deep(.swiper-pagination-bullet-active) {
+  background: #f59e0b;
+  opacity: 1;
+}
+
+
+
+.tour-card {
+  border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fffbeb);
+  transition: all 0.3s;
+}
+
+.tour-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.2);
+}
+
+.tour-link {
+  color: #d97706 !important;
+}
+
+.tour-link:hover {
+  color: #b45309 !important;
+}
+
+
+
+
+.book-tour-float:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.5);
+  background: #d97706;
+}
+
+.book-tour-float span {
+  display: inline-block;
+}
+
+@media (max-width: 768px) {
+
+  
+  .book-tour-float span {
+    display: none;
+  }
+  
+  .book-tour-float i {
+    font-size: 1.2rem;
+  }
+}
+
+/* ========================================
+   RESPONSIVE - HERO SPACING
+   ======================================== */
+@media (max-width: 968px) {
+  .hero-title {
+    font-size: 2.5rem;
+  }
+  
+
+}
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .hero-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .hero-stats {
+    grid-template-columns: 1fr 1fr;
+    padding: 20px;
+    gap: 15px;
+  }
+  
+
+  .hero-text {
+    padding-bottom: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 1.5rem;
+  }
+  
+  .hero-badge {
+    font-size: 0.7rem;
+  }
+  
+
+  .hero-stats {
+    grid-template-columns: 1fr;
+    padding: 15px;
+    gap: 10px;
+  }
+  
+  .stat-number {
+    font-size: 1.5rem;
+  }
+}
+
+
+
+
+
+
+/*   Tour Card in Shop Section */
+.tour-card {
+  border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fffbeb);
+  transition: all 0.3s;
+}
+
+.tour-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.2);
+}
+
+.tour-link {
+  color: #d97706 !important;
+}
+
+.tour-link:hover {
+  color: #b45309 !important;
+}
+
+
+
+.book-tour-float:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.5);
+  background: #d97706;
+}
+
+.book-tour-float span {
+  display: inline-block;
+}
+
+
+
+
+
+
+
+/*  Tour Button in Hero */
+.btn-tour {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  border: none;
+  
+}
+
+.btn-tour:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+}
+
+.btn-tour i {
+  font-size: 1.1rem;
+}
+
+/*   Tour Card in Shop Section */
+.tour-card {
+  border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fffbeb);
+  transition: all 0.3s;
+}
+
+.tour-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.2);
+}
+
+.tour-link {
+  color: #d97706 !important;
+}
+
+.tour-link:hover {
+  color: #b45309 !important;
+}
+
+
+.book-tour-float {
+  position: fixed;
+  bottom: 80px;
+  right: 30px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 14px 22px;
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.book-tour-float:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.5);
+  background: #d97706;
+}
+
+.book-tour-float span {
+  display: inline-block;
 }
 
 /* ========================================
@@ -1222,13 +1944,7 @@ export default {
   flex-wrap: wrap;
 }
 
-.hero-stats-container {
-  position: absolute;
-  bottom: 100px;
-  left: 0;
-  right: 0;
-  z-index: 3;
-}
+
 
 .hero-stats {
   display: grid;
@@ -1620,7 +2336,7 @@ export default {
   line-height: 1.5;
   margin-bottom: 12px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  /* -webkit-line-clamp: 2; */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -2616,9 +3332,6 @@ export default {
   to { opacity: 1; }
 }
 
-/* ========================================
-   RESPONSIVE - COMPLETE
-   ======================================== */
 @media (max-width: 968px) {
   .section-header-with-image,
   .section-header-with-image.reverse {
@@ -2740,8 +3453,22 @@ export default {
     height: 36px;
   }
   
-  .hero-stats-container {
-    bottom: 40px;
+
+  
+  /*   Floating button mobile */
+  .book-tour-float {
+    padding: 12px 18px;
+    font-size: 13px;
+    /* bottom: 20px; */
+    right: 20px;
+  }
+  
+  .book-tour-float span {
+    display: none; /* Hide text on mobile, show only icon */
+  }
+  
+  .book-tour-float i {
+    font-size: 1.2rem;
   }
 }
 
@@ -2784,8 +3511,6 @@ export default {
     font-size: 0.9rem;
   }
   
-
-  
   .modal-actions-large {
     flex-direction: column;
   }
@@ -2796,3 +3521,7 @@ export default {
   }
 }
 </style>
+
+
+
+
