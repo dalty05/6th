@@ -826,8 +826,8 @@ def admin_create_blog_post():
             excerpt=data.get('excerpt', ''),
             content=data['content'],
             featured_image=data.get('featured_image', ''),
-            status=data.get('status', 'draft'),  # Default to draft
-            author_id=current_user.id  # Set author to current user
+            status=data.get('status', 'draft'),  
+            author_id=current_user.id  
         )
         
         db.session.add(post)

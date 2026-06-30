@@ -1,5 +1,3 @@
-// frontend/src/services/permissionService.js
-
 import api from './api'
 import authService from './auth'
 
@@ -9,9 +7,16 @@ class PermissionService {
     this.userRole = null
     this.loaded = false
     this.loadingPromise = null
+    this.initialized = false
   }
 
   async loadPermissions() {
+    // Don't load if not authenticated
+    if (!authService.isAuthenticated()) {
+      console.log('⚠️ Not authenticated, skipping permission load')
+      return false
+    }
+
     // If already loading, return the existing promise
     if (this.loadingPromise) {
       return this.loadingPromise
@@ -31,6 +36,11 @@ class PermissionService {
         console.log('✅ Permissions loaded:', this.userRole, this.permissions)
         return true
       } catch (error) {
+        // If 401, clear any stored user data
+        if (error.response?.status === 401) {
+          console.log('⚠️ Session expired, clearing user data')
+          authService.clearUser()
+        }
         console.error('Failed to load permissions:', error)
         this.loaded = false
         return false
@@ -194,16 +204,9 @@ class PermissionService {
   }
 }
 
-// Create instance and auto-load
+
 const permissionService = new PermissionService()
 
-// Auto-load permissions on creation
-permissionService.loadPermissions().then(success => {
-  if (success) {
-    console.log('✅ Permissions auto-loaded successfully')
-  } else {
-    console.warn('⚠️ Failed to auto-load permissions')
-  }
-})
+
 
 export default permissionService

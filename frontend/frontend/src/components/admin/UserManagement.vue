@@ -691,7 +691,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ========== ALL EXISTING STYLES REMAIN THE SAME ========== */
 .user-management {
   padding: 0;
 }
