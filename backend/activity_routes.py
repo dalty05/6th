@@ -34,42 +34,40 @@ def log_activity(user_id, user_name, action, resource_type, resource_id, descrip
 @activity_bp.route('/admin/activities', methods=['GET'])
 @login_required
 def get_activities():
-    """Get recent activities (admin only)"""
+    """Get user's activities"""
     try:
-        if not current_user.is_super_admin() and not current_user.is_admin():
-            return jsonify({'error': 'Unauthorized'}), 403
+        limit = request.args.get('limit', 10, type=int)
         
-        days = request.args.get('days', 30, type=int)
-        activity_type = request.args.get('type', None)
-        limit = request.args.get('limit', 50, type=int)
+        # ✅ Check if user has permission to view activities
+        from permission_service import has_permission
+        if not has_permission(current_user, 'activities', 'read'):
+            # Check if user is admin or tour staff
+            if current_user.role in ['admin', 'tour_manager', 'tour_assistant']:
+                # Allow access for these roles even without explicit permission
+                pass
+            else:
+                return jsonify({'error': 'Permission denied'}), 403
         
-        query = ActivityLog.query
+        # Different users see different activities
+        if current_user.is_super_admin():
+            activities = ActivityLog.query.order_by(
+                ActivityLog.created_at.desc()
+            ).limit(limit).all()
+        else:
+            activities = ActivityLog.query.filter_by(
+                user_id=current_user.id
+            ).order_by(
+                ActivityLog.created_at.desc()
+            ).limit(limit).all()
         
-        # Filter by days
-        if days and days > 0:
-            cutoff = datetime.utcnow() - timedelta(days=days)
-            query = query.filter(ActivityLog.created_at >= cutoff)
+        return jsonify({
+            'activities': [a.to_dict() for a in activities]
+        }), 200
         
-        # Filter by type
-        if activity_type:
-            query = query.filter(ActivityLog.resource_type == activity_type)
-        
-        # Order by most recent
-        activities = query.order_by(ActivityLog.created_at.desc()).limit(limit).all()
-        
-        return jsonify([{
-            'id': a.id,
-            'user_name': a.user_name,
-            'action': a.action,
-            'resource_type': a.resource_type,
-            'description': a.description,
-            'details': json.loads(a.details) if a.details else None,
-            'ip_address': a.ip_address,
-            'created_at': a.created_at.isoformat() if a.created_at else None
-        } for a in activities]), 200
     except Exception as e:
-        print(f"Error in get_activities: {e}")
-        return jsonify([]), 200
+        print(f"Error getting activities: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 
 @activity_bp.route('/admin/activities/<int:id>', methods=['GET'])

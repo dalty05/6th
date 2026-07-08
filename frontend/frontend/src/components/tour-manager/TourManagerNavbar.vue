@@ -21,24 +21,15 @@
         <i class="fas fa-bell"></i>
         <span v-if="pendingCount > 0" class="badge">{{ pendingCount }}</span>
       </div>
-      <div class="navbar-user" @click="showDropdown = !showDropdown">
+      <div class="navbar-user" >
         <div class="user-avatar">
           <i class="fas fa-user-circle"></i>
         </div>
         <span class="user-name">{{ user?.full_name || 'Tour Manager' }}</span>
-        <i class="fas fa-chevron-down" :class="{ rotated: showDropdown }"></i>
+        
       </div>
 
-      <!-- Dropdown -->
-      <div v-if="showDropdown" class="dropdown-menu" @click.stop>
-        <div class="dropdown-item" @click="goToProfile">
-          <i class="fas fa-user"></i> Profile
-        </div>
-        <div class="dropdown-divider"></div>
-        <div class="dropdown-item logout" @click="handleLogout">
-          <i class="fas fa-sign-out-alt"></i> Logout
-        </div>
-      </div>
+      
     </div>
   </nav>
 </template>
@@ -70,27 +61,12 @@ const goToProfile = () => {
 
 const handleLogout = async () => {
   showDropdown.value = false
-  await authService.logout()
+    await authService.logout()
+  this.$router.push('/admin/login')
   router.push('/login')
 }
 
-// Close dropdown on outside click
-const handleClickOutside = (event) => {
-  const navbar = event.target.closest('.navbar-right')
-  if (!navbar) {
-    showDropdown.value = false
-  }
-}
 
-onMounted(() => {
-  user.value = authService.getUser()
-  fetchPendingCount()
-  document.addEventListener('click', handleClickOutside)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
 </script>
 
 <style scoped>
@@ -220,60 +196,6 @@ onUnmounted(() => {
 
 .navbar-user .fa-chevron-down.rotated {
   transform: rotate(180deg);
-}
-
-/* Dropdown */
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 8px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-  min-width: 180px;
-  overflow: hidden;
-  z-index: 200;
-  animation: dropDown 0.2s ease;
-}
-
-@keyframes dropDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.dropdown-item {
-  padding: 10px 16px;
-  cursor: pointer;
-  transition: background 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.9rem;
-  color: #1f2937;
-}
-
-.dropdown-item:hover {
-  background: #f3f4f6;
-}
-
-.dropdown-item.logout {
-  color: #ef4444;
-}
-
-.dropdown-item.logout:hover {
-  background: #fef2f2;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: #e5e7eb;
 }
 
 @media (max-width: 768px) {

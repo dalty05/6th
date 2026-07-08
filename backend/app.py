@@ -1,4 +1,4 @@
-from flask import Flask, send_from_directory, jsonify, request
+from flask import Flask, send_from_directory, jsonify, request, send_file
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
@@ -24,6 +24,7 @@ import importlib.util
 
 
 from permission_routes import permission_bp
+from debug_permissions import debug_bp
 
 from blog_routes import blog_bp
 from tour_routes import tour_bp
@@ -47,13 +48,6 @@ from flask_login import current_user
 
 from flask_login import login_user, logout_user, login_required, current_user
 
-
-
-
-
-
-
-from permission_routes import permission_bp
 from user_management_routes import user_mgmt_bp
 
 
@@ -66,7 +60,13 @@ from outlet_routes import outlet_bp
 
 from flask_mail import Mail
 
+from role_routes import role_bp
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+import sqlite3
+from sqlalchemy.exc import OperationalError
+import time
 
 
 
@@ -101,7 +101,16 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///meru_dairy.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  
+
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '0') == '1'
+
+app.config['STATIC_FOLDER'] = 'static'
+app.config['STATIC_URL_PATH'] = '/static'
 
 
 
@@ -112,6 +121,7 @@ def check_permissions():
 
 
 # permision blueprints
+app.register_blueprint(debug_bp, url_prefix='/api')
 app.register_blueprint(permission_bp, url_prefix='/api')
 app.register_blueprint(user_mgmt_bp, url_prefix='/api')
 
@@ -132,6 +142,8 @@ app.register_blueprint(newsletter_bp, url_prefix='/api')
 
 app.register_blueprint(tour_bp, url_prefix='/api')
 
+app.register_blueprint(role_bp)
+
 
 
 
@@ -149,7 +161,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.test_login'
 
-# For API calls we generally want JSON 401/403 instead of redirects
+
 @login_manager.unauthorized_handler
 def unauthorized():
     from flask import jsonify
@@ -174,6 +186,40 @@ mail = Mail()
 def allowed_file(filename):
     """Check if file type is allowed for upload"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA cache_size=10000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    """Close database session at the end of each request"""
+    if exception:
+        db.session.rollback()
+    db.session.remove()
+
+# Context manager for database operations
+def with_retry(func, max_retries=3, delay=0.5):
+    """Retry a function if database is locked"""
+    def wrapper(*args, **kwargs):
+        for attempt in range(max_retries):
+            try:
+                return func(*args, **kwargs)
+            except OperationalError as e:
+                if "database is locked" in str(e) and attempt < max_retries - 1:
+                    db.session.rollback()
+                    time.sleep(delay * (attempt + 1))
+                    continue
+                raise
+        return None
+    return wrapper
 
 # ============================================================================
 # PUBLIC API ROUTES
@@ -224,9 +270,54 @@ def get_statistics():
         } for s in stats])
     except Exception as e:
         print(f"Error fetching statistics: {e}")
-        return jsonify([]), 200  # Return empty array instead of error
+        return jsonify([]), 200  
 
-# ---------------------- PRODUCTS ----------------------
+
+
+
+from services.qr_code_service import QRCodeService
+qr_service = QRCodeService()
+
+
+
+# ✅ Serve QR codes from backend/static/qr_codes/
+@app.route('/static/qr_codes/<path:filename>')
+def serve_qr_code(filename):
+    """Serve QR code images from the backend/static/qr_codes folder"""
+    try:
+        return send_from_directory('static/qr_codes', filename)
+    except FileNotFoundError:
+        return jsonify({'error': 'QR code not found'}), 404
+
+# ✅ Serve other backend static files if needed
+@app.route('/backend-static/<path:filename>')
+def serve_backend_static(filename):
+    """Serve static files from the backend/static folder"""
+    try:
+        return send_from_directory('static', filename)
+    except FileNotFoundError:
+        return jsonify({'error': 'File not found'}), 404
+
+#  List QR codes (optional)
+@app.route('/debug/qr-codes')
+def list_qr_codes():
+    """List all QR code files for debugging"""
+    try:
+        qr_dir = os.path.join(os.path.dirname(__file__), 'static', 'qr_codes')
+        if os.path.exists(qr_dir):
+            files = os.listdir(qr_dir)
+            return jsonify({
+                'count': len(files),
+                'files': files[:20],
+                'directory': qr_dir
+            })
+        else:
+            return jsonify({'error': 'QR directory not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ---------------------- PRODUCTS----------------------
+
 @app.route('/api/products', methods=['GET'])
 def get_products():
     """
@@ -248,10 +339,10 @@ def get_products():
         
         # Ensure valid pagination values
         page = max(1, page)
-        per_page = min(50, max(1, per_page))  # Max 50 items per page
+        per_page = min(50, max(1, per_page))
         
         # Build query
-        query = Product.query
+        query = Product.query.filter_by(is_active=True)
         
         # Apply filters
         if category and category != 'All' and category != '':
@@ -277,6 +368,7 @@ def get_products():
             'data': [{
                 'id': p.id,
                 'name': p.name,
+                'slug': p.slug,
                 'category': p.category,
                 'description': p.description[:200] + '...' if len(p.description) > 200 else p.description,
                 'benefits': p.benefits,
@@ -285,6 +377,7 @@ def get_products():
                 'ingredients': p.ingredients,
                 'image_url': p.image_url,
                 'featured': p.featured,
+                'qr_code_url': p.qr_code_url,
                 'created_at': p.created_at.isoformat() if p.created_at else None
             } for p in paginated.items],
             'pagination': {
@@ -307,19 +400,23 @@ def get_featured_products():
         limit = request.args.get('limit', 6, type=int)
         limit = min(12, max(1, limit))
         
-        products = Product.query.filter_by(featured=True).limit(limit).all()
+        products = Product.query.filter_by(featured=True, is_active=True).limit(limit).all()
         return jsonify([{
             'id': p.id,
             'name': p.name,
+            'slug': p.slug,
             'category': p.category,
             'description': p.description[:120] + '...' if len(p.description) > 120 else p.description,
             'image_url': p.image_url,
             'featured': p.featured,
-            'packaging_sizes': p.packaging_sizes
+            'packaging_sizes': p.packaging_sizes,
+            'qr_code_url': p.qr_code_url
         } for p in products])
     except Exception as e:
         print(f"Error in get_featured_products: {e}")
         return jsonify([]), 200
+
+
 
 @app.route('/api/products/<int:id>', methods=['GET'])
 def get_product(id):
@@ -329,6 +426,7 @@ def get_product(id):
         return jsonify({
             'id': product.id,
             'name': product.name,
+            'slug': product.slug,  # ✅ Add this
             'category': product.category,
             'description': product.description,
             'benefits': product.benefits,
@@ -336,10 +434,38 @@ def get_product(id):
             'nutritional_info': product.nutritional_info,
             'ingredients': product.ingredients,
             'image_url': product.image_url,
-            'featured': product.featured
+            'featured': product.featured,
+            'is_active': product.is_active,
+            'qr_code_url': product.qr_code_url,  # ✅ Add this
+            'qr_code_generated_at': product.qr_code_generated_at.isoformat() if product.qr_code_generated_at else None
         })
     except Exception as e:
         print(f"Error in get_product: {e}")
+        return jsonify({'error': 'Product not found'}), 404
+
+
+#  Get product by slug (for public product page)
+@app.route('/api/products/slug/<slug>', methods=['GET'])
+def get_product_by_slug(slug):
+    """Get single product by slug"""
+    try:
+        product = Product.query.filter_by(slug=slug, is_active=True).first_or_404()
+        return jsonify({
+            'id': product.id,
+            'name': product.name,
+            'slug': product.slug,
+            'category': product.category,
+            'description': product.description,
+            'benefits': product.benefits,
+            'packaging_sizes': product.packaging_sizes,
+            'nutritional_info': product.nutritional_info,
+            'ingredients': product.ingredients,
+            'image_url': product.image_url,
+            'featured': product.featured,
+            'qr_code_url': product.qr_code_url
+        })
+    except Exception as e:
+        print(f"Error in get_product_by_slug: {e}")
         return jsonify({'error': 'Product not found'}), 404
 
 @app.route('/api/products/categories', methods=['GET'])
@@ -352,6 +478,159 @@ def get_product_categories():
     except Exception as e:
         print(f"Error in get_product_categories: {e}")
         return jsonify(['All', 'Fresh Milk', 'Yoghurt', 'Lala', 'Ghee']), 200
+
+#  Admin endpoints for QR code management
+
+
+
+@app.route('/api/admin/products/<int:product_id>/regenerate-qr', methods=['POST'])
+@login_required
+def regenerate_product_qr(product_id):
+    """Regenerate QR code for a product (admin)"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        
+        # ✅ Log current state
+        print(f"📝 Generating QR for product: {product.id} - {product.name}")
+        print(f"📝 Current QR URL: {product.qr_code_url}")
+        
+        # Generate QR code
+        from services.qr_code_service import QRCodeService
+        qr_service = QRCodeService()
+        qr_url = qr_service.regenerate_product_qr(product)
+        
+        # ✅ Commit the changes
+        db.session.add(product)
+        db.session.commit()
+        
+        print(f"✅ QR regenerated successfully: {qr_url}")
+        print(f"✅ Database updated for product {product.id}")
+        
+        return jsonify({
+            'message': 'QR code regenerated successfully',
+            'qr_code_url': qr_url,
+            'product_id': product.id
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error regenerating QR: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+#  Download QR code as PNG
+@app.route('/api/products/<int:product_id>/qr/download', methods=['GET'])
+def download_product_qr(product_id):
+    """Download QR code as PNG"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        
+        if not product.qr_code_url:
+            return jsonify({'error': 'QR code not found'}), 404
+        
+        # Get the file path
+        filepath = product.qr_code_url.lstrip('/')
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'QR code file not found'}), 404
+        
+        return send_file(
+            filepath,
+            as_attachment=True,
+            download_name=f"qr_{product.slug or product.id}.png",
+            mimetype='image/png'
+        )
+        
+    except Exception as e:
+        print(f"Error downloading QR: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
+@app.route('/api/admin/products/<int:product_id>/qr/check', methods=['GET'])
+@login_required
+def check_product_qr(product_id):
+    """Check if QR code exists and is accessible"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        
+        if not product.qr_code_url:
+            return jsonify({
+                'exists': False,
+                'message': 'No QR code generated'
+            }), 200
+        
+        # ✅ Extract filename and check both relative and absolute paths
+        filename = product.qr_code_url.split('/')[-1]
+        
+        # Get absolute path
+        static_dir = os.path.join(os.path.dirname(__file__), 'static')
+        qr_dir = os.path.join(static_dir, 'qr_codes')
+        filepath = os.path.join(qr_dir, filename)
+        
+        file_exists = os.path.exists(filepath)
+        
+        # ✅ Also check if there are any QR files for this product
+        import glob
+        product_pattern = f"qr_{product.slug}*.png" if product.slug else f"qr_*{product.id}*.png"
+        matching_files = glob.glob(os.path.join(qr_dir, product_pattern))
+        
+        return jsonify({
+            'exists': file_exists,
+            'qr_code_url': product.qr_code_url,
+            'full_url': f"http://localhost:5173{product.qr_code_url}",
+            'file_path': filepath,
+            'absolute_path': os.path.abspath(filepath),
+            'file_exists': file_exists,
+            'matching_files': [os.path.basename(f) for f in matching_files],
+            'qr_directory': qr_dir,
+            'product_slug': product.slug
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+@app.route('/api/admin/products/<int:product_id>/qr/sync', methods=['POST'])
+@login_required
+def sync_product_qr(product_id):
+    """Sync QR code URL with actual file on disk"""
+    try:
+        product = Product.query.get_or_404(product_id)
+        
+        if not product.qr_code_url:
+            return jsonify({'error': 'No QR code URL'}), 400
+        
+        # Extract filename
+        filename = product.qr_code_url.split('/')[-1]
+        filepath = os.path.join('static', 'qr_codes', filename)
+        
+        if not os.path.exists(filepath):
+            # File doesn't exist, regenerate
+            from services.qr_code_service import QRCodeService
+            qr_service = QRCodeService()
+            qr_url = qr_service.regenerate_product_qr(product)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'QR code regenerated',
+                'new_url': qr_url
+            }), 200
+        
+        return jsonify({
+            'message': 'QR code is valid',
+            'qr_code_url': product.qr_code_url
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+
+
 
 # ========== BLOG ROUTES ==========
 @app.route('/api/blog', methods=['GET'])
@@ -460,10 +739,6 @@ def get_testimonials():
         print(f"Error in get_testimonials: {e}")
         return jsonify([]), 200
 
-# ============================================================================
-# IMAGE UPLOAD ROUTES (Enhanced)
-# ============================================================================
-# Add these routes to app.py
 
 # ========== IMAGE UPLOAD ROUTES ==========
 
@@ -677,16 +952,17 @@ def subscribe_newsletter():
 
 # ========== ADMIN PRODUCTS MANAGEMENT ROUTES ==========
 
+
 @app.route('/api/admin/products', methods=['GET'])
 @login_required
-
-def admin_get_products():
-    """Get all products for admin panel"""
+def get_admin_products():
+    """Get all products for admin (with QR fields)"""
     try:
-        products = Product.query.order_by(Product.created_at.desc()).all()
+        products = Product.query.all()
         return jsonify([{
             'id': p.id,
             'name': p.name,
+            'slug': p.slug,  # ✅ Add this
             'category': p.category,
             'description': p.description,
             'benefits': p.benefits,
@@ -695,15 +971,15 @@ def admin_get_products():
             'ingredients': p.ingredients,
             'image_url': p.image_url,
             'featured': p.featured,
-            'is_active': True,  # Assuming all products are active by default
+            'is_active': p.is_active,
+            'qr_code_url': p.qr_code_url,  # ✅ Add this
+            'qr_code_generated_at': p.qr_code_generated_at.isoformat() if p.qr_code_generated_at else None,
             'created_at': p.created_at.isoformat() if p.created_at else None,
             'updated_at': p.updated_at.isoformat() if p.updated_at else None
-        } for p in products]), 200
+        } for p in products])
     except Exception as e:
-        print(f"Error in admin_get_products: {e}")
-        return jsonify([]), 200
-
-
+        print(f"Error in get_admin_products: {e}")
+        return jsonify({'error': 'Failed to fetch products'}), 500
 
 
 @app.route('/api/admin/products', methods=['POST'])
@@ -748,6 +1024,10 @@ def admin_update_product(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+
+
 
 @app.route('/api/admin/products/<int:id>', methods=['DELETE'])
 @login_required
@@ -982,11 +1262,6 @@ def serve_frontend(path):
     # For all other routes, serve index.html (Vue Router)
     return send_from_directory('../dist', 'index.html')
 
-# ============================================================================
-# ERROR HANDLERS
-# ============================================================================
-
-# In backend/app.py
 @app.errorhandler(404)
 def not_found(error):
     from flask import request, jsonify
@@ -996,7 +1271,7 @@ def not_found(error):
             "message": f"Flask could not find an API route matching: {request.path}"
         }), 404
     
-    # ... your fallback code for index.html ...
+
     return send_from_directory('../dist', 'index.html')
 
 @app.errorhandler(500)
@@ -1006,7 +1281,7 @@ def server_error(error):
     return jsonify({'error': 'Internal server error'}), 500
 
 
-# Add at the bottom of app.py, before if __name__ == '__main__'
+
 import traceback
 
 @app.errorhandler(500)
@@ -1017,10 +1292,10 @@ def internal_error(error):
     print("=" * 50)
     return jsonify({'error': 'Internal server error', 'details': str(error)}), 500
 
-# Handle favicon requests
+
 @app.route('/favicon.ico')
 def favicon():
-    return '', 204  # Return empty response with No Content status
+    return '', 204  
 
 
 

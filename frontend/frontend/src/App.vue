@@ -15,10 +15,6 @@ import { useRoute } from 'vue-router'
 
 export default {
   name: 'App',
-  components: {
-    Navbar,
-    Footer
-  },
   setup() {
     const route = useRoute()
     
@@ -33,6 +29,10 @@ export default {
     return {
       isAdminRoute
     }
+  },
+  components: {
+    Navbar,
+    Footer
   }
 }
 </script>

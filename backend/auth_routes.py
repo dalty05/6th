@@ -1,15 +1,17 @@
 from flask import Blueprint, request, jsonify, current_app, session
 from flask_login import login_user, logout_user, login_required, current_user
-from models import db, User, OTP, PasswordResetToken, EmailVerificationToken, LoginAttempt
+from models import db, User, OTP, PasswordResetToken, EmailVerificationToken, LoginAttempt, Role, ActivityLog
 from email_service import EmailService
 from datetime import datetime, timedelta
 import re
 from functools import wraps
+from services.activity_logger import log_activity
 
 auth_bp = Blueprint('auth', __name__)
 email_service = EmailService()
 
-# Rate limiting helper (simple in-memory, upgrade to Redis for production)
+
+
 login_attempts_cache = {}
 
 def rate_limit_check(email, ip, max_attempts=5, window_minutes=15):
@@ -74,6 +76,22 @@ def role_required(*roles):
 # ============================================================
 # PUBLIC ROUTES
 # ============================================================
+
+
+@auth_bp.route('/auth/check-session', methods=['GET'])
+def check_session():
+    """Check if user has active session"""
+    if current_user.is_authenticated:
+        return jsonify({
+            'authenticated': True,
+            'user': current_user.to_dict()
+        }), 200
+    return jsonify({
+        'authenticated': False
+    }), 401
+
+
+
 
 @auth_bp.route('/auth/register', methods=['POST'])
 def register():
@@ -384,6 +402,20 @@ def create_user():
     if not valid:
         return jsonify({'error': message}), 400
     
+    # Determine role by ID or name
+    role_id = data.get('role_id')
+    selected_role = None
+    if role_id is not None:
+        selected_role = Role.query.get(role_id)
+        if not selected_role:
+            return jsonify({'error': 'Role not found'}), 404
+        role = selected_role.name
+    else:
+        role = data.get('role', 'partner')
+        if role:
+            selected_role = Role.query.filter_by(name=role).first()
+            role_id = selected_role.id if selected_role else None
+
     # Determine tour role flags
     is_tour_manager = role == 'tour_manager'
     is_tour_assistant = role == 'tour_assistant'
@@ -393,6 +425,7 @@ def create_user():
         email=email,
         full_name=full_name,
         role=role,
+        role_id=role_id,
         is_active=is_active,
         is_approved=is_approved,
         is_tour_manager=is_tour_manager,
@@ -420,17 +453,32 @@ def update_user(user_id):
     if data.get('full_name'):
         user.full_name = data['full_name']
     
-    if data.get('role'):
-        user.role = data['role']
-        # Update tour flags based on role
-        user.is_tour_manager = user.role == 'tour_manager'
-        user.is_tour_assistant = user.role == 'tour_assistant'
-    
+    if 'role_id' in data:
+        if data['role_id'] is not None:
+            selected_role = Role.query.get(data['role_id'])
+            if not selected_role:
+                return jsonify({'error': 'Role not found'}), 404
+            user.role_id = selected_role.id
+            user.role = selected_role.name
+        else:
+            user.role_id = None
+            user.role = None
+            user.is_active = False
+    elif data.get('role'):
+        requested_role = data['role']
+        selected_role = Role.query.filter_by(name=requested_role).first()
+        user.role = requested_role
+        user.role_id = selected_role.id if selected_role else None
+
     if 'is_active' in data:
         user.is_active = data['is_active']
     
     if 'is_approved' in data:
         user.is_approved = data['is_approved']
+    
+    # Update tour flags based on role
+    user.is_tour_manager = user.role == 'tour_manager'
+    user.is_tour_assistant = user.role == 'tour_assistant'
     
     # Allow manual override of tour flags if needed
     if 'is_tour_manager' in data:
@@ -599,54 +647,26 @@ def check_auth_alias():
     """Alias for legacy admin auth checks"""
     return check_auth()
 
-# ============================================================
-# TEST ROUTE (REMOVE IN PRODUCTION)
-# ============================================================
 
-@auth_bp.route('/auth/login/test', methods=['POST'])
-def test_login():
-    """TEMPORARY: Test login without OTP - Remove in production"""
-    from flask_login import login_user
-    
-    data = request.json
-    email = data.get('email', '').lower().strip()
-    password = data.get('password')
-    ip_address = request.remote_addr
-    
-    user = User.query.filter_by(email=email).first()
-    
-    if not user or not user.check_password(password):
-        record_login_attempt(email, ip_address, False)
-        return jsonify({'error': 'Invalid credentials'}), 401
-    
-    # Check account status
-    if not user.is_active:
-        return jsonify({'error': 'Account is suspended. Contact administrator.'}), 401
-    
-    if not user.is_approved:
-        return jsonify({'error': 'Account pending approval. You will be notified when approved.'}), 401
-    
-    # Login user directly
-    login_user(user)
-    user.last_login = datetime.utcnow()
-    user.last_login_ip = ip_address
-    db.session.commit()
-    
-    record_login_attempt(email, ip_address, True, user.id)
-    
-    return jsonify({
-        'message': 'Login successful',
-        'user': {
-            'id': user.id,
-            'email': user.email,
-            'full_name': user.full_name,
-            'role': user.role,
-            'is_active': user.is_active,
-            'is_approved': user.is_approved,
-            'is_tour_manager': user.is_tour_manager,
-            'is_tour_assistant': user.is_tour_assistant,
-            'created_at': user.created_at.isoformat() if user.created_at else None,
-            'last_login': user.last_login.isoformat() if user.last_login else None
-        },
-        'is_super_admin': user.is_super_admin()
-    }), 200
+
+# Activity Log Endpoint c
+
+@auth_bp.route('/admin/activities', methods=['GET'])
+@login_required
+def get_activities():
+    """Get user's recent activities"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        
+        activities = ActivityLog.query.filter_by(
+            user_id=current_user.id
+        ).order_by(
+            ActivityLog.created_at.desc()
+        ).limit(limit).all()
+        
+        return jsonify({
+            'activities': [a.to_dict() for a in activities]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

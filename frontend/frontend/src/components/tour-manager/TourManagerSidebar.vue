@@ -101,9 +101,21 @@
         </button>
       </div>
 
+      <!-- ✅ Add Account Section with Profile -->
       <div class="nav-section">
         <span v-if="!isCollapsed" class="nav-section-title">Account</span>
         
+        <!-- ✅ Add Profile Link -->
+        <button
+          class="nav-item"
+          :class="{ active: activeTab === 'profile' }"
+          @click="navigateToProfile()"
+        >
+          <i class="fas fa-user-circle"></i>
+          <span v-if="!isCollapsed">My Profile</span>
+          <span v-if="isCollapsed" class="tooltip">My Profile</span>
+        </button>
+
         <button class="nav-item logout-btn" @click="handleLogout">
           <i class="fas fa-sign-out-alt"></i>
           <span v-if="!isCollapsed">Logout</span>
@@ -113,7 +125,6 @@
     </nav>
   </aside>
 </template>
-
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
@@ -174,13 +185,19 @@ const navigate = (tab) => {
   emit('navigate', tab)
 }
 
+// ✅ Add navigate to profile
+const navigateToProfile = () => {
+  // Navigate to tour manager profile page
+  router.push('/tour-manager/profile')
+}
+
 const toggleSidebar = () => {
   isCollapsed.value = !isCollapsed.value
 }
 
 const handleLogout = async () => {
   await authService.logout()
-  router.push('/login')
+  router.push('/admin/login')
 }
 
 const fetchPendingCount = async () => {
@@ -204,7 +221,6 @@ onMounted(() => {
   fetchPendingCount()
 })
 </script>
-
 <style scoped>
 .tour-manager-sidebar {
   position: fixed;

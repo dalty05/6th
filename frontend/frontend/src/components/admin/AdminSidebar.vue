@@ -5,14 +5,14 @@
       <img src="/logo.png" alt="Meru Dairy" class="sidebar-logo">
       <div class="sidebar-brand" v-if="!isCollapsed">
         <h3>Meru Dairy</h3>
-        <span>Admin Panel</span>
+        <span>{{ roleName || 'Dashboard' }}</span>
       </div>
       <button class="sidebar-toggle" @click="toggleSidebar" v-if="!isMobile">
         <i :class="isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left'"></i>
       </button>
     </div>
 
-    <!-- User Profile Section -->
+    <!-- User Profile -->
     <div class="user-profile" v-if="!isCollapsed">
       <div class="user-avatar">
         <i class="fas fa-user-circle"></i>
@@ -20,232 +20,47 @@
       <div class="user-info">
         <h4>{{ user?.full_name || 'Administrator' }}</h4>
         <span class="user-role">
-          <i class="fas fa-tag"></i> {{ formatRole(user?.role) }}
+          <i class="fas fa-tag"></i> {{ formatRole(roleName) }}
         </span>
       </div>
     </div>
 
-    <!-- Navigation Menu -->
+    <!-- Navigation -->
     <nav class="sidebar-nav">
-      <div class="nav-section">
-        <div class="nav-section-title" v-if="!isCollapsed">Main</div>
+      <div class="nav-section" v-for="section in groupedComponents" :key="section.name">
+        <div class="nav-section-title" v-if="!isCollapsed">{{ section.name }}</div>
         
         <button
+          v-for="component in section.components"
+          :key="component.key"
           class="nav-item"
-          :class="{ active: activeTab === 'overview' }"
-          @click="navigate('overview')"
+          :class="{ active: activeTab === component.key }"
+          @click="navigate(component)"
         >
-          <i class="fas fa-tachometer-alt"></i>
-          <span v-if="!isCollapsed">Overview</span>
-          <span v-if="isCollapsed" class="tooltip">Overview</span>
-        </button>
-
-        <button
-          v-if="canViewProducts"
-          class="nav-item"
-          :class="{ active: activeTab === 'products' }"
-          @click="navigate('products')"
-        >
-          <i class="fas fa-box-open"></i>
-          <span v-if="!isCollapsed">Products</span>
-          <span v-if="isCollapsed" class="tooltip">Products</span>
-        </button>
-
-        <button
-          v-if="canViewBlog"
-          class="nav-item"
-          :class="{ active: activeTab === 'blog' }"
-          @click="navigate('blog')"
-        >
-          <i class="fas fa-newspaper"></i>
-          <span v-if="!isCollapsed">Blog Posts</span>
-          <span v-if="isCollapsed" class="tooltip">Blog Posts</span>
-        </button>
-
-        <button
-          v-if="canViewJobs"
-          class="nav-item"
-          :class="{ active: activeTab === 'jobs' }"
-          @click="navigate('jobs')"
-        >
-          <i class="fas fa-briefcase"></i>
-          <span v-if="!isCollapsed">Job Management</span>
-          <span v-if="isCollapsed" class="tooltip">Job Management</span>
-        </button>
-
-        <button
-          v-if="canViewOutlets"
-          class="nav-item"
-          :class="{ active: activeTab === 'outlets' }"
-          @click="navigate('outlets')"
-        >
-          <i class="fas fa-map-marker-alt"></i>
-          <span v-if="!isCollapsed">Outlet Locations</span>
-          <span v-if="isCollapsed" class="tooltip">Outlet Locations</span>
-        </button>
-
-        <button
-          v-if="canViewUsers"
-          class="nav-item"
-          :class="{ active: activeTab === 'users' }"
-          @click="navigate('users')"
-        >
-          <i class="fas fa-users"></i>
-          <span v-if="!isCollapsed">User Management</span>
-          <span v-if="isCollapsed" class="tooltip">User Management</span>
-        </button>
-
-        <button
-          v-if="canViewPartners"
-          class="nav-item"
-          :class="{ active: activeTab === 'partners' }"
-          @click="navigate('partners')"
-        >
-          <i class="fas fa-handshake"></i>
-          <span v-if="!isCollapsed">Partners</span>
-          <span v-if="isCollapsed" class="tooltip">Partners</span>
-        </button>
-
-        <button
-          v-if="canViewStatistics"
-          class="nav-item"
-          :class="{ active: activeTab === 'statistics' }"
-          @click="navigate('statistics')"
-        >
-          <i class="fas fa-chart-line"></i>
-          <span v-if="!isCollapsed">Analytics</span>
-          <span v-if="isCollapsed" class="tooltip">Analytics</span>
-        </button>
-
-        <button
-          v-if="canViewContacts"
-          class="nav-item"
-          :class="{ active: activeTab === 'contacts' }"
-          @click="navigate('contacts')"
-        >
-          <i class="fas fa-envelope"></i>
-          <span v-if="!isCollapsed">Contact Messages</span>
-          <span v-if="isCollapsed" class="tooltip">Contact Messages</span>
-        </button>
-
-        <button
-          v-if="canViewNewsletter"
-          class="nav-item"
-          :class="{ active: activeTab === 'newsletter' }"
-          @click="navigate('newsletter')"
-        >
-          <i class="fas fa-envelope-open-text"></i>
-          <span v-if="!isCollapsed">Newsletter</span>
-          <span v-if="isCollapsed" class="tooltip">Newsletter</span>
-        </button>
-
-        <!-- TOUR MANAGEMENT -->
-        <div class="nav-divider" v-if="canViewTours && !isCollapsed"></div>
-        
-        <button
-          v-if="canViewTours"
-          class="nav-item"
-          :class="{ active: activeTab === 'tours' }"
-          @click="navigate('tours')"
-        >
-          <i class="fas fa-factory"></i>
-          <span v-if="!isCollapsed">Tour Bookings</span>
-          <span v-if="isCollapsed" class="tooltip">Tour Bookings</span>
-          <span v-if="pendingTourCount > 0" class="badge">{{ pendingTourCount }}</span>
-        </button>
-
-        <button
-          v-if="canManageTours"
-          class="nav-item"
-          :class="{ active: activeTab === 'tour-packages' }"
-          @click="navigate('tour-packages')"
-        >
-          <i class="fas fa-tag"></i>
-          <span v-if="!isCollapsed">Tour Packages</span>
-          <span v-if="isCollapsed" class="tooltip">Tour Packages</span>
-        </button>
-
-        <button
-          v-if="canManageTours"
-          class="nav-item"
-          :class="{ active: activeTab === 'tour-calendar' }"
-          @click="navigate('tour-calendar')"
-        >
-          <i class="fas fa-calendar-alt"></i>
-          <span v-if="!isCollapsed">Tour Calendar</span>
-          <span v-if="isCollapsed" class="tooltip">Tour Calendar</span>
-        </button>
-
-        <button
-          v-if="canManageTours"
-          class="nav-item"
-          :class="{ active: activeTab === 'tour-payments' }"
-          @click="navigate('tour-payments')"
-        >
-          <i class="fas fa-money-bill-wave"></i>
-          <span v-if="!isCollapsed">Tour Payments</span>
-          <span v-if="isCollapsed" class="tooltip">Tour Payments</span>
-        </button>
-
-        <button
-          v-if="canManageTours"
-          class="nav-item"
-          :class="{ active: activeTab === 'tour-reports' }"
-          @click="navigate('tour-reports')"
-        >
-          <i class="fas fa-chart-bar"></i>
-          <span v-if="!isCollapsed">Tour Reports</span>
-          <span v-if="isCollapsed" class="tooltip">Tour Reports</span>
-        </button>
-
-        <button
-          v-if="canManagePermissions"
-          class="nav-item"
-          :class="{ active: activeTab === 'permissions' }"
-          @click="navigate('permissions')"
-        >
-          <i class="fas fa-lock"></i>
-          <span v-if="!isCollapsed">Permissions</span>
-          <span v-if="isCollapsed" class="tooltip">Permissions</span>
+          <i :class="component.icon || 'fas fa-cube'"></i>
+          <span v-if="!isCollapsed">{{ component.label }}</span>
+          <span v-if="isCollapsed" class="tooltip">{{ component.label }}</span>
         </button>
       </div>
 
+      <!-- Logout -->
       <div class="nav-section" v-if="!isCollapsed">
         <div class="nav-section-title">Account</div>
-        
-        <button
-          class="nav-item"
-          :class="{ active: activeTab === 'profile' }"
-          @click="navigate('profile')"
-        >
-          <i class="fas fa-user-circle"></i>
-          <span>My Profile</span>
-        </button>
-        
         <button class="nav-item logout-btn" @click="handleLogout">
           <i class="fas fa-sign-out-alt"></i>
           <span>Logout</span>
         </button>
       </div>
-
-      <!-- Mobile Logout Button -->
-      <button v-if="isMobile" class="nav-item logout-btn mobile-logout" @click="handleLogout">
-        <i class="fas fa-sign-out-alt"></i>
-        <span>Logout</span>
-      </button>
     </nav>
-
-    <!-- Mobile Overlay -->
-    <div class="sidebar-overlay" v-if="isMobile && isOpen" @click="closeMobileSidebar"></div>
   </aside>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import authService from '@/services/auth'
+import api from '@/services/api'
 import permissionService from '@/services/permissionService'
-import axios from 'axios'
 
 const props = defineProps({
   activeTab: {
@@ -258,149 +73,45 @@ const emit = defineEmits(['navigate'])
 
 const router = useRouter()
 const user = ref(null)
+const components = ref([])
+const roleName = ref('')
 const isCollapsed = ref(false)
 const isMobile = ref(false)
-const isOpen = ref(false)
-const pendingTourCount = ref(0)
-const permissionsLoaded = ref(false)
+const loading = ref(false)
 
-// Simple role-based permissions
-const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
-const isAdmin = computed(() => user.value?.role === 'admin' || user.value?.role === 'super_admin')
-const isPartner = computed(() => user.value?.role === 'partner')
-
-// Check if permissions are loaded
-const checkPermissions = async () => {
-  if (!permissionService.loaded) {
-    await permissionService.loadPermissions()
-  }
-  permissionsLoaded.value = true
-}
-
-// Existing permissions - Only return true if permissions are loaded
-const canViewProducts = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewProducts()
-})
-
-const canViewBlog = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewBlog()
-})
-
-const canViewJobs = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewJobs()
-})
-
-const canViewOutlets = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewOutlets()
-})
-
-const canViewUsers = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewUsers()
-})
-
-const canViewPartners = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewPartners()
-})
-
-const canViewStatistics = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewStatistics()
-})
-
-const canViewContacts = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewContacts()
-})
-
-const canManagePermissions = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canManagePermissions()
-})
-
-const canViewNewsletter = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewNewsletter()
-})
-
-// Tour permissions - Using permission service
-const canViewTours = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewTours()
-})
-
-const canViewBookings = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewBookings()
-})
-
-const canViewTourPackages = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canViewTours()
-})
-
-const canManageTours = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canManageTours()
-})
-
-const canManageBookings = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canManageBookings()
-})
-
-const canApproveBookings = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canApproveBookings()
-})
-
-const canRejectBookings = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canRejectBookings()
-})
-
-const canUpdateAvailability = computed(() => {
-  if (!permissionsLoaded.value) return false
-  return permissionService.canUpdateAvailability()
-})
-
-const canManageTourStaff = computed(() => {
-  // Only super admin can manage tour staff
-  return user.value?.role === 'super_admin'
-})
-
-// Fetch pending tour count
-const fetchPendingTours = async () => {
-  if (!canViewTours.value) return
-  
+const loadDashboardConfig = async () => {
+  loading.value = true
   try {
-    const response = await axios.get('/api/tour/admin/bookings?status=pending')
-    pendingTourCount.value = response.data.count || 0
+    const response = await api.get('/dashboard/config')
+    components.value = response.data.components || []
+    roleName.value = response.data.role?.name || 'User'
+    
+    console.log('✅ Dashboard config loaded:', components.value.length, 'components')
   } catch (error) {
-    console.error('Error fetching pending tours:', error)
+    console.error('Error loading dashboard config:', error)
+  } finally {
+    loading.value = false
   }
 }
 
-const formatRole = (role) => {
-  const roles = {
-    super_admin: 'Super Admin',
-    admin: 'Admin',
-    partner: 'Partner',
-    tour_manager: 'Tour Manager',
-    tour_assistant: 'Tour Assistant'
-  }
-  return roles[role] || role
-}
+// Group components by section
+const groupedComponents = computed(() => {
+  const groups = {}
+  components.value.forEach(comp => {
+    const section = comp.section || 'Main'
+    if (!groups[section]) groups[section] = []
+    groups[section].push(comp)
+  })
+  return Object.entries(groups).map(([name, comps]) => ({
+    name,
+    components: comps.sort((a, b) => (a.order || 0) - (b.order || 0))
+  }))
+})
 
-const navigate = (tab) => {
-  emit('navigate', tab)
-  if (isMobile.value) {
-    isOpen.value = false
+const navigate = (component) => {
+  emit('navigate', component.key)
+  if (component.path) {
+    router.push(component.path)
   }
 }
 
@@ -409,56 +120,30 @@ const toggleSidebar = () => {
   localStorage.setItem('admin_sidebar_collapsed', isCollapsed.value)
 }
 
-const closeMobileSidebar = () => {
-  isOpen.value = false
-}
-
 const handleLogout = async () => {
-  await authService.logout()
+    await authService.logout()
+  this.$router.push('/admin/login')
   router.push('/admin/login')
 }
 
-const checkScreenSize = () => {
-  const width = window.innerWidth
-  isMobile.value = width < 768
-  if (isMobile.value) {
-    isOpen.value = false
+const formatRole = (role) => {
+  const roles = {
+    super_admin: 'Super Admin',
+    admin: 'Admin',
+    tour_manager: 'Tour Manager',
+    tour_assistant: 'Tour Assistant',
+    partner: 'Partner'
   }
+  return roles[role] || role
 }
 
-// Setup interval for pending count
-let intervalId = null
-
-onMounted(async () => {
+onMounted(() => {
   user.value = authService.getUser()
-  
-  // Load permissions before rendering
-  await checkPermissions()
-  
-  // Now fetch pending tours
-  if (canViewTours.value) {
-    fetchPendingTours()
-  }
+  loadDashboardConfig()
   
   const saved = localStorage.getItem('admin_sidebar_collapsed')
   if (saved !== null) {
     isCollapsed.value = saved === 'true'
-  }
-  checkScreenSize()
-  window.addEventListener('resize', checkScreenSize)
-  
-  // Refresh every 30 seconds
-  intervalId = setInterval(() => {
-    if (canViewTours.value) {
-      fetchPendingTours()
-    }
-  }, 30000)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', checkScreenSize)
-  if (intervalId) {
-    clearInterval(intervalId)
   }
 })
 </script>

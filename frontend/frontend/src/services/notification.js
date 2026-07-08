@@ -22,7 +22,7 @@ class NotificationService {
       return
     }
     
-    const token = localStorage.getItem('auth_token') || localStorage.getItem('user')
+    const token = localStorage.getItem('token') || localStorage.getItem('user')
     const wsUrl = `ws://${window.location.hostname}:5000/ws/notifications?token=${token}`
     
     try {

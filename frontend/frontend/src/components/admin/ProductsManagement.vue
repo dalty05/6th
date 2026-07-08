@@ -40,6 +40,15 @@
           <p>Categories</p>
         </div>
       </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">
+          <i class="fas fa-qrcode"></i>
+        </div>
+        <div class="stat-info">
+          <h3>{{ productsWithQR }}</h3>
+          <p>QR Codes Generated</p>
+        </div>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -103,9 +112,34 @@
           <div class="product-meta" v-if="product.packaging_sizes">
             <i class="fas fa-weight-hanging"></i> {{ product.packaging_sizes }}
           </div>
+
+          <!-- QR Code Display -->
+      
+          
+        <div class="product-qr-section">
+          <div v-if="product.qr_code_url" class="qr-display">
+            <!-- ✅ Use getFullUrl to get the complete URL -->
+            <img :src="getFullUrl(product.qr_code_url)" alt="QR Code" class="qr-image">
+            <div class="qr-actions">
+              <button @click="downloadQR(product)" class="qr-btn download" title="Download QR Code">
+                <i class="fas fa-download"></i>
+              </button>
+              <button @click="shareProduct(product)" class="qr-btn share" title="Share Product">
+                <i class="fas fa-share-alt"></i>
+              </button>
+              <button @click="copyProductLink(product)" class="qr-btn copy" title="Copy Product Link">
+                <i class="fas fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          <button v-else @click="generateQR(product)" class="btn-generate-qr">
+            <i class="fas fa-qrcode"></i> Generate QR Code
+          </button>
         </div>
-        
-        <div class="product-actions">
+          
+    
+    
+    <div class="product-actions">
           <button @click="editProduct(product)" class="action-btn edit" title="Edit">
             <i class="fas fa-edit"></i> Edit
           </button>
@@ -113,7 +147,7 @@
             <i class="fas fa-star"></i>
           </button>
           <button @click="deleteProduct(product.id)" class="action-btn delete" title="Delete">
-            <i class="fas fa-trash"></i> Delete
+            <i class="fas fa-trash"></i>
           </button>
         </div>
       </div>
@@ -235,7 +269,10 @@
       </div>
     </div>
   </div>
+  </div>
 </template>
+
+
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
@@ -272,6 +309,8 @@ const form = ref({
 
 // Computed
 const featuredCount = computed(() => products.value.filter(p => p.featured).length)
+const productsWithQR = computed(() => products.value.filter(p => p.qr_code_url).length)
+
 const uniqueCategories = computed(() => {
   const cats = products.value.map(p => p.category).filter(c => c)
   return [...new Set(cats)]
@@ -280,7 +319,6 @@ const uniqueCategories = computed(() => {
 const filteredProducts = computed(() => {
   let filtered = [...products.value]
   
-  // Search filter
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(p => 
@@ -289,12 +327,10 @@ const filteredProducts = computed(() => {
     )
   }
   
-  // Category filter
   if (categoryFilter.value !== 'all') {
     filtered = filtered.filter(p => p.category === categoryFilter.value)
   }
   
-  // Status filter
   if (statusFilter.value === 'active') {
     filtered = filtered.filter(p => p.is_active !== false)
   } else if (statusFilter.value === 'inactive') {
@@ -343,6 +379,94 @@ const nextPage = () => {
   if (currentPage.value < totalPages.value) currentPage.value++
 }
 
+// QR Code Methods
+const generateQR = async (product) => {
+  try {
+    const response = await api.post(`/admin/products/${product.id}/regenerate-qr`)
+    toast.success('QR Code generated successfully')
+    await loadProducts()
+  } catch (error) {
+    console.error('Error generating QR:', error)
+    toast.error('Failed to generate QR code')
+  }
+}
+
+
+
+
+const shareProduct = (product) => {
+  const url = `${window.location.origin}/product/${product.slug || product.id}`
+  
+  if (navigator.share) {
+    navigator.share({
+      title: product.name,
+      text: `Check out ${product.name} - ${product.description}`,
+      url: url
+    }).catch(() => {})
+  } else {
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('Product link copied to clipboard!')
+    }).catch(() => {
+      // Fallback
+      const textarea = document.createElement('textarea')
+      textarea.value = url
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      toast.success('Product link copied to clipboard!')
+    })
+  }
+}
+
+const copyProductLink = (product) => {
+  const url = `${window.location.origin}/product/${product.slug || product.id}`
+  navigator.clipboard.writeText(url).then(() => {
+    toast.success('Product link copied to clipboard!')
+  }).catch(() => {
+    const textarea = document.createElement('textarea')
+    textarea.value = url
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+    toast.success('Product link copied to clipboard!')
+  })
+}
+
+
+const getFullUrl = (path) => {
+  if (!path) return ''
+  // If it's already a full URL, return as is
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path
+  }
+  // Otherwise prepend the base URL
+  return `${window.location.origin}${path}`
+}
+
+// Update the downloadQR function
+const downloadQR = (product) => {
+  if (!product.qr_code_url) return
+  
+  // Get the full URL
+  const url = getFullUrl(product.qr_code_url)
+  
+  // Create a link element to trigger download
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `qr_${product.slug || product.id}.png`
+  link.target = '_blank'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  toast.success('QR Code downloading...')
+}
+
+
+
+
+// Open Create Modal
 const openCreateModal = () => {
   editingProduct.value = null
   form.value = {
@@ -361,6 +485,7 @@ const openCreateModal = () => {
   showModal.value = true
 }
 
+// Edit Product
 const editProduct = (product) => {
   editingProduct.value = product
   form.value = {
@@ -379,18 +504,17 @@ const editProduct = (product) => {
   showModal.value = true
 }
 
+// Image Upload
 const handleImageUpload = (event) => {
   const file = event.target.files[0]
   if (!file) return
   
-  // Validate file type
   const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp']
   if (!allowedTypes.includes(file.type)) {
     toast.error('Invalid file type. Please upload an image.')
     return
   }
   
-  // Validate file size (5MB)
   if (file.size > 5 * 1024 * 1024) {
     toast.error('File size must be less than 5MB')
     return
@@ -408,6 +532,7 @@ const removeImage = () => {
   }
 }
 
+// Save Product
 const saveProduct = async () => {
   if (!form.value.name || !form.value.description || !form.value.category) {
     toast.error('Please fill in all required fields')
@@ -419,7 +544,6 @@ const saveProduct = async () => {
   try {
     let imageUrl = form.value.image_url
     
-    // Upload image if new file selected
     if (form.value.image_file) {
       const uploadData = new FormData()
       uploadData.append('file', form.value.image_file)
@@ -428,8 +552,7 @@ const saveProduct = async () => {
       const uploadResponse = await api.post('/upload', uploadData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      imageUrl = uploadResponse.data.url
-    }
+      imageUrl = uploadResponse.data.url    }
     
     const productData = {
       name: form.value.name,
@@ -461,6 +584,7 @@ const saveProduct = async () => {
   }
 }
 
+// Delete Product
 const deleteProduct = async (id) => {
   if (confirm('Are you sure you want to delete this product?')) {
     try {
@@ -474,6 +598,7 @@ const deleteProduct = async (id) => {
   }
 }
 
+// Toggle Featured
 const toggleFeatured = async (product) => {
   try {
     const updatedProduct = { ...product, featured: !product.featured }
@@ -506,9 +631,120 @@ const handleImageError = (event) => {
 onMounted(() => {
   loadProducts()
 })
+
+
 </script>
 
+
+
+
+
+
 <style scoped>
+
+
+/* ✅ QR Code Styles */
+.product-qr-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.qr-display {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.qr-image {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  padding: 4px;
+  background: white;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.qr-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.qr-btn.download {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.qr-btn.download:hover {
+  background: #bfdbfe;
+}
+
+.qr-btn.share {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.qr-btn.share:hover {
+  background: #a7f3d0;
+}
+
+.qr-btn.copy {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.qr-btn.copy:hover {
+  background: #fde68a;
+}
+
+.btn-generate-qr {
+  padding: 6px 14px;
+  background: #f1f5f9;
+  border: 1px dashed #94a3b8;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #64748b;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-generate-qr:hover {
+  background: #e2e8f0;
+  border-color: #64748b;
+  color: #1a1a2e;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .qr-display {
+    justify-content: center;
+  }
+}
+
+
+
+
+
+
+
 .products-management {
   padding: 1.5rem;
   background: #f8fafc;

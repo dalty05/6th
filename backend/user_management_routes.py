@@ -54,7 +54,7 @@ def log_activity(user_id, user_name, action, resource_type, resource_id, descrip
 @user_mgmt_bp.route('/admin/users', methods=['GET'])
 @login_required
 @super_admin_required
-def get_users():
+def get_users_route():
     """Get all users - Super Admin only"""
     try:
         users = User.query.order_by(User.created_at.desc()).all()
@@ -76,33 +76,10 @@ def get_users():
         print(f"Error in get_users: {e}")
         return jsonify([]), 200
 
-# ========== GET SINGLE USER ==========
-@user_mgmt_bp.route('/admin/users/<int:user_id>', methods=['GET'])
-@login_required
-@super_admin_required
-def get_user(user_id):
-    """Get single user details - Super Admin only"""
-    try:
-        user = User.query.get_or_404(user_id)
-        return jsonify({
-            'id': user.id,
-            'email': user.email,
-            'full_name': user.full_name,
-            'role': user.role,
-            'is_active': user.is_active,
-            'is_approved': user.is_approved,
-            'email_verified': user.email_verified,
-            'referral_code': user.referral_code,
-            'total_clicks': user.total_clicks,
-            'total_conversions': user.total_conversions,
-            'created_at': user.created_at.isoformat() if user.created_at else None,
-            'last_login': user.last_login.isoformat() if user.last_login else None
-        }), 200
-    except Exception as e:
-        print(f"Error in get_user: {e}")
-        return jsonify({'error': 'User not found'}), 404
 
-# ========== CREATE USER ==========
+
+
+# ========== CREATE USER  ==========
 @user_mgmt_bp.route('/admin/users', methods=['POST'])
 @login_required
 @super_admin_required
@@ -116,13 +93,27 @@ def create_user():
         if User.query.filter_by(email=email).first():
             return jsonify({'error': 'User with this email already exists'}), 400
         
+        # ✅ Handle role_id properly
+        role_name = data.get('role', 'partner')
+        role_id = data.get('role_id')
+        
+        # If role_id is provided, get the role name from roles table
+        if role_id:
+            from models import Role
+            role = Role.query.get(role_id)
+            if role:
+                role_name = role.name
+            else:
+                return jsonify({'error': f'Role with ID {role_id} not found'}), 400
+        
         # Generate random password
         temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
         
         user = User(
             email=email,
             full_name=data.get('full_name', '').strip(),
-            role=data.get('role', 'partner'),
+            role=role_name,
+            role_id=role_id,  # ✅ Store the role_id
             is_active=data.get('is_active', True),
             is_approved=data.get('is_approved', True),
             email_verified=True,
@@ -134,7 +125,7 @@ def create_user():
         db.session.commit()
         
         # Generate referral code for partner
-        if user.role == 'partner':
+        if user.role == 'partner' and hasattr(user, 'generate_referral_code'):
             user.generate_referral_code()
             db.session.commit()
         
@@ -166,16 +157,20 @@ def create_user():
                 'email': user.email,
                 'full_name': user.full_name,
                 'role': user.role,
-                'temporary_password': temp_password  # Only shown once
+                'role_id': user.role_id,
+                'temporary_password': temp_password
             }
         }), 201
         
     except Exception as e:
         db.session.rollback()
         print(f"Error in create_user: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-# ========== UPDATE USER ==========
+
+# ========== UPDATE USER  ==========
 @user_mgmt_bp.route('/admin/users/<int:user_id>', methods=['PUT'])
 @login_required
 @super_admin_required
@@ -187,11 +182,31 @@ def update_user(user_id):
         
         if 'full_name' in data:
             user.full_name = data['full_name']
-        if 'role' in data:
+        
+        # ✅ Handle role_id update
+        if 'role_id' in data:
+            from models import Role
+            role_id = data['role_id']
+            if role_id:
+                role = Role.query.get(role_id)
+                if role:
+                    user.role = role.name
+                    user.role_id = role_id
+                else:
+                    return jsonify({'error': f'Role with ID {role_id} not found'}), 400
+            else:
+                user.role_id = None
+                user.role = 'partner'  # Default role
+        
+        # ✅ Also handle role string (for backward compatibility)
+        if 'role' in data and 'role_id' not in data:
             user.role = data['role']
-            # Generate referral code if becoming partner
-            if user.role == 'partner' and not user.referral_code:
-                user.generate_referral_code()
+            # Try to find matching role_id
+            from models import Role
+            role = Role.query.filter_by(name=data['role']).first()
+            if role:
+                user.role_id = role.id
+        
         if 'is_active' in data:
             user.is_active = data['is_active']
         if 'is_approved' in data:
@@ -199,6 +214,12 @@ def update_user(user_id):
         
         user.updated_at = datetime.utcnow()
         db.session.commit()
+        
+        # Generate referral code if becoming partner
+        if user.role == 'partner' and not user.referral_code:
+            if hasattr(user, 'generate_referral_code'):
+                user.generate_referral_code()
+                db.session.commit()
         
         # If user was approved via this update, send approval email
         if 'is_approved' in data and data['is_approved'] and not user.is_approved:
@@ -219,16 +240,59 @@ def update_user(user_id):
             description=f'Updated user: {user.email}'
         )
         
-        return jsonify({'message': 'User updated successfully'}), 200
+        return jsonify({
+            'message': 'User updated successfully',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'role_id': user.role_id
+            }
+        }), 200
         
     except Exception as e:
         db.session.rollback()
         print(f"Error in update_user: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ========== GET ALL USERS ) ==========
+@user_mgmt_bp.route('/admin/users', methods=['GET'])
+@login_required
+@super_admin_required
+def get_users():
+    """Get all users - Super Admin only"""
+    try:
+        users = User.query.order_by(User.created_at.desc()).all()
+        return jsonify([{
+            'id': u.id,
+            'email': u.email,
+            'full_name': u.full_name,
+            'role': u.role,
+            'role_id': u.role_id,  # ✅ Include role_id
+            'is_active': u.is_active,
+            'is_approved': u.is_approved,
+            'email_verified': u.email_verified,
+            'referral_code': u.referral_code,
+            'total_clicks': u.total_clicks,
+            'total_conversions': u.total_conversions,
+            'created_at': u.created_at.isoformat() if u.created_at else None,
+            'last_login': u.last_login.isoformat() if u.last_login else None
+        } for u in users]), 200
+    except Exception as e:
+        print(f"Error in get_users: {e}")
+        return jsonify([]), 200
+
+
+
+
+
 
 # ========== DELETE USER ==========
 
-# ========== DELETE USER (Permanent) ==========
 @user_mgmt_bp.route('/admin/users/<int:user_id>', methods=['DELETE'])
 @login_required
 @super_admin_required
@@ -333,7 +397,7 @@ def approve_user(user_id):
         print(f"Error in approve_user: {e}")
         return jsonify({'error': str(e)}), 500
 
-# ========== SUSPEND USER ==========
+
 
 # ========== SUSPEND USER (with email) ==========
 @user_mgmt_bp.route('/admin/users/<int:user_id>/suspend', methods=['POST'])

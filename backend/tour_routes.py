@@ -8,11 +8,7 @@ from sqlalchemy import func, and_, or_
 
 from services.tour_email_service import TourEmailService
 
-
-
- 
 # REPORTLAB PDF export
-
 try:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import landscape, A4
@@ -25,13 +21,59 @@ except ImportError:
     REPORTLAB_AVAILABLE = False
     print("⚠️ ReportLab not available. PDF export disabled.")
 
-
-
 tour_bp = Blueprint('tour', __name__)
 
+# ==================== HELPER FUNCTIONS ====================
 
-# PUBLIC ROUTES (No Authentication Required)
+def is_tour_manager(user):
+    """Check if user has tour manager permissions"""
+    if not user or not user.is_authenticated:
+        return False
+    # Check for admin or tour manager roles
+    return (hasattr(user, 'is_admin') and user.is_admin) or \
+           (hasattr(user, 'is_super_admin') and user.is_super_admin) or \
+           (hasattr(user, 'is_tour_manager') and user.is_tour_manager)
 
+def is_tour_assistant(user):
+    """Check if user has tour assistant permissions"""
+    if not user or not user.is_authenticated:
+        return False
+    return is_tour_manager(user) or \
+           (hasattr(user, 'is_tour_assistant') and user.is_tour_assistant)
+
+def can_manage_bookings(user):
+    """Check if user can manage bookings (view, update, approve)"""
+    return is_tour_manager(user) or is_tour_assistant(user)
+
+def can_manage_packages(user):
+    """Check if user can manage packages (create, update, delete)"""
+    return is_tour_manager(user)
+
+def require_tour_manager(f):
+    """Decorator for tour manager-only routes"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        if not is_tour_manager(current_user):
+            return jsonify({'error': 'Tour manager permissions required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_tour_assistant(f):
+    """Decorator for tour assistant-only routes"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        if not can_manage_bookings(current_user):
+            return jsonify({'error': 'Tour assistant permissions required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ==================== PUBLIC ROUTES (No Authentication Required) ====================
 
 @tour_bp.route('/tour/packages', methods=['GET'])
 def get_packages():
@@ -43,7 +85,6 @@ def get_packages():
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @tour_bp.route('/tour/availability', methods=['GET'])
 def check_availability():
@@ -57,7 +98,6 @@ def check_availability():
         
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         
-        # ✅ Check if date is blocked
         availability = TourAvailability.query.filter_by(
             package_id=package_id,
             date=target_date
@@ -71,7 +111,6 @@ def check_availability():
                 'is_available': not availability.is_blocked
             }), 200
         else:
-            # ✅ No availability record = available
             return jsonify({
                 'date': date_str,
                 'is_blocked': False,
@@ -82,10 +121,9 @@ def check_availability():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @tour_bp.route('/tour/booking', methods=['POST'])
 def create_booking():
-    
+    """Public endpoint to create a new booking"""
     try:
         data = request.get_json()
         
@@ -109,7 +147,7 @@ def create_booking():
         
         people_count = int(data['people_count'])
         
-        # ✅ Check package min/max limits
+        # Check package min/max limits
         if people_count < package.min_people:
             return jsonify({'error': f'Minimum {package.min_people} people required'}), 400
         
@@ -120,7 +158,7 @@ def create_booking():
         
         tour_date = datetime.strptime(data['tour_date'], '%Y-%m-%d %H:%M:%S')
         
-        # ✅ Check if date is blocked (optional - remove if you want no blocking)
+        # Check if date is blocked
         availability = TourAvailability.query.filter_by(
             package_id=package.id,
             date=tour_date.date()
@@ -129,7 +167,7 @@ def create_booking():
         if availability and availability.is_blocked:
             return jsonify({'error': 'This date is not available'}), 400
         
-        # ✅ Create booking - ALWAYS PENDING
+        # Create booking - ALWAYS PENDING
         booking = TourBooking(
             package_id=package.id,
             tour_date=tour_date,
@@ -139,7 +177,7 @@ def create_booking():
             customer_phone=data['customer_phone'].strip(),
             special_requirements=data.get('special_requirements'),
             group_name=data.get('group_name'),
-            status='pending',  # ✅ ALL bookings start as pending
+            status='pending',
             payment_status='pending'
         )
         
@@ -154,7 +192,7 @@ def create_booking():
         booking.total_amount = price_data['total']
         
         # Use package commitment percentage
-        commitment_percentage = package.commitment_percentage or 30.0
+        commitment_percentage = getattr(package, 'commitment_percentage', 30.0)
         booking.commitment_amount = price_data['total'] * (commitment_percentage / 100)
         
         db.session.add(booking)
@@ -162,15 +200,12 @@ def create_booking():
         
         print(f"✅ Booking created: {booking.reference} (Status: pending)")
         
-        # ✅ Send booking received email
+        # Send booking received email
         try:
-            from services.tour_email_service import TourEmailService
             email_service = TourEmailService()
             email_service.send_booking_received(booking)
         except Exception as e:
             print(f"❌ Failed to send booking received email: {e}")
-        except Exception as e:
-            print(f"Email error: {e}")
         
         price_data['commitment_deposit'] = booking.commitment_amount
         price_data['remaining_balance'] = price_data['total'] - booking.commitment_amount
@@ -191,15 +226,11 @@ def create_booking():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
-
-# ADMIN ROUTES 
-
-
-
+# ==================== ADMIN ROUTES (Authentication Required) ====================
 
 @tour_bp.route('/tour/admin/bookings', methods=['GET'])
 @login_required
+@require_tour_assistant  # Tour assistants and managers can view bookings
 def get_all_bookings():
     """Get all bookings with filters"""
     try:
@@ -243,6 +274,7 @@ def get_all_bookings():
 
 @tour_bp.route('/tour/admin/bookings/<int:booking_id>', methods=['GET'])
 @login_required
+@require_tour_assistant
 def get_booking(booking_id):
     """Get a single booking by ID"""
     try:
@@ -253,7 +285,9 @@ def get_booking(booking_id):
 
 @tour_bp.route('/tour/admin/bookings/<int:booking_id>/status', methods=['PUT'])
 @login_required
+@require_tour_manager  # Only managers can change booking status
 def update_booking_status(booking_id):
+    """Update booking status (approve/reject/complete)"""
     try:
         booking = TourBooking.query.get_or_404(booking_id)
         data = request.get_json()
@@ -273,7 +307,7 @@ def update_booking_status(booking_id):
         
         db.session.commit()
         
-        # ✅ Send email notifications based on status change
+        # Send email notifications based on status change
         try:
             email_service = TourEmailService()
             if new_status == 'confirmed' and old_status != 'confirmed':
@@ -295,9 +329,9 @@ def update_booking_status(booking_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 @tour_bp.route('/tour/admin/bookings/<int:booking_id>/change-request', methods=['POST'])
 @login_required
+@require_tour_manager
 def handle_change_request(booking_id):
     """Handle date change request"""
     try:
@@ -327,10 +361,11 @@ def handle_change_request(booking_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 @tour_bp.route('/tour/admin/bookings/<int:booking_id>/payment', methods=['PUT'])
 @login_required
+@require_tour_manager
 def confirm_payment(booking_id):
+    """Confirm payment for a booking"""
     try:
         booking = TourBooking.query.get_or_404(booking_id)
         data = request.get_json()
@@ -344,13 +379,13 @@ def confirm_payment(booking_id):
         if not payment_amount or not payment_type:
             return jsonify({'error': 'Amount and payment type are required'}), 400
         
-        # ✅ Check if booking can accept payments
+        # Check if booking can accept payments
         if booking.status in ['rejected', 'cancelled']:
             return jsonify({
                 'error': f'Cannot process payment for a {booking.status} booking'
             }), 400
         
-        # ✅ Check if booking is already fully paid
+        # Check if booking is already fully paid
         if booking.payment_status == 'fully_paid':
             return jsonify({
                 'error': 'This booking is already fully paid'
@@ -358,7 +393,6 @@ def confirm_payment(booking_id):
         
         # Update booking payment status
         if payment_type == 'commitment':
-            # ✅ Check if commitment already paid
             if booking.commitment_paid:
                 return jsonify({
                     'error': 'Commitment deposit has already been paid'
@@ -371,7 +405,6 @@ def confirm_payment(booking_id):
                 booking.status = 'commitment_pending'
                 
         elif payment_type == 'balance' or payment_type == 'full':
-            # ✅ Check if already fully paid
             if booking.payment_status == 'fully_paid':
                 return jsonify({
                     'error': 'This booking is already fully paid'
@@ -402,7 +435,6 @@ def confirm_payment(booking_id):
         
         # Send payment received email
         try:
-            from services.tour_email_service import TourEmailService
             email_service = TourEmailService()
             email_service.send_payment_received(booking, payment_amount, payment_type)
         except Exception as e:
@@ -423,14 +455,11 @@ def confirm_payment(booking_id):
 
 @tour_bp.route('/tour/admin/bookings/<int:booking_id>/certificate', methods=['GET'])
 @login_required
+@require_tour_manager
 def download_certificate(booking_id):
     """Download clearance certificate PDF"""
     try:
         booking = TourBooking.query.get_or_404(booking_id)
-        
-        if not current_user.is_super_admin() and not current_user.is_admin() and not current_user.is_tour_manager():
-            if current_user.id != booking.customer_user_id:
-                return jsonify({'error': 'Permission denied'}), 403
         
         if booking.status not in ['cleared', 'completed']:
             return jsonify({'error': 'Certificate only available for cleared bookings'}), 400
@@ -452,8 +481,11 @@ def download_certificate(booking_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ==================== PACKAGE MANAGEMENT ROUTES ====================
+
 @tour_bp.route('/tour/admin/packages', methods=['GET'])
 @login_required
+@require_tour_assistant
 def get_admin_packages():
     """Get all packages for admin"""
     try:
@@ -466,6 +498,7 @@ def get_admin_packages():
 
 @tour_bp.route('/tour/admin/packages', methods=['POST'])
 @login_required
+@require_tour_manager  # Only managers can create packages
 def create_package():
     """Create a new tour package"""
     try:
@@ -517,6 +550,7 @@ def create_package():
 
 @tour_bp.route('/tour/admin/packages/<int:package_id>', methods=['PUT'])
 @login_required
+@require_tour_manager
 def update_package(package_id):
     """Update a tour package"""
     try:
@@ -539,9 +573,8 @@ def update_package(package_id):
             package.max_people = data['max_people']
         if 'discount_tiers' in data:
             package.discount_tiers = data['discount_tiers']
-        if 'commitment_percentage' in data:  # ✅ Add this
+        if 'commitment_percentage' in data:
             package.commitment_percentage = data['commitment_percentage']
-
         if 'duration_hours' in data:
             package.duration_hours = data['duration_hours']
         if 'includes' in data:
@@ -572,6 +605,7 @@ def update_package(package_id):
 
 @tour_bp.route('/tour/admin/packages/<int:package_id>', methods=['DELETE'])
 @login_required
+@require_tour_manager
 def delete_package(package_id):
     """Delete a tour package"""
     try:
@@ -592,8 +626,11 @@ def delete_package(package_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# ==================== AVAILABILITY ROUTES ====================
+
 @tour_bp.route('/tour/admin/availability', methods=['PUT'])
 @login_required
+@require_tour_manager
 def update_availability():
     """Update availability for a specific date"""
     try:
@@ -642,8 +679,11 @@ def update_availability():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+# ==================== DASHBOARD ROUTES ====================
+
 @tour_bp.route('/tour/admin/dashboard/stats', methods=['GET'])
 @login_required
+@require_tour_assistant
 def get_dashboard_stats():
     """Get dashboard statistics"""
     try:
@@ -677,12 +717,11 @@ def get_dashboard_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
- 
-# REPORTING ROUTES
- 
+# ==================== REPORTING ROUTES ====================
 
 @tour_bp.route('/tour/admin/reports/summary', methods=['GET'])
 @login_required
+@require_tour_manager
 def get_report_summary():
     """Get report summary for date range"""
     try:
@@ -750,10 +789,9 @@ def get_report_summary():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
-
 @tour_bp.route('/tour/admin/reports/export', methods=['GET'])
 @login_required
+@require_tour_manager
 def export_report():
     """Export report in CSV or PDF format"""
     try:
@@ -862,7 +900,6 @@ def export_report():
                     [f"KES {total_revenue:,.0f}", str(total_bookings), str(confirmed), str(pending)]
                 ]
                 
-                # ✅ Now inch is properly imported
                 summary_table = Table(summary_data, colWidths=[2*inch, 2*inch, 1.5*inch, 1.5*inch])
                 summary_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e3a8a')),
@@ -880,7 +917,7 @@ def export_report():
                 
                 # Booking details table
                 table_data = [['Ref', 'Customer', 'Package', 'Date', 'People', 'Amount', 'Status']]
-                for b in bookings[:20]:  # Limit to 20 for PDF
+                for b in bookings[:20]:
                     table_data.append([
                         b.reference,
                         b.customer_name[:20] + '...' if len(b.customer_name) > 20 else b.customer_name,
@@ -951,12 +988,12 @@ def export_report():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
- 
-# PAYMENT ROUTES
- 
+
+# ==================== PAYMENT ROUTES ====================
 
 @tour_bp.route('/tour/admin/payments', methods=['GET'])
 @login_required
+@require_tour_manager
 def get_payments():
     """Get all payments with filters"""
     try:
@@ -981,6 +1018,7 @@ def get_payments():
 
 @tour_bp.route('/tour/admin/payments/<int:payment_id>', methods=['GET'])
 @login_required
+@require_tour_manager
 def get_payment(payment_id):
     """Get a single payment by ID"""
     try:
@@ -989,19 +1027,15 @@ def get_payment(payment_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
- 
-# TOUR INVOICE ROUTES
- 
+# ==================== INVOICE ROUTES ====================
 
 @tour_bp.route('/tour/admin/invoices/<int:booking_id>', methods=['GET'])
 @login_required
+@require_tour_manager
 def get_invoice(booking_id):
     """Get invoice for a booking"""
     try:
         booking = TourBooking.query.get_or_404(booking_id)
-        
-        if not current_user.is_super_admin() and not current_user.is_admin() and not current_user.is_tour_manager():
-            return jsonify({'error': 'Permission denied'}), 403
         
         invoice = TourInvoice.query.filter_by(booking_id=booking_id).first()
         
@@ -1015,6 +1049,7 @@ def get_invoice(booking_id):
 
 @tour_bp.route('/tour/admin/invoices/<int:booking_id>', methods=['POST'])
 @login_required
+@require_tour_manager
 def generate_invoice(booking_id):
     """Generate invoice for a booking"""
     try:

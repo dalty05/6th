@@ -52,11 +52,9 @@
       <div class="filter-options">
         <select v-model="roleFilter" class="filter-select">
           <option value="">All Roles</option>
-          <option value="super_admin">Super Admin</option>
-          <option value="admin">Admin</option>
-          <option value="tour_manager">Tour Manager</option>
-          <option value="tour_assistant">Tour Assistant</option>
-          <option value="partner">Partner</option>
+          <option v-for="role in roles" :key="role.id" :value="role.name">
+            {{ role.name }}
+          </option>
         </select>
         <select v-model="statusFilter" class="filter-select">
           <option value="">All Status</option>
@@ -203,12 +201,11 @@
           </div>
           <div class="form-group">
             <label>Role *</label>
-            <select v-model="form.role" required>
-              <option value="super_admin">Super Admin</option>
-              <option value="admin">Admin</option>
-              <option value="tour_manager">Tour Manager</option>
-              <option value="tour_assistant">Tour Assistant</option>
-              <option value="partner">Partner</option>
+            <select v-model="form.role_id" required>
+              <option :value="null" disabled>Select role</option>
+              <option v-for="role in roles" :key="role.id" :value="role.id">
+                {{ role.name }}
+              </option>
             </select>
           </div>
           <div class="checkbox-group">
@@ -368,6 +365,7 @@ import authService from '@/services/auth'
 
 // ========== STATE ==========
 const users = ref([])
+const roles = ref([])
 const loading = ref(false)
 const searchQuery = ref('')
 const roleFilter = ref('')
@@ -403,6 +401,7 @@ const currentUserId = computed(() => currentUser?.id)
 const form = ref({
   full_name: '',
   email: '',
+  role_id: null,
   role: 'partner',
   is_active: true,
   is_approved: true
@@ -449,6 +448,16 @@ const paginatedUsers = computed(() => {
 })
 
 // ========== METHODS ==========
+const loadRoles = async () => {
+  try {
+    const response = await api.get('/roles')
+    roles.value = response.data.filter(r => r.is_active)
+  } catch (error) {
+    console.error('Error loading roles:', error)
+    toast.error('Failed to load roles')
+  }
+}
+
 const loadUsers = async () => {
   loading.value = true
   try {
@@ -477,6 +486,7 @@ const openCreateModal = () => {
   form.value = {
     full_name: '',
     email: '',
+    role_id: null,
     role: 'partner',
     is_active: true,
     is_approved: true
@@ -487,10 +497,12 @@ const openCreateModal = () => {
 const editUser = (user) => {
   editingUser.value = user
   newUserPassword.value = ''
+  const selectedRole = roles.value.find(r => r.id === user.role_id) || roles.value.find(r => r.name === user.role)
   form.value = {
     full_name: user.full_name,
     email: user.email,
-    role: user.role,
+    role_id: selectedRole ? selectedRole.id : null,
+    role: selectedRole ? selectedRole.name : user.role,
     is_active: user.is_active,
     is_approved: user.is_approved
   }
@@ -657,14 +669,18 @@ const confirmDelete = async () => {
 
 // ========== HELPERS ==========
 const getRoleLabel = (role) => {
-  const roles = {
+  const roleItem = roles.value.find(r => r.name === role)
+  if (roleItem) {
+    return roleItem.name
+  }
+  const roleMap = {
     super_admin: 'Super Admin',
     admin: 'Admin',
     tour_manager: 'Tour Manager',
     tour_assistant: 'Tour Assistant',
     partner: 'Partner'
   }
-  return roles[role] || role
+  return roleMap[role] || role || 'Unknown'
 }
 
 const getRoleClass = (role) => {
@@ -685,8 +701,9 @@ const formatDate = (dateString) => {
 }
 
 // ========== LIFECYCLE ==========
-onMounted(() => {
-  loadUsers()
+onMounted(async () => {
+  await loadRoles()
+  await loadUsers()
 })
 </script>
 

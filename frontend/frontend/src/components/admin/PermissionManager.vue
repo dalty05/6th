@@ -1,30 +1,56 @@
 <template>
   <div class="permission-manager">
-    <div class="admin-header">
-      <h2>Permission Manager</h2>
-      <p>Override role-based permissions for individual users</p>
-      <div class="warning-banner" v-if="!isSuperAdmin">
-        <i class="fas fa-shield-alt"></i>
-        Super admin access required to manage permissions
+    <!-- Header -->
+    <div class="permission-header">
+      <div class="header-content">
+        <h1><i class="fas fa-shield-alt"></i> Permission Manager</h1>
+        <p class="subtitle">Manage user permissions and access control</p>
+      </div>
+      <div class="header-actions">
+        <button v-if="isSuperAdmin" @click="refreshData" class="btn-refresh" :disabled="loading">
+          <i class="fas fa-sync-alt" :class="{ 'spinning': loading }"></i>
+          Refresh
+        </button>
       </div>
     </div>
 
-    <!-- User Selector - Only visible to super admin -->
-    <div v-if="isSuperAdmin" class="user-selector">
-      <label>Select User:</label>
-      <select v-model="selectedUserId" @change="loadUserPermissions">
-        <option value="">-- Select User --</option>
-        <option v-for="user in users" :key="user.id" :value="user.id">
-          {{ user.full_name }} ({{ user.email }}) - {{ user.role }}
-        </option>
-      </select>
+    <!-- Warning Banner -->
+    <div class="warning-banner" v-if="!isSuperAdmin">
+      <i class="fas fa-shield-alt"></i>
+      <span>Super admin access required to manage permissions</span>
     </div>
 
-    <!-- Access Denied for non-super admin -->
-    <div v-else class="access-denied">
-      <i class="fas fa-lock"></i>
-      <h3>Access Denied</h3>
-      <p>Only Super Administrators can manage permissions</p>
+    <!-- Super Admin Controls -->
+    <div v-if="isSuperAdmin" class="controls-section">
+      <!-- User Selector -->
+      <div class="user-selector">
+        <label for="userSelect">Select User:</label>
+        <select 
+          id="userSelect"
+          v-model="selectedUserId" 
+          @change="loadUserPermissions"
+          :disabled="loading"
+        >
+          <option value="">-- Select User --</option>
+          <option v-for="user in users" :key="user.id" :value="user.id">
+            {{ user.full_name }} ({{ user.email }}) - {{ user.role }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Quick Stats -->
+      <div v-if="selectedUser" class="user-stats">
+        <div class="stat-item">
+          <span class="stat-label">Custom Permissions:</span>
+          <span class="stat-value">{{ customPermissions.length }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Role:</span>
+          <span class="stat-value role-badge" :class="selectedUser.role">
+            {{ selectedUser.role.toUpperCase() }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -33,20 +59,55 @@
       <p>Loading permissions...</p>
     </div>
 
+    <!-- Access Denied -->
+    <div v-else-if="!isSuperAdmin" class="access-denied">
+      <i class="fas fa-lock"></i>
+      <h3>Access Denied</h3>
+      <p>Only Super Administrators can manage permissions</p>
+    </div>
+
+    <!-- No User Selected -->
+    <div v-else-if="!selectedUser" class="empty-state">
+      <i class="fas fa-user-lock"></i>
+      <h3>Select a user to manage permissions</h3>
+      <p>Choose a user from the dropdown above to view and edit their permissions</p>
+    </div>
+
     <!-- Permission Editor -->
     <div v-else-if="selectedUser && isSuperAdmin" class="permissions-editor">
+      <!-- User Info Card -->
       <div class="user-info-card">
-        <h3>{{ selectedUser.full_name }}</h3>
-        <p>Role: <strong>{{ selectedUser.role.toUpperCase() }}</strong></p>
-        <p class="info-text">Check boxes to grant permission. Uncheck to deny. Empty boxes use role defaults.</p>
+        <div class="user-avatar">
+          <span>{{ userInitials }}</span>
+        </div>
+        <div class="user-details">
+          <h3>{{ selectedUser.full_name }}</h3>
+          <p class="user-email">{{ selectedUser.email }}</p>
+          <div class="user-meta">
+            <span class="role-badge" :class="selectedUser.role">
+              {{ selectedUser.role.toUpperCase() }}
+            </span>
+            <span class="status-badge" :class="{ active: selectedUser.is_active, inactive: !selectedUser.is_active }">
+              {{ selectedUser.is_active ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+        </div>
+        <div class="user-info-hint">
+          <i class="fas fa-info-circle"></i>
+          Check boxes to grant permission. Uncheck to deny. Empty boxes use role defaults.
+        </div>
       </div>
 
+      <!-- Resources Grid -->
       <div class="permissions-grid">
         <!-- Core Resources -->
-        <div v-for="resource in coreResources" :key="resource.name" class="resource-card">
+        <div v-for="resource in availableResources" :key="resource.name" class="resource-card">
           <div class="resource-header">
             <h4>{{ resource.label }}</h4>
             <span class="resource-name">{{ resource.name }}</span>
+            <span v-if="hasCustomPermission(resource.name)" class="custom-badge">
+              <i class="fas fa-pen"></i> Custom
+            </span>
           </div>
           <div class="actions-list">
             <div v-for="action in resource.actions" :key="action" class="action-row">
@@ -55,540 +116,773 @@
                   type="checkbox" 
                   :checked="isCustomAllowed(resource.name, action)"
                   @change="togglePermission(resource.name, action, $event.target.checked)"
+                  :disabled="saving"
                 >
                 <span class="action-name">{{ action }}</span>
               </label>
-              <span class="role-default-badge">
-                Default: {{ getRoleDefault(resource.name, action) ? '✓' : '✗' }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 🆕 TOUR RESOURCES -->
-        <div class="resource-section-divider">
-          <h3>Tour Management</h3>
-          <p>Permissions for factory tour management</p>
-        </div>
-
-        <!-- Tours Resource -->
-        <div class="resource-card tour-resource">
-          <div class="resource-header tour-header">
-            <h4>🏭 Tours</h4>
-            <span class="resource-name">tours</span>
-          </div>
-          <div class="actions-list">
-            <div v-for="action in ['create', 'read', 'update', 'delete']" :key="action" class="action-row">
-              <label class="checkbox-label">
-                <input 
-                  type="checkbox" 
-                  :checked="isCustomAllowed('tours', action)"
-                  @change="togglePermission('tours', action, $event.target.checked)"
-                >
-                <span class="action-name">{{ action }}</span>
-              </label>
-              <span class="role-default-badge">
-                Default: {{ getRoleDefault('tours', action) ? '✓' : '✗' }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bookings Resource -->
-        <div class="resource-card tour-resource">
-          <div class="resource-header tour-header">
-            <h4>📋 Bookings</h4>
-            <span class="resource-name">bookings</span>
-          </div>
-          <div class="actions-list">
-            <div v-for="action in ['create', 'read', 'update', 'delete', 'approve', 'reject']" :key="action" class="action-row">
-              <label class="checkbox-label">
-                <input 
-                  type="checkbox" 
-                  :checked="isCustomAllowed('bookings', action)"
-                  @change="togglePermission('bookings', action, $event.target.checked)"
-                >
-                <span class="action-name">{{ action }}</span>
-              </label>
-              <span class="role-default-badge">
-                Default: {{ getRoleDefault('bookings', action) ? '✓' : '✗' }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tour Settings Resource -->
-        <div class="resource-card tour-resource">
-          <div class="resource-header tour-header">
-            <h4>⚙️ Tour Settings</h4>
-            <span class="resource-name">tour_settings</span>
-          </div>
-          <div class="actions-list">
-            <div v-for="action in ['read', 'update']" :key="action" class="action-row">
-              <label class="checkbox-label">
-                <input 
-                  type="checkbox" 
-                  :checked="isCustomAllowed('tour_settings', action)"
-                  @change="togglePermission('tour_settings', action, $event.target.checked)"
-                >
-                <span class="action-name">{{ action }}</span>
-              </label>
-              <span class="role-default-badge">
-                Default: {{ getRoleDefault('tour_settings', action) ? '✓' : '✗' }}
+              <span class="role-default-badge" :class="{ allowed: getRoleDefault(resource.name, action) }">
+                {{ getRoleDefault(resource.name, action) ? '✓ Default' : '✗ Default' }}
               </span>
             </div>
           </div>
         </div>
       </div>
 
+      <!-- Form Actions -->
       <div class="form-actions">
-        <button @click="resetToRoleDefaults" class="btn-reset" :disabled="saving">
-          Reset to Role Defaults
+        <button @click="resetToRoleDefaults" class="btn-reset" :disabled="saving || customPermissions.length === 0">
+          <i class="fas fa-undo"></i>
+          {{ saving ? 'Resetting...' : 'Reset to Role Defaults' }}
         </button>
         <button @click="savePermissions" class="btn-save" :disabled="saving">
+          <i v-if="!saving" class="fas fa-save"></i>
+          <i v-else class="fas fa-spinner fa-spin"></i>
           {{ saving ? 'Saving...' : 'Save Custom Permissions' }}
         </button>
       </div>
-    </div>
 
-    <!-- No User Selected -->
-    <div v-else-if="!loading && !selectedUser && isSuperAdmin" class="empty-state">
-      <i class="fas fa-user-lock"></i>
-      <h3>Select a user to manage permissions</h3>
-      <p>Choose a user from the dropdown above to view and edit their permissions</p>
+      <!-- Success/Error Messages -->
+      <div v-if="successMessage" class="alert-success">
+        <i class="fas fa-check-circle"></i> {{ successMessage }}
+      </div>
+      <div v-if="errorMessage" class="alert-error">
+        <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+      </div>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, computed } from 'vue'
+<script>
+import { ref, onMounted, computed, watch } from 'vue'
 import { toast } from 'vue3-toastify'
 import api from '@/services/api'
 import authService from '@/services/auth'
 
-const users = ref([])
-const selectedUserId = ref('')
-const selectedUser = ref(null)
-const resources = ref([])
-const customPermissions = ref([])
-const roleDefaults = ref({})
-const loading = ref(false)
-const saving = ref(false)
-
-// Check if current user is super admin
-const currentUser = authService.getUser()
-const isSuperAdmin = computed(() => currentUser?.role === 'super_admin')
-
-// Core resources (without tour resources)
-const coreResources = [
-  { name: 'products', label: 'Products', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'blog', label: 'Blog Posts', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'jobs', label: 'Job Management', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'outlets', label: 'Outlet Locations', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'users', label: 'User Management', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'partners', label: 'Partners', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'referrals', label: 'Referrals', actions: ['create', 'read', 'update', 'delete'] },
-  { name: 'statistics', label: 'Statistics', actions: ['read'] },
-  { name: 'contacts', label: 'Contact Messages', actions: ['read', 'update', 'delete'] },
-  { name: 'newsletter', label: 'Newsletter', actions: ['create', 'read', 'update', 'delete'] }
-]
-
-// Load all users
-const loadUsers = async () => {
-  if (!isSuperAdmin.value) return
+export default {
+  name: 'PermissionManager',
   
-  try {
-    const response = await api.get('/admin/users')
-    users.value = response.data
-  } catch (error) {
-    console.error('Error loading users:', error)
-    toast.error('Failed to load users')
-  }
-}
-
-// Load available resources
-const loadResources = async () => {
-  if (!isSuperAdmin.value) return
-  
-  try {
-    const response = await api.get('/permissions/resources')
-    resources.value = response.data
-  } catch (error) {
-    console.error('Error loading resources:', error)
-    toast.error('Failed to load resources')
-  }
-}
-
-// Load permissions for selected user
-const loadUserPermissions = async () => {
-  if (!selectedUserId.value || !isSuperAdmin.value) {
-    selectedUser.value = null
-    return
-  }
-  
-  loading.value = true
-  try {
-    const response = await api.get(`/permissions/users/${selectedUserId.value}`)
-    selectedUser.value = response.data.user
-    customPermissions.value = response.data.custom_permissions || []
-    roleDefaults.value = response.data.role_defaults || {}
-  } catch (error) {
-    console.error('Error loading user permissions:', error)
-    toast.error('Failed to load user permissions')
-  } finally {
-    loading.value = false
-  }
-}
-
-// Check if a permission is set as custom (overridden)
-const isCustomAllowed = (resource, action) => {
-  const perm = customPermissions.value.find(p => p.resource === resource && p.action === action)
-  return perm ? perm.is_allowed : false
-}
-
-// Get role default for display
-const getRoleDefault = (resource, action) => {
-  const defaults = roleDefaults.value[resource]
-  if (Array.isArray(defaults)) {
-    return defaults.includes(action)
-  }
-  if (typeof defaults === 'object') {
-    return defaults[action] === true
-  }
-  return false
-}
-
-// Toggle a permission
-const togglePermission = (resource, action, isAllowed) => {
-  const existingIndex = customPermissions.value.findIndex(p => p.resource === resource && p.action === action)
-  
-  if (existingIndex !== -1) {
-    if (!isAllowed) {
-      customPermissions.value.splice(existingIndex, 1)
-    } else {
-      customPermissions.value[existingIndex].is_allowed = isAllowed
+  data() {
+    return {
+      users: [],
+      selectedUserId: '',
+      selectedUser: null,
+      resources: [],
+      customPermissions: [],
+      roleDefaults: {},
+      loading: false,
+      saving: false,
+      successMessage: '',
+      errorMessage: '',
+      messageTimeout: null
     }
-  } else if (isAllowed) {
-    customPermissions.value.push({
-      resource,
-      action,
-      is_allowed: isAllowed,
-      id: null
-    })
-  }
-}
+  },
 
-// Save custom permissions
-const savePermissions = async () => {
-  saving.value = true
-  
-  try {
-    // Save each custom permission
-    for (const perm of customPermissions.value) {
-      await api.post(`/permissions/users/${selectedUserId.value}`, {
-        resource: perm.resource,
-        action: perm.action,
-        is_allowed: perm.is_allowed
-      })
-    }
+  computed: {
+    currentUser() {
+      return authService.getUser()
+    },
     
-    toast.success('Permissions saved successfully')
-    await loadUserPermissions()
-  } catch (error) {
-    console.error('Error saving permissions:', error)
-    toast.error('Failed to save permissions')
-  } finally {
-    saving.value = false
-  }
-}
+    isSuperAdmin() {
+      return this.currentUser?.role === 'super_admin'
+    },
+    
+    userInitials() {
+      if (!this.selectedUser?.full_name) return 'U'
+      return this.selectedUser.full_name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    },
+    
+    availableResources() {
+      // Combine core resources with any from API
+      const coreResources = [
+        { name: 'products', label: 'Products', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'blog', label: 'Blog Posts', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'jobs', label: 'Job Management', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'outlets', label: 'Outlet Locations', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'users', label: 'User Management', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'partners', label: 'Partners', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'referrals', label: 'Referrals', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'statistics', label: 'Statistics', actions: ['read'] },
+        { name: 'contacts', label: 'Contact Messages', actions: ['read', 'update', 'delete'] },
+        { name: 'newsletter', label: 'Newsletter', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'tours', label: '🏭 Tours', actions: ['create', 'read', 'update', 'delete'] },
+        { name: 'bookings', label: '📋 Bookings', actions: ['create', 'read', 'update', 'delete', 'approve', 'reject'] },
+        { name: 'tour_settings', label: '⚙️ Tour Settings', actions: ['read', 'update'] },
+        { name: 'profile', label: '👤 Profile', actions: ['read', 'update'] }
+      ]
+      
+      // If API resources are loaded, merge them
+      if (this.resources && this.resources.length > 0) {
+        return this.resources
+      }
+      
+      return coreResources
+    }
+  },
 
-// Reset to role defaults
-const resetToRoleDefaults = async () => {
-  if (!confirm('Reset all custom permissions for this user to role defaults?')) {
-    return
-  }
-  
-  saving.value = true
-  try {
-    // Delete all custom permissions for this user
-    for (const perm of customPermissions.value) {
-      if (perm.id) {
-        await api.delete(`/permissions/users/${selectedUserId.value}/${perm.id}`)
+  watch: {
+    selectedUserId(newVal) {
+      if (!newVal) {
+        this.selectedUser = null
+        this.customPermissions = []
+        this.roleDefaults = {}
       }
     }
-    
-    customPermissions.value = []
-    toast.success('Reset to role defaults')
-    await loadUserPermissions()
-  } catch (error) {
-    console.error('Error resetting permissions:', error)
-    toast.error('Failed to reset permissions')
-  } finally {
-    saving.value = false
+  },
+
+  mounted() {
+    if (this.isSuperAdmin) {
+      this.loadUsers()
+      this.loadResources()
+    }
+  },
+
+  beforeUnmount() {
+    if (this.messageTimeout) {
+      clearTimeout(this.messageTimeout)
+    }
+  },
+
+  methods: {
+    async loadUsers() {
+      if (!this.isSuperAdmin) return
+      
+      try {
+        const response = await api.get('/admin/users')
+        this.users = response.data || []
+      } catch (error) {
+        console.error('Error loading users:', error)
+        this.showError('Failed to load users')
+      }
+    },
+
+    async loadResources() {
+      if (!this.isSuperAdmin) return
+      
+      try {
+        const response = await api.get('/permissions/resources')
+        this.resources = response.data || []
+        console.log('✅ Resources loaded:', this.resources.length)
+      } catch (error) {
+        console.error('Error loading resources:', error)
+        // Use fallback resources
+        this.resources = []
+        // Don't show error for 404 - use fallback
+        if (error.response?.status !== 404) {
+          this.showError('Failed to load resources')
+        }
+      }
+    },
+
+    async loadUserPermissions() {
+      if (!this.selectedUserId || !this.isSuperAdmin) {
+        this.selectedUser = null
+        this.customPermissions = []
+        this.roleDefaults = {}
+        return
+      }
+      
+      this.loading = true
+      this.errorMessage = ''
+      
+      try {
+        const response = await api.get(`/permissions/users/${this.selectedUserId}`)
+        this.selectedUser = response.data.user
+        this.customPermissions = response.data.custom_permissions || []
+        this.roleDefaults = response.data.role_defaults || {}
+        
+        console.log(`✅ Loaded permissions for user: ${this.selectedUser.full_name}`)
+        console.log('📋 Custom permissions:', this.customPermissions.length)
+      } catch (error) {
+        console.error('Error loading user permissions:', error)
+        this.showError(error.response?.data?.error || 'Failed to load user permissions')
+        this.selectedUser = null
+        this.customPermissions = []
+        this.roleDefaults = {}
+      } finally {
+        this.loading = false
+      }
+    },
+
+    hasCustomPermission(resource) {
+      return this.customPermissions.some(p => p.resource === resource)
+    },
+
+    isCustomAllowed(resource, action) {
+      const perm = this.customPermissions.find(p => p.resource === resource && p.action === action)
+      return perm ? perm.is_allowed : false
+    },
+
+    getRoleDefault(resource, action) {
+      const defaults = this.roleDefaults[resource]
+      if (!defaults) return false
+      
+      if (Array.isArray(defaults)) {
+        return defaults.includes(action)
+      }
+      if (typeof defaults === 'object') {
+        return defaults[action] === true
+      }
+      return false
+    },
+
+    togglePermission(resource, action, isAllowed) {
+      const existingIndex = this.customPermissions.findIndex(
+        p => p.resource === resource && p.action === action
+      )
+      
+      if (existingIndex !== -1) {
+        if (!isAllowed) {
+          // Remove if unchecked
+          this.customPermissions.splice(existingIndex, 1)
+        } else {
+          // Update if checked
+          this.customPermissions[existingIndex].is_allowed = isAllowed
+        }
+      } else if (isAllowed) {
+        // Add new if checked and not exists
+        this.customPermissions.push({
+          resource,
+          action,
+          is_allowed: true,
+          id: null
+        })
+      }
+      
+      // Clear messages on change
+      this.successMessage = ''
+      this.errorMessage = ''
+    },
+
+    async savePermissions() {
+      if (!this.selectedUserId) {
+        this.showError('No user selected')
+        return
+      }
+      
+      this.saving = true
+      this.errorMessage = ''
+      this.successMessage = ''
+      
+      try {
+        // Save each custom permission
+        for (const perm of this.customPermissions) {
+          await api.post(`/permissions/users/${this.selectedUserId}`, {
+            resource: perm.resource,
+            action: perm.action,
+            is_allowed: perm.is_allowed
+          })
+        }
+        
+        this.showSuccess('Permissions saved successfully!')
+        await this.loadUserPermissions()
+        
+      } catch (error) {
+        console.error('Error saving permissions:', error)
+        this.showError(error.response?.data?.error || 'Failed to save permissions')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async resetToRoleDefaults() {
+      if (!this.selectedUserId) {
+        this.showError('No user selected')
+        return
+      }
+      
+      if (!confirm('Reset all custom permissions for this user to role defaults?')) {
+        return
+      }
+      
+      this.saving = true
+      this.errorMessage = ''
+      this.successMessage = ''
+      
+      try {
+        // Delete all custom permissions for this user
+        for (const perm of this.customPermissions) {
+          if (perm.id) {
+            await api.delete(`/permissions/users/${this.selectedUserId}/${perm.id}`)
+          }
+        }
+        
+        this.customPermissions = []
+        this.showSuccess('Reset to role defaults successfully!')
+        await this.loadUserPermissions()
+        
+      } catch (error) {
+        console.error('Error resetting permissions:', error)
+        this.showError(error.response?.data?.error || 'Failed to reset permissions')
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async refreshData() {
+      this.errorMessage = ''
+      this.successMessage = ''
+      await this.loadUsers()
+      await this.loadResources()
+      if (this.selectedUserId) {
+        await this.loadUserPermissions()
+      }
+      toast.info('Data refreshed')
+    },
+
+    showSuccess(message) {
+      this.successMessage = message
+      if (this.messageTimeout) clearTimeout(this.messageTimeout)
+      this.messageTimeout = setTimeout(() => {
+        this.successMessage = ''
+      }, 5000)
+    },
+
+    showError(message) {
+      this.errorMessage = message
+      if (this.messageTimeout) clearTimeout(this.messageTimeout)
+      this.messageTimeout = setTimeout(() => {
+        this.errorMessage = ''
+      }, 5000)
+    }
   }
 }
-
-onMounted(() => {
-  if (isSuperAdmin.value) {
-    loadUsers()
-    loadResources()
-  }
-})
 </script>
 
 <style scoped>
 .permission-manager {
-  padding: 1.5rem;
-  background: #f8fafc;
-  min-height: 100vh;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.admin-header {
-  margin-bottom: 1.5rem;
-}
-
-.admin-header h2 {
-  color: #1e3a8a;
-  margin: 0 0 0.25rem;
-  font-size: 1.5rem;
-}
-
-.admin-header p {
-  color: #6b7280;
-  margin: 0;
-}
-
-.warning-banner {
-  background: #fef3c7;
-  color: #92400e;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  margin-top: 1rem;
+/* Header */
+.permission-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.access-denied {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border-radius: 12px;
-}
-
-.access-denied i {
-  font-size: 3rem;
-  color: #ef4444;
-  margin-bottom: 1rem;
-}
-
-.access-denied h3 {
-  color: #991b1b;
-  margin-bottom: 0.5rem;
-}
-
-.user-selector {
-  background: white;
-  padding: 1rem;
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  margin-bottom: 24px;
   flex-wrap: wrap;
+  gap: 16px;
 }
 
-.user-selector label {
-  font-weight: 600;
-  color: #374151;
+.header-content h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
 }
 
-.user-selector select {
-  padding: 0.5rem 1rem;
-  border: 1px solid #e5e7eb;
+.header-content h1 i {
+  color: #2563eb;
+  margin-right: 12px;
+}
+
+.subtitle {
+  color: #64748b;
+  margin: 0;
+  font-size: 16px;
+}
+
+.btn-refresh {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  min-width: 300px;
-  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
 }
 
-.loading-state {
-  text-align: center;
-  padding: 3rem;
+.btn-refresh:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #1a1a2e;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #1e3a8a;
-  border-radius: 50%;
+.btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinning {
   animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
+/* Warning Banner */
+.warning-banner {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* Controls Section */
+.controls-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.user-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-selector label {
+  font-weight: 600;
+  color: #1a1a2e;
+  font-size: 14px;
+}
+
+.user-selector select {
+  padding: 8px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 250px;
+  background: #f8fafc;
+  transition: all 0.2s;
+}
+
+.user-selector select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.user-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.stat-label {
+  color: #64748b;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.role-badge {
+  padding: 2px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.role-badge.super_admin {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.role-badge.admin {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.role-badge.tour_manager {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.role-badge.tour_assistant {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.role-badge.partner {
+  background: #fce4ec;
+  color: #9a3412;
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  color: #94a3b8;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+/* Access Denied */
+.access-denied,
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 12px;
+}
+
+.access-denied i,
+.empty-state i {
+  font-size: 48px;
+  color: #94a3b8;
+  margin-bottom: 16px;
+}
+
+.access-denied h3,
+.empty-state h3 {
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+}
+
+.access-denied p,
+.empty-state p {
+  color: #64748b;
+  margin: 0;
+}
+
+/* User Info Card */
 .user-info-card {
   background: white;
-  padding: 1rem;
   border-radius: 12px;
-  margin-bottom: 1.5rem;
-  border-left: 4px solid #f59e0b;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
-.user-info-card h3 {
-  margin: 0 0 0.25rem;
-  color: #1e3a8a;
+.user-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
 }
 
-.user-info-card p {
-  margin: 0.25rem 0;
-  color: #6b7280;
+.user-details {
+  flex: 1;
 }
 
-.info-text {
-  font-size: 0.8rem;
-  color: #9ca3af;
-  margin-top: 0.5rem !important;
+.user-details h3 {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  color: #1a1a2e;
 }
 
+.user-email {
+  margin: 0 0 8px 0;
+  color: #64748b;
+}
+
+.user-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 2px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.user-info-hint {
+  margin-left: auto;
+  font-size: 13px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+/* Permissions Grid */
 .permissions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-/* 🆕 Resource Section Divider */
-.resource-section-divider {
-  grid-column: 1 / -1;
-  padding: 1rem 0 0.5rem;
-  border-top: 2px solid #e5e7eb;
-  margin-top: 0.5rem;
-}
-
-.resource-section-divider h3 {
-  color: #1e3a8a;
-  margin: 0 0 0.25rem;
-  font-size: 1.2rem;
-}
-
-.resource-section-divider p {
-  color: #6b7280;
-  margin: 0;
-  font-size: 0.9rem;
+  gap: 20px;
+  margin-bottom: 24px;
 }
 
 .resource-card {
   background: white;
   border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
 }
 
-/* 🆕 Tour Resource Styling */
-.resource-card.tour-resource {
-  border-color: #f59e0b;
-  border-width: 2px;
-}
-
-.resource-header.tour-header {
-  background: #fef3c7;
-  border-bottom-color: #f59e0b;
+.resource-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
 }
 
 .resource-header {
-  background: #f8fafc;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
 }
 
 .resource-header h4 {
   margin: 0;
-  color: #1e3a8a;
-  font-size: 1rem;
+  font-size: 15px;
+  color: #1a1a2e;
 }
 
 .resource-name {
-  font-size: 0.7rem;
-  color: #9ca3af;
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: monospace;
+  background: #f1f5f9;
+  padding: 1px 8px;
+  border-radius: 4px;
+}
+
+.custom-badge {
+  font-size: 11px;
+  color: #2563eb;
+  background: #dbeafe;
+  padding: 1px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .actions-list {
-  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .action-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.action-row:last-child {
-  border-bottom: none;
+  padding: 4px 0;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
   cursor: pointer;
 }
 
 .action-name {
-  font-size: 0.85rem;
   text-transform: capitalize;
+  color: #1a1a2e;
 }
 
 .role-default-badge {
-  font-size: 0.7rem;
-  color: #9ca3af;
+  font-size: 11px;
+  color: #94a3b8;
 }
 
+.role-default-badge.allowed {
+  color: #16a34a;
+}
+
+/* Form Actions */
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.5rem;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
 }
 
+.btn-reset,
 .btn-save {
-  background: #1e3a8a;
-  color: white;
+  padding: 10px 24px;
   border: none;
-  padding: 0.6rem 1.5rem;
   border-radius: 8px;
-  cursor: pointer;
   font-weight: 500;
-  transition: background 0.2s;
-}
-
-.btn-save:hover:not(:disabled) {
-  background: #f59e0b;
-}
-
-.btn-save:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-reset {
-  background: #e5e7eb;
-  color: #374151;
-  border: none;
-  padding: 0.6rem 1.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s;
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .btn-reset:hover:not(:disabled) {
-  background: #d1d5db;
+  background: #e2e8f0;
+  color: #1a1a2e;
 }
 
 .btn-reset:disabled {
@@ -596,47 +890,95 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border-radius: 12px;
+.btn-save {
+  background: #2563eb;
+  color: white;
 }
 
-.empty-state i {
-  font-size: 3rem;
-  color: #9ca3af;
-  margin-bottom: 1rem;
+.btn-save:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
-.empty-state h3 {
-  color: #1e3a8a;
-  margin-bottom: 0.5rem;
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.empty-state p {
-  color: #6b7280;
+/* Alert Messages */
+.alert-success,
+.alert-error {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
 
+.alert-success {
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+
+.alert-error {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .permission-manager {
-    padding: 1rem;
+    padding: 16px;
+  }
+  
+  .permission-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .controls-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .user-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .user-selector select {
+    min-width: unset;
+  }
+  
+  .user-stats {
+    justify-content: space-around;
+  }
+  
+  .user-info-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .user-info-hint {
+    margin-left: 0;
   }
   
   .permissions-grid {
     grid-template-columns: 1fr;
   }
   
-  .user-selector select {
-    min-width: 100%;
-  }
-  
   .form-actions {
     flex-direction: column;
   }
   
-  .btn-save, .btn-reset {
-    width: 100%;
+  .form-actions button {
+    justify-content: center;
   }
 }
 </style>

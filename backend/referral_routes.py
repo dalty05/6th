@@ -63,7 +63,7 @@ def get_referral_links():
         return jsonify([{
             'id': l.id,
             'name': l.name,
-            'link_code': l.link_code,  # <-- This should be l.link_code, not link_code
+            'link_code': l.link_code, 
             'full_url': f"{frontend_url}/r/{l.link_code}",
             'destination_url': l.destination_url,
             'campaign_name': l.campaign_name,
@@ -88,7 +88,7 @@ def create_referral_link():
     try:
         data = request.json
         name = data.get('name', '').strip()
-        destination_url = current_app.config.get('REFERRAL_DESTINATION_URL', 'http://propeller-outclass-parsnip.ngrok-free.dev:5173/#products')
+        destination_url = current_app.config.get('REFERRAL_DESTINATION_URL', 'https://shop.mountkenyamilk.co.ke/')
 
 
         campaign_name = data.get('campaign_name', '').strip()
@@ -99,13 +99,13 @@ def create_referral_link():
             return jsonify({'error': 'Link name is required'}), 400
         if not destination_url:
             
-            destination_url = 'https://propeller-outclass-parsnip.ngrok-free.dev:5173/#products'
+            destination_url = 'https://shop.mountkenyamilk.co.ke/'
         
         # Validate URL format
         if not re.match(r'^https?://', destination_url):
             destination_url = 'https://' + destination_url
         
-        # Generate code in format: PARTNER-{user_id}-{random}
+        
         import secrets
         random_part = secrets.token_urlsafe(4).upper().replace('-', '')
         link_code = f"PARTNER-{current_user.id}-{random_part}"
@@ -127,8 +127,8 @@ def create_referral_link():
         db.session.add(link)
         db.session.commit()
         
-        # Generate full URL for frontend
-        frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
+      
+        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173/')
         full_url = f"{frontend_url}/r/{link_code}"
         
         return jsonify({
@@ -156,11 +156,11 @@ def create_referral_link():
 @referral_bp.route('/referral/links/<int:link_id>', methods=['PUT'])
 @login_required
 def update_referral_link(link_id):
-    """Update referral link (name, destination, active status)"""
+    
     try:
         link = ReferralLink.query.get_or_404(link_id)
         
-        # Check permission
+        
         if current_user.role != 'super_admin' and link.user_id != current_user.id:
             return jsonify({'error': 'Permission denied'}), 403
         
@@ -194,7 +194,6 @@ def update_referral_link(link_id):
 @referral_bp.route('/referral/links/<int:link_id>/convert', methods=['POST'])
 @login_required
 def record_conversion(link_id):
-    """Record a conversion (e.g., user signed up, made purchase)"""
     try:
         link = ReferralLink.query.get_or_404(link_id)
         
@@ -528,7 +527,9 @@ def get_geo_analytics():
         
         link_ids = [l.id for l in links] if links else []
         
-        # Get IP distribution (simplified - in production use IP geolocation service)
+        
+
+        
         ip_stats = db.session.query(
             ReferralClick.ip_address,
             func.count(ReferralClick.id).label('count')

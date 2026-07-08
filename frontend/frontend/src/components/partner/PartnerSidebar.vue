@@ -52,6 +52,7 @@
       </div>
     </div>
   </aside>
+
 </template>
 
 <script setup>
@@ -76,7 +77,8 @@ const closeMobile = () => {
 }
 
 const handleLogout = async () => {
-  await authService.logout()
+    await authService.logout()
+  this.$router.push('/admin/login')
   router.push('/')
 }
 

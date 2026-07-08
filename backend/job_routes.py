@@ -1,6 +1,7 @@
 # backend/job_routes.py
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
+from permission_service import has_permission
 from models import db, Job, JobCategory, JobApplication, User
 from datetime import datetime
 import re
@@ -301,7 +302,7 @@ def get_job_categories():
 def admin_get_jobs():
     """Get all jobs for admin panel"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'read'):
             return jsonify({'error': 'Permission denied'}), 403
         
         jobs = Job.query.order_by(Job.created_at.desc()).all()
@@ -333,7 +334,7 @@ def admin_get_jobs():
 def admin_create_job():
     """Create a new job posting"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'create'):
             return jsonify({'error': 'Permission denied'}), 403
         
         data = request.json
@@ -394,7 +395,7 @@ def admin_create_job():
 def admin_update_job(job_id):
     """Update a job posting"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'update'):
             return jsonify({'error': 'Permission denied'}), 403
         
         job = Job.query.get_or_404(job_id)
@@ -443,7 +444,7 @@ def admin_update_job(job_id):
 def admin_delete_job(job_id):
     """Delete a job posting (soft delete)"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'delete'):
             return jsonify({'error': 'Permission denied'}), 403
         
         job = Job.query.get_or_404(job_id)
@@ -474,7 +475,7 @@ def admin_delete_job(job_id):
 def admin_get_categories():
     """Get all job categories"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'read'):
             return jsonify({'error': 'Permission denied'}), 403
         
         categories = JobCategory.query.order_by(JobCategory.name).all()
@@ -497,7 +498,7 @@ def admin_get_categories():
 def admin_create_category():
     """Create a job category"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'create'):
             return jsonify({'error': 'Permission denied'}), 403
         
         data = request.json
@@ -541,7 +542,7 @@ def admin_create_category():
 def admin_update_category(category_id):
     """Update a job category"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'update'):
             return jsonify({'error': 'Permission denied'}), 403
         
         category = JobCategory.query.get_or_404(category_id)
@@ -584,7 +585,7 @@ def admin_update_category(category_id):
 def admin_delete_category(category_id):
     """Delete a job category"""
     try:
-        if current_user.role != 'super_admin':
+        if not has_permission(current_user, 'jobs', 'delete'):
             return jsonify({'error': 'Super admin access required'}), 403
         
         category = JobCategory.query.get_or_404(category_id)
@@ -618,7 +619,7 @@ def admin_delete_category(category_id):
 def admin_get_applications():
     """Get all job applications"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'read'):
             return jsonify({'error': 'Permission denied'}), 403
         
         job_id = request.args.get('job_id', type=int)
@@ -663,7 +664,7 @@ def admin_get_applications():
 def admin_get_application(application_id):
     """Get single application details"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'read'):
             return jsonify({'error': 'Permission denied'}), 403
         
         app = JobApplication.query.get_or_404(application_id)
@@ -699,7 +700,7 @@ def admin_get_application(application_id):
 def admin_update_application_status(application_id):
     """Update application status with email notification"""
     try:
-        if current_user.role not in ['super_admin', 'admin']:
+        if not has_permission(current_user, 'jobs', 'update'):
             return jsonify({'error': 'Permission denied'}), 403
         
         app = JobApplication.query.get_or_404(application_id)

@@ -1,6 +1,7 @@
 # backend/newsletter_routes.py
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
+from permission_service import has_permission
 from models import db, NewsletterSubscriber, User, ActivityLog
 from datetime import datetime
 import secrets
@@ -161,7 +162,7 @@ def unsubscribe():
 @login_required
 def get_subscribers():
     """Get all newsletter subscribers - Admin only"""
-    if current_user.role not in ['super_admin', 'admin']:
+    if not has_permission(current_user, 'newsletter', 'read'):
         return jsonify({'error': 'Permission denied'}), 403
     
     try:
@@ -215,7 +216,7 @@ def get_subscribers():
 @login_required
 def get_subscriber_stats():
     """Get newsletter statistics - Admin only"""
-    if current_user.role not in ['super_admin', 'admin']:
+    if not has_permission(current_user, 'newsletter', 'read'):
         return jsonify({'error': 'Permission denied'}), 403
     
     try:
@@ -246,7 +247,7 @@ def get_subscriber_stats():
 @login_required
 def delete_subscriber(subscriber_id):
     """Delete a subscriber - Super Admin only"""
-    if current_user.role != 'super_admin':
+    if not has_permission(current_user, 'newsletter', 'delete'):
         return jsonify({'error': 'Super admin access required'}), 403
     
     try:
@@ -274,7 +275,7 @@ def delete_subscriber(subscriber_id):
 @login_required
 def toggle_subscriber_status(subscriber_id):
     """Toggle subscriber active status - Admin only"""
-    if current_user.role not in ['super_admin', 'admin']:
+    if not has_permission(current_user, 'newsletter', 'update'):
         return jsonify({'error': 'Permission denied'}), 403
     
     try:
@@ -304,7 +305,7 @@ def toggle_subscriber_status(subscriber_id):
 @login_required
 def send_newsletter():
     """Send newsletter to all active subscribers - Admin only"""
-    if current_user.role not in ['super_admin', 'admin']:
+    if not has_permission(current_user, 'newsletter', 'create'):
         return jsonify({'error': 'Permission denied'}), 403
     
     try:
@@ -413,7 +414,7 @@ def build_newsletter_html(subject, content, email, unsubscribe_token, frontend_u
 @login_required
 def export_subscribers():
     """Export subscribers to CSV - Admin only"""
-    if current_user.role not in ['super_admin', 'admin']:
+    if not has_permission(current_user, 'newsletter', 'read'):
         return jsonify({'error': 'Permission denied'}), 403
     
     try:

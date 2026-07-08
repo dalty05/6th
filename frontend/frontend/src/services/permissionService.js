@@ -1,3 +1,5 @@
+// frontend/src/services/permissionService.js
+
 import api from './api'
 import authService from './auth'
 
@@ -5,43 +7,83 @@ class PermissionService {
   constructor() {
     this.permissions = null
     this.userRole = null
+    this.dashboardComponents = []
+    this.roleName = null
     this.loaded = false
     this.loadingPromise = null
     this.initialized = false
   }
 
+  // ✅ Initialize only when needed
+  async init() {
+    if (this.initialized) return
+    
+    // ✅ Only load if authenticated
+    // Note: authService.isAuthenticated() is session-based now.
+    if (authService.isAuthenticated()) {
+      await this.loadPermissions()
+    } else {
+      console.log('ℹ️ Not authenticated, permissions will load after login')
+      // Don't mark loaded=true here; otherwise it prevents retry after login.
+      this.loaded = false
+    }
+
+    this.initialized = true
+  }
+
   async loadPermissions() {
-    // Don't load if not authenticated
+    // ✅ Skip if not authenticated
     if (!authService.isAuthenticated()) {
       console.log('⚠️ Not authenticated, skipping permission load')
       return false
     }
 
-    // If already loading, return the existing promise
     if (this.loadingPromise) {
       return this.loadingPromise
     }
 
-    // If already loaded, return
-    if (this.loaded) {
+    if (this.loaded && this.permissions) {
       return true
     }
 
     this.loadingPromise = (async () => {
       try {
-        const response = await api.get('/debug/permissions')
-        this.permissions = response.data.permissions
-        this.userRole = response.data.role
+        // Load permissions
+        const permResponse = await api.get('/debug/permissions')
+        this.permissions = permResponse.data.permissions
+        this.userRole = permResponse.data.role
+        
+        // Load dashboard config
+        const configResponse = await api.get('/dashboard/config')
+        this.dashboardComponents = configResponse.data.components || []
+        this.roleName = configResponse.data.role?.name || 'User'
+        
         this.loaded = true
-        console.log('✅ Permissions loaded:', this.userRole, this.permissions)
+        console.log('✅ Permissions and dashboard config loaded:', {
+          role: this.roleName,
+          components: this.dashboardComponents.length
+        })
         return true
       } catch (error) {
-        // If 401, clear any stored user data
-        if (error.response?.status === 401) {
-          console.log('⚠️ Session expired, clearing user data')
-          authService.clearUser()
-        }
         console.error('Failed to load permissions:', error)
+        
+        // Handle 403 gracefully
+        if (error.response?.status === 403) {
+          console.warn('⚠️ User does not have permission to access dashboard config')
+          this.dashboardComponents = []
+          this.roleName = 'User'
+          this.loaded = true
+          return true
+        }
+        
+        // ✅ Handle 401 (unauthorized) gracefully
+        if (error.response?.status === 401) {
+          console.log('ℹ️ Session expired - please login again')
+          authService.logout()
+          this.loaded = true
+          return false
+        }
+        
         this.loaded = false
         return false
       } finally {
@@ -53,13 +95,18 @@ class PermissionService {
   }
 
   can(resource, action = 'read') {
-    // Super admin can do everything
+    // ✅ Check authentication first
+    if (!authService.isAuthenticated()) {
+      return false
+    }
+
     if (this.userRole === 'super_admin') {
       return true
     }
     
     if (!this.permissions || !this.permissions[resource]) {
-      return false
+      const hasComponent = this.dashboardComponents.some(c => c.key === resource)
+      return hasComponent
     }
     
     return this.permissions[resource][action] === true
@@ -79,6 +126,53 @@ class PermissionService {
 
   canDelete(resource) {
     return this.can(resource, 'delete')
+  }
+
+  // ============================================================
+  // DYNAMIC DASHBOARD METHODS
+  // ============================================================
+
+  getDashboardComponents() {
+    return this.dashboardComponents
+  }
+
+  getRoleName() {
+    return this.roleName
+  }
+
+  canViewComponent(componentKey) {
+    if (this.userRole === 'super_admin') {
+      return true
+    }
+    return this.dashboardComponents.some(c => c.key === componentKey)
+  }
+
+  getComponentsBySection() {
+    const groups = {}
+    this.dashboardComponents.forEach(comp => {
+      const section = comp.section || 'Main'
+      if (!groups[section]) groups[section] = []
+      groups[section].push(comp)
+    })
+    return Object.entries(groups).map(([name, comps]) => ({
+      name,
+      components: comps.sort((a, b) => (a.order || 0) - (b.order || 0))
+    }))
+  }
+
+  isDashboardLoaded() {
+    return this.loaded
+  }
+
+  clear() {
+    this.permissions = null
+    this.userRole = null
+    this.dashboardComponents = []
+    this.roleName = null
+    this.loaded = false
+    this.loadingPromise = null
+    this.initialized = false
+    console.debug('Permission cache cleared')
   }
 
   // ============================================================
@@ -133,13 +227,11 @@ class PermissionService {
   // TOUR PERMISSIONS
   // ============================================================
 
-  // Tour Packages
-  canViewTours() { return this.canView('tours') }
+  canViewTours() { return this.canView('tours') || this.canViewComponent('tours') }
   canCreateTours() { return this.canCreate('tours') }
   canUpdateTours() { return this.canUpdate('tours') }
   canDeleteTours() { return this.canDelete('tours') }
 
-  // Tour Bookings
   canViewBookings() { return this.canView('bookings') }
   canCreateBookings() { return this.canCreate('bookings') }
   canUpdateBookings() { return this.canUpdate('bookings') }
@@ -147,64 +239,54 @@ class PermissionService {
   canApproveBookings() { return this.can('bookings', 'approve') }
   canRejectBookings() { return this.can('bookings', 'reject') }
 
-  // Tour Availability
   canViewAvailability() { return this.canView('tours') }
   canUpdateAvailability() { return this.canUpdate('tours') }
 
-  // Tour Settings
   canViewTourSettings() { return this.canView('tour_settings') }
   canUpdateTourSettings() { return this.canUpdate('tour_settings') }
 
-  // ============================================================
-  // COMPOSITE CHECKS
-  // ============================================================
-
-  /**
-   * Check if user can manage tours (create, update, delete packages)
-   * This is used in Dashboard.vue and AdminSidebar.vue
-   */
   canManageTours() {
     return this.canCreateTours() || this.canUpdateTours() || this.canDeleteTours()
   }
 
-  /**
-   * Check if user can manage bookings (approve, reject, update)
-   */
   canManageBookings() {
     return this.canApproveBookings() || this.canRejectBookings() || this.canUpdateBookings()
   }
 
-  /**
-   * Check if user can view tour data (read-only access)
-   */
   canViewTourData() {
     return this.canViewTours() || this.canViewBookings()
   }
 
-  /**
-   * Check if user is a tour staff (manager or assistant)
-   */
   isTourStaff() {
     return this.canViewTourData()
   }
 
   // ============================================================
-  // DEBUG METHOD
+  // RELOAD PERMISSIONS AFTER LOGIN
+  // ============================================================
+
+  async refresh() {
+    this.clear()
+    await this.loadPermissions()
+  }
+
+  // ============================================================
+  // DEBUG
   // ============================================================
 
   debugPermissions() {
     console.log('🔍 Permission Debug:')
+    console.log('  Initialized:', this.initialized)
     console.log('  Loaded:', this.loaded)
     console.log('  User Role:', this.userRole)
+    console.log('  Role Name:', this.roleName)
+    console.log('  Components:', this.dashboardComponents.length)
     console.log('  Permissions:', this.permissions)
-    console.log('  Can View Tours:', this.canViewTours())
-    console.log('  Can Manage Tours:', this.canManageTours())
-    console.log('  Can View Bookings:', this.canViewBookings())
-    console.log('  Can Approve Bookings:', this.canApproveBookings())
+    console.log('  Authenticated:', authService.isAuthenticated())
   }
 }
 
-
+// Create instance
 const permissionService = new PermissionService()
 
 

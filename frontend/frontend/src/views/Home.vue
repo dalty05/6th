@@ -8,7 +8,10 @@
     <BackToTop />
 
     <!-- Hero Section -->
-    <section id="home" class="hero-section" ref="heroSection" :style="{ paddingTop: navbarHeight + 'px' }">
+    <section id="home" class="hero-section" ref="heroSection" >
+
+<!-- :style="{ paddingTop: navbarHeight + 'px' }" -->
+
       <swiper
         :modules="modules"
         :slides-per-view="1"
@@ -342,7 +345,8 @@
         </div>
         
         <div class="physical-shops-section">
-          <button @click="showOutletsModal = true" class="btn-outlets"><i class="fas fa-store"></i> Find Physical Shops & Depots Near You</button>
+          <button @click="showOutletsModal = true" class="btn-outlets">
+            <i class="fas fa-store"></i> Find Physical Shops & Depots Near You</button>
         </div>
         
         <div class="shop-cta">
@@ -599,6 +603,9 @@
   </main>
 </template>
 
+
+
+
 <script>
 import { Swiper, SwiperSlide } from 'swiper/vue'
 import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules'
@@ -614,8 +621,6 @@ import ScrollProgress from '@/components/ScrollProgress.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import OutletsModal from '@/components/modals/OutletsModal.vue'
 import TourBookingModal from '@/components/TourBookingModal.vue'
-import { ref, onMounted, onUnmounted } from 'vue'
-
 
 export default {
   name: 'Home',
@@ -627,6 +632,7 @@ export default {
     SwiperSlide,
     TourBookingModal
   },
+  
   data() {
     return {
       modules: [Autoplay, Pagination, Navigation, EffectFade],
@@ -671,6 +677,7 @@ export default {
       totalProducts: 0,
       productsLoading: true,
       productsLoadingMore: false,
+      isFetchingProducts: false,
       
       // Product Modal
       showProductModal: false,
@@ -686,14 +693,18 @@ export default {
       totalBlogs: 0,
       blogsLoading: true,
       blogsLoadingMore: false,
+      isFetchingBlogs: false,
 
       // Blog Modal
       showBlogModal: false,
       selectedBlog: null,
       blogModalLoading: false,
 
-      // Tour Modal
+      // Tour
       showBookingModal: false,
+      tourPackages: [],
+      featuredTourPackage: null,
+      isFetchingTourPackages: false,
 
       // Contact
       contactForm: {
@@ -707,6 +718,7 @@ export default {
       errorMessage: '',
       showModal: false,
       showOutletsModal: false,
+      navbarHeight: 80,
       
       features: [
         { icon: 'fas fa-tint', title: '100% Pure & Fresh', description: 'Pasteurized and packed fresh daily from the slopes of Mount Kenya' },
@@ -714,44 +726,74 @@ export default {
         { icon: 'fas fa-microscope', title: 'Quality Assured', description: 'Rigorous quality testing at every stage of production' },
         { icon: 'fas fa-truck-fast', title: 'Nationwide Delivery', description: 'Reaching millions of customers across Kenya every day' }
       ],
+      
       statistics: [
         { value: '120', suffix: 'K+', label: 'Active Farmers' },
         { value: '250', suffix: 'K+', label: 'Liters Daily' },
         { value: '50', suffix: '+', label: 'Years Serving Kenya' }
       ],
+      
       testimonials: [
         { id: 1, name: 'Grace Kawira', role: 'Nairobi Resident', content: "Mount Kenya Milk is the absolute best for my family tea. Rich and always fresh.", rating: 5 },
         { id: 2, name: 'John Mwangi', role: 'Hotelier', content: "The yogurt consistency is incredible. My customers won't take anything else.", rating: 5 }
       ]
     }
   },
+  
   mounted() {
+    this.updateNavbarHeight()
     this.fetchProducts()
     this.fetchBlogs()
-    this.setupAOS()
-    // Fetch tour packages for dynamic pricing
     this.fetchTourPackages()
+    this.setupAOS()
+    
+    window.addEventListener('resize', this.updateNavbarHeight, { passive: true })
+  },
+  
+  beforeUnmount() {
+    window.removeEventListener('resize', this.updateNavbarHeight)
+    
+    // Destroy Swiper instance if it exists
+    if (this.$refs.swiper && this.$refs.swiper.swiper) {
+      this.$refs.swiper.swiper.destroy(true, true)
+    }
   },
   
   methods: {
-    
-    async fetchTourPackages() {
-      try {
-        const response = await axios.get('/api/tour/packages')
-        this.tourPackages = response.data.packages || []
-        if (this.tourPackages.length > 0) {
-          this.featuredTourPackage = this.tourPackages[0]
-        }
-      } catch (error) {
-        console.error('Error fetching tour packages:', error)
+    // ==================== NAVBAR ====================
+    updateNavbarHeight() {
+      if (window.requestAnimationFrame) {
+        window.requestAnimationFrame(() => {
+          const navbarSelectors = [
+            '.navbar',
+            'nav',
+            '.header',
+            '.main-header',
+            '.site-header'
+          ]
+          
+          let navbar = null
+          for (const selector of navbarSelectors) {
+            navbar = document.querySelector(selector)
+            if (navbar) break
+          }
+          
+          if (navbar) {
+            this.navbarHeight = navbar.offsetHeight || 80
+          } else {
+            this.navbarHeight = 80
+          }
+        })
+      } else {
+        const navbar = document.querySelector('.navbar') || document.querySelector('nav')
+        this.navbarHeight = navbar ? navbar.offsetHeight : 80
       }
     },
-
-
     
-    
-    // Products
+    // ==================== PRODUCTS ====================
     async fetchProducts(reset = true) {
+      if (this.isFetchingProducts) return
+      
       try {
         if (reset) {
           this.productsLoading = true
@@ -762,6 +804,8 @@ export default {
           this.productsLoadingMore = true
         }
         
+        this.isFetchingProducts = true
+        
         const response = await axios.get(`/api/products?page=${this.productsPage}&per_page=${this.productsPerPage}`)
         
         if (response.data && response.data.data) {
@@ -771,18 +815,17 @@ export default {
           this.hasMoreProducts = response.data.pagination?.has_next || false
           this.allProducts = reset ? newProducts : [...this.allProducts, ...newProducts]
         }
-        
-        this.productsLoading = false
-        this.productsLoadingMore = false
       } catch (error) {
         console.error('Error fetching products:', error)
+      } finally {
         this.productsLoading = false
         this.productsLoadingMore = false
+        this.isFetchingProducts = false
       }
     },
     
     loadMoreProducts() {
-      if (this.hasMoreProducts && !this.productsLoadingMore) {
+      if (this.hasMoreProducts && !this.productsLoadingMore && !this.isFetchingProducts) {
         this.productsPage++
         this.fetchProducts(false)
       }
@@ -801,9 +844,11 @@ export default {
       this.selectedProduct = null
       document.body.style.overflow = 'auto'
     },
-
-    // Blogs
+    
+    // ==================== BLOGS ====================
     async fetchBlogs(reset = true) {
+      if (this.isFetchingBlogs) return
+      
       try {
         if (reset) {
           this.blogsLoading = true
@@ -813,7 +858,9 @@ export default {
         } else {
           this.blogsLoadingMore = true
         }
-
+        
+        this.isFetchingBlogs = true
+        
         const response = await axios.get(`/api/blog?page=${this.blogsPage}&per_page=${this.blogsPerPage}`)
         
         if (response.data && response.data.data) {
@@ -822,18 +869,17 @@ export default {
           this.totalBlogs = response.data.pagination?.total_items || 0
           this.hasMoreBlogs = response.data.pagination?.has_next || false
         }
-        
-        this.blogsLoading = false
-        this.blogsLoadingMore = false
       } catch (error) {
         console.error('Error fetching blogs:', error)
+      } finally {
         this.blogsLoading = false
         this.blogsLoadingMore = false
+        this.isFetchingBlogs = false
       }
     },
     
     loadMoreBlogs() {
-      if (this.hasMoreBlogs && !this.blogsLoadingMore) {
+      if (this.hasMoreBlogs && !this.blogsLoadingMore && !this.isFetchingBlogs) {
         this.blogsPage++
         this.fetchBlogs(false)
       }
@@ -852,18 +898,7 @@ export default {
       this.selectedBlog = null
       document.body.style.overflow = 'auto'
     },
-
-    // Tour Modal Methods
-    openBookingModal() {
-      this.showBookingModal = true
-      document.body.style.overflow = 'hidden'
-    },
-
-    closeBookingModal() {
-      this.showBookingModal = false
-      document.body.style.overflow = 'auto'
-    },
-
+    
     shareBlog() {
       if (this.selectedBlog) {
         const url = `${window.location.origin}/blog/${this.selectedBlog.slug}`
@@ -880,8 +915,36 @@ export default {
         }
       }
     },
-
-    // Contact
+    
+    // ==================== TOUR ====================
+    async fetchTourPackages() {
+      if (this.isFetchingTourPackages) return
+      
+      this.isFetchingTourPackages = true
+      try {
+        const response = await axios.get('/api/tour/packages')
+        this.tourPackages = response.data.packages || []
+        if (this.tourPackages.length > 0) {
+          this.featuredTourPackage = this.tourPackages[0]
+        }
+      } catch (error) {
+        console.error('Error fetching tour packages:', error)
+      } finally {
+        this.isFetchingTourPackages = false
+      }
+    },
+    
+    openBookingModal() {
+      this.showBookingModal = true
+      document.body.style.overflow = 'hidden'
+    },
+    
+    closeBookingModal() {
+      this.showBookingModal = false
+      document.body.style.overflow = 'auto'
+    },
+    
+    // ==================== CONTACT ====================
     async submitContactForm() {
       this.isSubmitting = true
       this.errorMessage = ''
@@ -907,17 +970,23 @@ export default {
         this.isSubmitting = false
       }
     },
-
-    // Navigation
-    scrollToProducts() { scrollToSection('products') },
-    scrollToAbout() { scrollToSection('about') },
-    scrollToContact() { 
-      this.closeProductModal()
-      this.closeBlogModal()
-      scrollToSection('contact') 
+    
+    // ==================== NAVIGATION ====================
+    scrollToProducts() {
+      scrollToSection('products')
     },
     
-    // Utilities
+    scrollToAbout() {
+      scrollToSection('about')
+    },
+    
+    scrollToContact() {
+      this.closeProductModal()
+      this.closeBlogModal()
+      scrollToSection('contact')
+    },
+    
+    // ==================== UTILITIES ====================
     truncate(text, length) {
       if (!text) return ''
       return text.length > length ? text.substring(0, length) + '...' : text
@@ -926,7 +995,11 @@ export default {
     formatDate(dateStr) {
       if (!dateStr) return ''
       const date = new Date(dateStr)
-      return date.toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' })
+      return date.toLocaleDateString('en-KE', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
     },
     
     handleImageError(event) {
@@ -942,14 +1015,16 @@ export default {
     },
     
     setupAOS() {
-      if (window.AOS) window.AOS.init({ duration: 800, once: true })
+      if (window.AOS) {
+        window.AOS.init({
+          duration: 800,
+          once: true
+        })
+      }
     }
   }
 }
 </script>
-
-
-
 
 
 <style scoped>

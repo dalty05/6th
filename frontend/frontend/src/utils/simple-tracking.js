@@ -30,7 +30,7 @@ export function initReferralTracking() {
   const finalReferralCode = referralCode || (cookieReferral ? cookieReferral.split('=')[1] : null)
   
   if (!finalReferralCode) {
-    console.log('🔍 No referral code found, tracking disabled')
+  
     return
   }
 

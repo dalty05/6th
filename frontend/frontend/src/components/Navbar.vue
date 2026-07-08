@@ -6,6 +6,13 @@
         <span class="brand-name">Mount Kenya Milk</span>
       </div>
       
+      <!-- Mobile Toggle Button -->
+      <div class="mobile-toggle" @click="toggleMobileMenu">
+        <span :class="{ active: mobileMenuOpen }"></span>
+        <span :class="{ active: mobileMenuOpen }"></span>
+        <span :class="{ active: mobileMenuOpen }"></span>
+      </div>
+      
       <div class="navbar-menu" :class="{ 'is-active': mobileMenuOpen }">
         <a 
           @click.prevent="scrollTo('home')" 
@@ -214,6 +221,14 @@ export default {
       isScrolled.value = window.scrollY > 50
     }
     
+    const toggleMobileMenu = () => {
+      mobileMenuOpen.value = !mobileMenuOpen.value
+      // Close dropdown when toggling mobile menu
+      if (dropdownOpen.value) {
+        dropdownOpen.value = false
+      }
+    }
+    
     const handleStep1 = async () => {
       loading.value = true
       errorMessage.value = ''
@@ -245,9 +260,16 @@ export default {
       errorMessage.value = ''
       
       try {
-        await authService.loginStep2(otpCode)
-        closeLoginModal()
-        router.push('/admin/dashboard')
+        const response = await authService.loginStep2(otpCode)
+        
+        if (response.user) {
+          // ✅ Use the new method that handles redirect properly
+          await authService.setUserAndReload(response.user)
+          // The page will reload, so no need to do anything else
+        } else {
+          // Fallback for older versions
+          router.push('/admin/dashboard')
+        }
       } catch (error) {
         errorMessage.value = error.response?.data?.error || 'Invalid code'
         otpCodes.value = ['', '', '', '', '', '']
@@ -255,7 +277,6 @@ export default {
         loading.value = false
       }
     }
-    
     const handleOtpInput = (index, event) => {
       const value = event.target.value.replace(/[^0-9]/g, '')
       otpCodes.value[index] = value
@@ -350,6 +371,7 @@ export default {
       openCSRModal,
       scrollTo,
       scrollToHome,
+      toggleMobileMenu,
       handleStep1,
       handleStep2,
       handleOtpInput,
@@ -371,7 +393,7 @@ export default {
   background: rgba(255,255,255,0.95);
   backdrop-filter: blur(10px);
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  /* position: fixed; */
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -394,6 +416,7 @@ export default {
   transition: padding 0.3s ease;
   max-width: 1400px;
   margin: 0 auto;
+  position: relative;
 }
 
 .navbar.scrolled .container {
@@ -407,6 +430,7 @@ export default {
   gap: 10px;
   cursor: pointer;
   flex-shrink: 0;
+  z-index: 1001;
 }
 
 .logo {
@@ -430,14 +454,47 @@ export default {
   font-size: 1rem;
 }
 
-/* ========== NAVIGATION - CENTERED ========== */
+/* ========== MOBILE TOGGLE ========== */
+.mobile-toggle {
+  display: none;
+  flex-direction: column;
+  cursor: pointer;
+  gap: 5px;
+  flex-shrink: 0;
+  z-index: 1001;
+  padding: 5px;
+}
+
+.mobile-toggle span {
+  display: block;
+  width: 28px;
+  height: 3px;
+  background: #1e3a8a;
+  transition: all 0.3s ease;
+  border-radius: 3px;
+  transform-origin: center;
+}
+
+.mobile-toggle span.active:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.mobile-toggle span.active:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-toggle span.active:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* ========== NAVIGATION ========== */
 .navbar-menu {
   display: flex;
   gap: 1.5rem;
   align-items: center;
-  justify-content: center;  /* ✅ Centering the menu */
-  flex: 1;  /* ✅ Takes available space */
-  margin: 0 2rem;  /* ✅ Spacing from brand and edges */
+  justify-content: center;
+  flex: 1;
+  margin: 0 2rem;
 }
 
 .nav-link {
@@ -505,8 +562,8 @@ export default {
 .dropdown-content {
   position: absolute;
   top: 100%;
-  left: 50%;  /* ✅ Center the dropdown under the button */
-  transform: translateX(-50%);  /* ✅ Align center */
+  left: 50%;
+  transform: translateX(-50%);
   background: white;
   min-width: 220px;
   box-shadow: 0 8px 25px rgba(0,0,0,0.15);
@@ -565,23 +622,6 @@ export default {
 
 .logout-btn i {
   color: #dc2626;
-}
-
-/* ========== MOBILE TOGGLE ========== */
-.mobile-toggle {
-  display: none;
-  flex-direction: column;
-  cursor: pointer;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.mobile-toggle span {
-  width: 25px;
-  height: 3px;
-  background: #1e3a8a;
-  transition: 0.3s;
-  border-radius: 3px;
 }
 
 /* ========== MODAL ========== */
@@ -795,7 +835,23 @@ export default {
   }
 }
 
+@media (max-width: 992px) {
+  .navbar-menu {
+    gap: 0.8rem;
+    margin: 0 0.5rem;
+  }
+  
+  .brand-name {
+    font-size: 1rem;
+  }
+}
+
 @media (max-width: 768px) {
+  .navbar {
+    height: auto;
+    min-height: 70px;
+  }
+  
   .mobile-toggle {
     display: flex;
   }
@@ -808,23 +864,41 @@ export default {
     right: 0;
     background: white;
     flex-direction: column;
-    padding: 1rem;
+    padding: 1.5rem 1.5rem 2rem;
     gap: 0.75rem;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     max-height: calc(100vh - 70px);
     overflow-y: auto;
-    justify-content: flex-start;  /* ✅ Left align on mobile */
+    justify-content: flex-start;
     margin: 0;
     flex: none;
+    border-top: 1px solid rgba(0,0,0,0.05);
   }
   
   .navbar-menu.is-active {
     display: flex;
+    animation: slideDown 0.3s ease;
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   
   .nav-link {
     width: 100%;
-    padding: 0.5rem 0;
+    padding: 0.75rem 0;
+    font-size: 1rem;
+  }
+  
+  .nav-link::after {
+    bottom: 0;
   }
   
   .dropdown {
@@ -834,7 +908,8 @@ export default {
   .dropdown-btn {
     width: 100%;
     justify-content: space-between;
-    padding: 0.5rem 0;
+    padding: 0.75rem 0;
+    font-size: 1rem;
   }
   
   .dropdown-content {
@@ -846,39 +921,74 @@ export default {
     margin-top: 0.25rem;
     background: #f8fafc;
     border-radius: 8px;
+    width: 100%;
   }
   
-  @keyframes fadeInDown {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .dropdown-item {
+    padding: 0.75rem 1rem;
   }
   
   .brand-name {
     display: none;
   }
   
+  .logo {
+    height: 45px;
+  }
+  
+  .navbar .container {
+    padding: 0.8rem 20px;
+  }
+  
+  .navbar.scrolled .container {
+    padding: 0.5rem 20px;
+  }
+  
   .modal-content {
     padding: 1.5rem;
+    width: 95%;
   }
 }
 
 @media (max-width: 480px) {
   .navbar .container {
-    padding: 0.8rem 15px;
-  }
-  
-  .logo {
-    height: 40px;
+    padding: 0.6rem 15px;
   }
   
   .navbar.scrolled .container {
-    padding: 0.5rem 15px;
+    padding: 0.4rem 15px;
+  }
+  
+  .logo {
+    height: 38px;
+  }
+  
+  .mobile-toggle span {
+    width: 24px;
+    height: 2.5px;
+  }
+  
+  .navbar-menu {
+    padding: 1rem 1rem 1.5rem;
+  }
+  
+  .nav-link {
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+  }
+  
+  .dropdown-btn {
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+  }
+  
+  .dropdown-content {
+    padding-left: 0.75rem;
+  }
+  
+  .dropdown-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
   }
   
   .otp-input {
@@ -890,6 +1000,7 @@ export default {
   .modal-content {
     padding: 1.25rem;
   }
-
 }
+
+
 </style>

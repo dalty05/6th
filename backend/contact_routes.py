@@ -1,6 +1,7 @@
 # backend/contact_routes.py
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
+from permission_service import has_permission
 from models import db, ContactMessage
 from datetime import datetime
 import re
@@ -74,8 +75,8 @@ def submit_contact():
 def get_contacts():
     """Get all contact messages (admin only)"""
     try:
-        # Check if user is admin or super admin
-        if not current_user.is_super_admin() and not current_user.is_admin():
+        # Check permission via permission service
+        if not has_permission(current_user, 'contacts', 'read'):
             return jsonify({'error': 'Unauthorized'}), 403
         
         # Optional: Filter by status
@@ -98,7 +99,7 @@ def get_contacts():
 def get_contact_stats():
     """Get contact statistics (admin only)"""
     try:
-        if not current_user.is_super_admin() and not current_user.is_admin():
+        if not has_permission(current_user, 'contacts', 'read'):
             return jsonify({'error': 'Unauthorized'}), 403
         
         total = ContactMessage.query.count()
@@ -125,7 +126,7 @@ def get_contact_stats():
 def get_contact(id):
     """Get single contact message (admin only)"""
     try:
-        if not current_user.is_super_admin() and not current_user.is_admin():
+        if not has_permission(current_user, 'contacts', 'read'):
             return jsonify({'error': 'Unauthorized'}), 403
         
         contact = ContactMessage.query.get_or_404(id)
@@ -147,7 +148,7 @@ def get_contact(id):
 def update_contact_status(id):
     """Update contact message status (admin only)"""
     try:
-        if not current_user.is_super_admin() and not current_user.is_admin():
+        if not has_permission(current_user, 'contacts', 'update'):
             return jsonify({'error': 'Unauthorized'}), 403
         
         contact = ContactMessage.query.get_or_404(id)
@@ -170,10 +171,11 @@ def update_contact_status(id):
 @contact_bp.route('/admin/contacts/<int:id>/reply', methods=['POST'])
 @login_required
 def reply_contact(id):
-    """Reply to a contact message (admin only)"""
+    """Reply to a contact message"""
     try:
-        if not current_user.is_super_admin() and not current_user.is_admin():
-            return jsonify({'error': 'Unauthorized'}), 403
+        # ✅ Use permission service instead of hardcoded role check
+        if not has_permission(current_user, 'contacts', 'update'):
+            return jsonify({'error': 'Unauthorized - You do not have permission to reply to contacts'}), 403
         
         contact = ContactMessage.query.get_or_404(id)
         data = request.json
@@ -213,13 +215,12 @@ def reply_contact(id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @contact_bp.route('/admin/contacts/<int:id>', methods=['DELETE'])
 @login_required
 def delete_contact(id):
     """Delete a contact message (super admin only)"""
     try:
-        if not current_user.is_super_admin():
+        if not has_permission(current_user, 'contacts', 'delete'):
             return jsonify({'error': 'Unauthorized - Super admin only'}), 403
         
         contact = ContactMessage.query.get_or_404(id)

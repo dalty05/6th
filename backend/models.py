@@ -26,7 +26,7 @@ class User(UserMixin, db.Model):
     total_clicks = db.Column(db.Integer, default=0)
     total_conversions = db.Column(db.Integer, default=0)
     
-    # ✅ Tour management fields (COLUMNS)
+    #  Tour management fields
     is_tour_manager = db.Column(db.Boolean, default=False)
     is_tour_assistant = db.Column(db.Boolean, default=False)
     
@@ -38,6 +38,10 @@ class User(UserMixin, db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     last_login_ip = db.Column(db.String(50))
+
+    
+        # Role relationship 
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=True)
     
     # Relationships
     created_by = db.relationship('User', remote_side=[id], foreign_keys=[created_by_id])
@@ -74,14 +78,15 @@ class User(UserMixin, db.Model):
             'email': self.email,
             'full_name': self.full_name,
             'role': self.role,
+            'role_id': self.role_id,
             'is_active': self.is_active,
             'is_approved': self.is_approved,
             'email_verified': self.email_verified,
             'referral_code': self.referral_code,
             'total_clicks': self.total_clicks,
             'total_conversions': self.total_conversions,
-            'is_tour_manager': self.is_tour_manager,  # ✅ Column value
-            'is_tour_assistant': self.is_tour_assistant,  # ✅ Column value
+            'is_tour_manager': self.is_tour_manager, 
+            'is_tour_assistant': self.is_tour_assistant,  
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
@@ -477,10 +482,6 @@ class TourInvoice(db.Model):
         }
 
 
-# ============================================================
-# EXISTING MODELS (Keep all your existing models below)
-# ============================================================
-
 class ReferralLink(db.Model):
     __tablename__ = 'referral_links'
     
@@ -649,6 +650,9 @@ class PermissionTemplate(db.Model):
         return templates.get(template_name)
 
 
+
+
+
 class Product(db.Model):
     __tablename__ = 'products'
     
@@ -662,8 +666,47 @@ class Product(db.Model):
     nutritional_info = db.Column(db.Text)
     ingredients = db.Column(db.Text)
     featured = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # ✅ QR Code fields
+    slug = db.Column(db.String(200), unique=True, nullable=True, index=True)
+    qr_code_url = db.Column(db.String(500), nullable=True)
+    qr_code_generated_at = db.Column(db.DateTime, nullable=True)
+    
+    # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def generate_slug(self):
+        """Generate a URL-friendly slug from product name"""
+        import re
+        slug = self.name.lower().strip()
+        slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+        slug = re.sub(r'\s+', '-', slug)
+        slug = re.sub(r'-+', '-', slug)
+        return slug
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'slug': self.slug,
+            'category': self.category,
+            'description': self.description,
+            'image_url': self.image_url,
+            'benefits': self.benefits,
+            'packaging_sizes': self.packaging_sizes,
+            'nutritional_info': self.nutritional_info,
+            'ingredients': self.ingredients,
+            'featured': self.featured,
+            'is_active': self.is_active,
+            'qr_code_url': self.qr_code_url,
+            'qr_code_generated_at': self.qr_code_generated_at.isoformat() if self.qr_code_generated_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
 
 
 class BlogPost(db.Model):
@@ -1023,3 +1066,118 @@ class ReferralNavigation(db.Model):
             'time_spent': self.time_spent,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+    
+# ============ DYNAMIC ROLE MODELS ============
+
+class Role(db.Model):
+    """Dynamic roles that can be created by super admin"""
+    __tablename__ = 'roles'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    description = db.Column(db.String(200))
+    is_system = db.Column(db.Boolean, default=False)  # Can't delete system roles
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    # Relationships
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    users = db.relationship('User', backref='role_ref', foreign_keys='User.role_id')
+    components = db.relationship('RoleComponent', back_populates='role', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'is_system': self.is_system,
+            'is_active': self.is_active,
+            'component_count': len(self.components),
+            'user_count': len(self.users),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'components': [rc.component.to_dict() for rc in self.components]
+        }
+    
+    def __repr__(self):
+        return f'<Role {self.name}>'
+
+
+class DashboardComponent(db.Model):
+    """Dashboard components that can be assigned to roles"""
+    __tablename__ = 'dashboard_components'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False, index=True)  # 'products', 'tours', etc.
+    label = db.Column(db.String(100), nullable=False)
+    icon = db.Column(db.String(50), default='fas fa-cube')  # FontAwesome class
+    component_name = db.Column(db.String(100))  # Vue component name
+    path = db.Column(db.String(100))  # URL path
+    description = db.Column(db.String(200))
+    section = db.Column(db.String(50), default='Main')  # Group in sidebar
+    is_active = db.Column(db.Boolean, default=True)
+    order = db.Column(db.Integer, default=0)
+    
+    # Permissions mapping (optional - links to existing permission system)
+    required_permissions = db.Column(db.JSON, default=list)  # ['products:read', 'tours:write']
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    roles = db.relationship('RoleComponent', back_populates='component', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'key': self.key,
+            'label': self.label,
+            'icon': self.icon,
+            'component_name': self.component_name,
+            'path': self.path,
+            'description': self.description,
+            'section': self.section,
+            'is_active': self.is_active,
+            'order': self.order,
+            'required_permissions': self.required_permissions or []
+        }
+    
+    def __repr__(self):
+        return f'<DashboardComponent {self.key}>'
+
+
+class RoleComponent(db.Model):
+    """Mapping between roles and dashboard components"""
+    __tablename__ = 'role_components'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
+    component_id = db.Column(db.Integer, db.ForeignKey('dashboard_components.id'), nullable=False)
+    order = db.Column(db.Integer, default=0)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    role = db.relationship('Role', back_populates='components')
+    component = db.relationship('DashboardComponent', back_populates='roles')
+    
+    # Ensure unique role-component pairs
+    __table_args__ = (
+        db.UniqueConstraint('role_id', 'component_id', name='unique_role_component'),
+    )
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'role_id': self.role_id,
+            'component': self.component.to_dict(),
+            'order': self.order
+        }
+    
+    def __repr__(self):
+        return f'<RoleComponent role={self.role_id} component={self.component_id}>'

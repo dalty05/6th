@@ -181,7 +181,8 @@ const loadRecentLinks = async () => {
 }
 
 const handleLogout = async () => {
-  await authService.logout()
+    await authService.logout()
+  this.$router.push('/admin/login')
   router.push('/')
 }
 
