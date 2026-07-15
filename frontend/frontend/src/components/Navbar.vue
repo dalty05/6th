@@ -6,7 +6,6 @@
         <span class="brand-name">Mount Kenya Milk</span>
       </div>
       
-      <!-- ✅ FIXED MOBILE TOGGLE -->
       <button 
         class="mobile-toggle" 
         @click.stop="toggleMobileMenu"
@@ -86,65 +85,13 @@
               </button>
             </template>
             <template v-else>
-              <button @click="openLoginModal" class="dropdown-item">
+              <!-- ✅ Changed to router-link to existing login page -->
+              <router-link to="/admin/login" @click="closeMenu" class="dropdown-item">
                 <i class="fas fa-lock"></i> Admin Login
-              </button>
+              </router-link>
             </template>
           </div>
         </div>
-      </div>
-    </div>
-    
-    <!-- Admin Login Modal -->
-    <div class="modal" v-if="showAdminLogin" @click.self="closeLoginModal">
-      <div class="modal-content">
-        <div class="modal-icon">
-          <i class="fas fa-lock"></i>
-        </div>
-        <h3>Admin Login</h3>
-        
-        <div v-if="loginStep === 1">
-          <form @submit.prevent="handleStep1">
-            <div class="input-group">
-              <i class="fas fa-envelope"></i>
-              <input type="email" v-model="loginForm.email" placeholder="Email Address" required>
-            </div>
-            <div class="input-group">
-              <i class="fas fa-lock"></i>
-              <input type="password" v-model="loginForm.password" placeholder="Password" required>
-            </div>
-            <button type="submit" class="btn btn-primary" :disabled="loading">
-              {{ loading ? 'Verifying...' : 'Continue' }}
-            </button>
-          </form>
-          <div class="modal-footer">
-            <router-link to="/admin/forgot-password" @click="closeLoginModal">Forgot Password?</router-link>
-            <router-link to="/admin/register" @click="closeLoginModal">Register</router-link>
-          </div>
-        </div>
-        
-        <div v-else-if="loginStep === 2">
-          <p class="otp-instruction">Enter the 6-digit code sent to your email</p>
-          <form @submit.prevent="handleStep2">
-            <div class="otp-inputs">
-              <input v-for="i in 6" :key="i" type="text" maxlength="1" class="otp-input"
-                v-model="otpCodes[i-1]" @input="handleOtpInput(i-1, $event)"
-                @keyup="handleOtpKeyup(i-1, $event)" ref="otpInputs" autofocus>
-            </div>
-            <button type="submit" class="btn btn-primary" :disabled="loading">
-              {{ loading ? 'Verifying...' : 'Verify & Login' }}
-            </button>
-          </form>
-          <button class="btn-resend" @click="resendOtp" :disabled="resendCooldown">
-            {{ resendCooldown ? `Resend in ${resendTimer}s` : 'Resend Code' }}
-          </button>
-          <button class="btn-back" @click="loginStep = 1">← Back</button>
-        </div>
-        
-        <div v-if="errorMessage" class="error-message">
-          <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
-        </div>
-        <button class="close-btn" @click="closeLoginModal">×</button>
       </div>
     </div>
     
@@ -182,15 +129,6 @@ export default {
     const dropdownRef = ref(null)
     const mobileMenuOpen = ref(false)
     const dropdownOpen = ref(false)
-    const showAdminLogin = ref(false)
-
-    const loginStep = ref(1)
-    const loginForm = ref({ email: '', password: '' })
-    const otpCodes = ref(['', '', '', '', '', ''])
-    const loading = ref(false)
-    const errorMessage = ref('')
-    const resendCooldown = ref(false)
-    const resendTimer = ref(0)
     const isScrolled = ref(false)
     const showCareersModal = ref(false)
     const showCSRModal = ref(false)
@@ -207,15 +145,6 @@ export default {
     const openCSRModal = () => {
       showCSRModal.value = true
       closeMenu()
-    }
-    
-    const openLoginModal = () => {
-      dropdownOpen.value = false
-      showAdminLogin.value = true
-      loginStep.value = 1
-      loginForm.value = { email: '', password: '' }
-      otpCodes.value = ['', '', '', '', '', '']
-      errorMessage.value = ''
     }
     
     const handleClickOutside = (event) => {
@@ -245,12 +174,10 @@ export default {
     const toggleMobileMenu = () => {
       mobileMenuOpen.value = !mobileMenuOpen.value
       
-      // Close dropdown when mobile menu opens/closes
       if (dropdownOpen.value) {
         dropdownOpen.value = false
       }
       
-      // Toggle body scroll
       if (mobileMenuOpen.value) {
         document.body.style.overflow = 'hidden'
       } else {
@@ -263,114 +190,10 @@ export default {
       dropdownOpen.value = !dropdownOpen.value
     }
     
-    const handleStep1 = async () => {
-      loading.value = true
-      errorMessage.value = ''
-      
-      try {
-        const response = await authService.loginStep1(
-          loginForm.value.email,
-          loginForm.value.password
-        )
-        
-        if (response.requires_otp) {
-          loginStep.value = 2
-          await nextTick()
-          const inputs = document.querySelectorAll('.otp-input')
-          if (inputs.length > 0) {
-            inputs[0].focus()
-          }
-        }
-      } catch (error) {
-        errorMessage.value = error.response?.data?.error || 'Login failed. Please check your credentials.'
-      } finally {
-        loading.value = false
-      }
-    }
-    
-    const handleStep2 = async () => {
-      const otpCode = otpCodes.value.join('')
-      if (otpCode.length !== 6) {
-        errorMessage.value = 'Please enter the complete 6-digit code'
-        return
-      }
-      
-      loading.value = true
-      errorMessage.value = ''
-      
-      try {
-        const response = await authService.loginStep2(otpCode)
-        
-        if (response.user) {
-          closeLoginModal()
-          const dashboard = authService.getRoleBasedDashboard()
-          router.push(dashboard)
-        }
-      } catch (error) {
-        errorMessage.value = error.response?.data?.error || 'Invalid verification code'
-        otpCodes.value = ['', '', '', '', '', '']
-        await nextTick()
-        const inputs = document.querySelectorAll('.otp-input')
-        if (inputs.length > 0) {
-          inputs[0].focus()
-        }
-      } finally {
-        loading.value = false
-      }
-    }
-    
-    const handleOtpInput = (index, event) => {
-      const value = event.target.value.replace(/[^0-9]/g, '')
-      otpCodes.value[index] = value
-      if (value && index < 5) {
-        const inputs = document.querySelectorAll('.otp-input')
-        if (inputs[index + 1]) {
-          inputs[index + 1].focus()
-        }
-      }
-    }
-    
-    const handleOtpKeyup = (index, event) => {
-      if (event.key === 'Backspace' && !otpCodes.value[index] && index > 0) {
-        const inputs = document.querySelectorAll('.otp-input')
-        if (inputs[index - 1]) {
-          inputs[index - 1].focus()
-        }
-      }
-    }
-    
-    const resendOtp = async () => {
-      if (resendCooldown.value) return
-      
-      try {
-        await authService.loginStep1(loginForm.value.email, loginForm.value.password)
-        resendCooldown.value = true
-        resendTimer.value = 60
-        const interval = setInterval(() => {
-          resendTimer.value--
-          if (resendTimer.value <= 0) {
-            clearInterval(interval)
-            resendCooldown.value = false
-          }
-        }, 1000)
-        errorMessage.value = ''
-      } catch (error) {
-        errorMessage.value = 'Failed to resend code. Please try again.'
-      }
-    }
-    
     const closeMenu = () => {
       mobileMenuOpen.value = false
       dropdownOpen.value = false
       document.body.style.overflow = ''
-    }
-    
-    const closeLoginModal = () => {
-      showAdminLogin.value = false
-      loginStep.value = 1
-      loginForm.value = { email: '', password: '' }
-      otpCodes.value = ['', '', '', '', '', '']
-      errorMessage.value = ''
     }
     
     const handleLogout = async () => {
@@ -394,7 +217,6 @@ export default {
       document.addEventListener('click', handleClickOutside)
       handleInitialHash()
       
-      // Close mobile menu on resize to desktop
       const handleResize = () => {
         if (window.innerWidth > 768 && mobileMenuOpen.value) {
           mobileMenuOpen.value = false
@@ -403,7 +225,6 @@ export default {
       }
       window.addEventListener('resize', handleResize)
       
-      // Clean up resize listener
       onUnmounted(() => {
         window.removeEventListener('resize', handleResize)
       })
@@ -419,14 +240,6 @@ export default {
       dropdownRef,
       mobileMenuOpen,
       dropdownOpen,
-      showAdminLogin,
-      loginStep,
-      loginForm,
-      otpCodes,
-      loading,
-      errorMessage,
-      resendCooldown,
-      resendTimer,
       isScrolled,
       activeSection,
       isAuthenticated,
@@ -434,18 +247,11 @@ export default {
       showCSRModal,
       openCareersModal,
       openCSRModal,
-      openLoginModal,
       scrollTo,
       scrollToHome,
       toggleMobileMenu,
       toggleDropdown,
-      handleStep1,
-      handleStep2,
-      handleOtpInput,
-      handleOtpKeyup,
-      resendOtp,
       closeMenu,
-      closeLoginModal,
       handleLogout,
       handleImageError
     }
@@ -712,39 +518,6 @@ export default {
   font-size: 1rem;
 }
 
-/* ========== MOBILE TOGGLE ========== */
-.mobile-toggle {
-  display: none;
-  flex-direction: column;
-  cursor: pointer;
-  gap: 5px;
-  flex-shrink: 0;
-  z-index: 1001;
-  padding: 5px;
-}
-
-.mobile-toggle span {
-  display: block;
-  width: 28px;
-  height: 3px;
-  background: #1e3a8a;
-  transition: all 0.3s ease;
-  border-radius: 3px;
-  transform-origin: center;
-}
-
-.mobile-toggle span.active:nth-child(1) {
-  transform: rotate(45deg) translate(5px, 5px);
-}
-
-.mobile-toggle span.active:nth-child(2) {
-  opacity: 0;
-}
-
-.mobile-toggle span.active:nth-child(3) {
-  transform: rotate(-45deg) translate(6px, -6px);
-}
-
 /* ========== NAVIGATION ========== */
 .navbar-menu {
   display: flex;
@@ -882,209 +655,6 @@ export default {
   color: #dc2626;
 }
 
-/* ========== MODAL ========== */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  background: white;
-  border-radius: 20px;
-  padding: 2rem;
-  width: 90%;
-  max-width: 420px;
-  position: relative;
-  animation: fadeInUp 0.3s ease;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal-icon {
-  text-align: center;
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-
-.modal-icon i {
-  color: #f59e0b;
-}
-
-.modal-content h3 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  color: #1e3a8a;
-}
-
-.input-group {
-  position: relative;
-  margin-bottom: 1rem;
-}
-
-.input-group i {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #999;
-}
-
-.input-group input {
-  width: 100%;
-  padding: 12px 12px 12px 42px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  transition: all 0.3s;
-}
-
-.input-group input:focus {
-  outline: none;
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
-}
-
-.close-btn {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #999;
-  transition: color 0.3s;
-}
-
-.close-btn:hover {
-  color: #ef4444;
-}
-
-.otp-instruction {
-  text-align: center;
-  color: #666;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.otp-inputs {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  margin: 1.5rem 0;
-}
-
-.otp-input {
-  width: 50px;
-  height: 50px;
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  transition: all 0.3s;
-}
-
-.otp-input:focus {
-  border-color: #f59e0b;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(245,158,11,0.1);
-}
-
-.btn {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.btn-primary {
-  background: #f59e0b;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #d97706;
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-resend, .btn-back {
-  width: 100%;
-  padding: 10px;
-  margin-top: 0.5rem;
-  background: none;
-  border: none;
-  color: #f59e0b;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.3s;
-}
-
-.btn-resend:hover, .btn-back:hover {
-  color: #d97706;
-}
-
-.btn-resend:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modal-footer {
-  margin-top: 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-}
-
-.modal-footer a {
-  color: #666;
-  text-decoration: none;
-  transition: color 0.3s;
-}
-
-.modal-footer a:hover {
-  color: #f59e0b;
-}
-
-.error-message {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: #fee2e2;
-  color: #dc2626;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1024px) {
   .navbar-menu {
@@ -1201,11 +771,6 @@ export default {
   .navbar.scrolled .container {
     padding: 0.5rem 20px;
   }
-  
-  .modal-content {
-    padding: 1.5rem;
-    width: 95%;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1247,16 +812,6 @@ export default {
   .dropdown-item {
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
-  }
-  
-  .otp-input {
-    width: 40px;
-    height: 40px;
-    font-size: 1.2rem;
-  }
-  
-  .modal-content {
-    padding: 1.25rem;
   }
 }
 </style>

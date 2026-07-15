@@ -1,107 +1,48 @@
-
 import api from './api'
 
 class ReferralService {
-  // Existing methods
-  async getLinks() {
-    const response = await api.get('/admin/referral/links')
-    return response.data
-  }
-
-  async createLink(data) {
-    const response = await api.post('/admin/referral/links', data)
-    return response.data
-  }
-
-  async updateLink(id, data) {
-    const response = await api.put(`/admin/referral/links/${id}`, data)
-    return response.data
-  }
-
-  async deleteLink(id) {
-    const response = await api.delete(`/admin/referral/links/${id}`)
-    return response.data
-  }
-
-  async toggleLinkStatus(id) {
-    const response = await api.post(`/admin/referral/links/${id}/toggle`)
-    return response.data
-  }
-
-  async getStats() {
-    const response = await api.get('/admin/referral/stats')
-    return response.data
-  }
-
-  async getTopLinks(limit = 5, sortBy = 'clicks') {
-    const response = await api.get(`/admin/referral/top-links?limit=${limit}&sort_by=${sortBy}`)
-    return response.data
-  }
-
-  async getRecentLinks(limit = 10) {
-    const response = await api.get(`/admin/referral/recent?limit=${limit}`)
-    return response.data
-  }
-
-  // NEW: Enhanced Analytics Methods
-  async getDailyAnalytics(days = 30) {
-    const response = await api.get(`/admin/referral/analytics/daily?days=${days}`)
-    return response.data
-  }
-
-  async getSourceAnalytics() {
-    const response = await api.get('/admin/referral/analytics/sources')
-    return response.data
-  }
-
-  async getGeoAnalytics() {
-    const response = await api.get('/admin/referral/analytics/geo')
-    return response.data
-  }
-
-  async getTimelineAnalytics() {
-    const response = await api.get('/admin/referral/analytics/timeline')
-    return response.data
-  }
-
-  async getRecentClicksAnalytics(limit = 20) {
-    const response = await api.get(`/admin/referral/analytics/recent-clicks?limit=${limit}`)
-    return response.data
-  }
-
-  async getAnalyticsSummary(days = 30) {
-    const response = await api.get(`/admin/referral/analytics/summary?days=${days}`)
-    return response.data
-  }
-
-  async getLinkAnalytics(linkId, days = 30) {
-    const response = await api.get(`/admin/referral/links/${linkId}/analytics?days=${days}`)
-    return response.data
-  }
-
-  // Legacy analytics 
-  async getAnalytics(days = 30) {
-    const response = await api.get(`/admin/referral/analytics?days=${days}`)
-    return response.data
-  }
-
-  async getPartnerStats(userId) {
-    const response = await api.get(`/admin/referral/partner/${userId}/stats`)
-    return response.data
-  }
-
-  async getPartnerAnalytics(days = 30) {
-    const response = await api.get(`/admin/referral/analytics/partner?days=${days}`)
-    return response.data
-  }
-
-  // Navigation Analytics
-  async getNavigationAnalytics(code = null, days = 30) {
-    const params = new URLSearchParams()
-    if (code) params.append('code', code)
-    params.append('days', days)
+  
     
-    const response = await api.get(`/admin/referral/analytics/navigation?${params.toString()}`)
+  async getAnalytics(days = 30) {
+    const response = await api.get('/admin/referral/analytics', {
+      params: { days }
+    })
+    return response.data
+  }
+  
+  
+  async getLinks() {
+    const response = await api.get('/admin/partners/links')
+    return response.data
+  }
+  
+  // Create new link
+  async createLink(data) {
+    const response = await api.post('/admin/partners/links', data)
+    return response.data
+  }
+  
+  // Update link
+  async updateLink(id, data) {
+    const response = await api.put(`/admin/partners/links/${id}`, data)
+    return response.data
+  }
+  
+  // Delete link
+  async deleteLink(id) {
+    const response = await api.delete(`/admin/partners/links/${id}`)
+    return response.data
+  }
+  
+  // Get partner stats
+  async getPartnerStats(partnerId) {
+    const response = await api.get(`/admin/referral/partner/${partnerId}/stats`)
+    return response.data
+  }
+  
+  // Get all partners
+  async getPartners() {
+    const response = await api.get('/admin/referral/partners')
     return response.data
   }
 }

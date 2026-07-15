@@ -1,5 +1,3 @@
-<!-- frontend/src/views/admin/Dashboard.vue -->
-
 <template>
   <div class="admin-dashboard">
     <component 
@@ -37,26 +35,19 @@ const componentMap = {
   'users': defineAsyncComponent(() => import('@/components/admin/UserManagement.vue')),
   'permissions': defineAsyncComponent(() => import('@/components/admin/PermissionManager.vue')),
   'roles': defineAsyncComponent(() => import('@/components/admin/RoleManager.vue')),
-  
-  // ✅ Tour components (moved from tour-manager views)
   'tours': defineAsyncComponent(() => import('@/components/admin/TourManagerBookings.vue')),
   'tour-packages': defineAsyncComponent(() => import('@/components/admin/TourManagerPackages.vue')),
   'tour-calendar': defineAsyncComponent(() => import('@/components/admin/TourManagerCalendar.vue')),
   'tour-payments': defineAsyncComponent(() => import('@/components/admin/TourManagerPayments.vue')),
   'tour-reports': defineAsyncComponent(() => import('@/components/admin/TourManagerReports.vue')),
   'tour-staff': defineAsyncComponent(() => import('@/components/admin/TourStaffManagement.vue')),
-  
-  // ✅ Partner components
   'partners': defineAsyncComponent(() => import('@/components/admin/PartnerManagement.vue')),
   'partner-links': defineAsyncComponent(() => import('@/components/admin/PartnerReferralLinks.vue')),
   'partner-analytics': defineAsyncComponent(() => import('@/components/admin/PartnerAnalytics.vue')),
-  
-  // ✅ Profile
   'profile': defineAsyncComponent(() => import('@/components/admin/MyProfile.vue')),
   'activities': defineAsyncComponent(() => import('@/components/admin/Activities.vue')),
-
-
 }
+
 const currentComponent = computed(() => {
   if (!activeComponent.value) return null
   return componentMap[activeComponent.value] || null
@@ -93,6 +84,7 @@ onMounted(() => {
 <style scoped>
 .admin-dashboard {
   min-height: 100vh;
+  padding: 0;
 }
 
 .no-component {

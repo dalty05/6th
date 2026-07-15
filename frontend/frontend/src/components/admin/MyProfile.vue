@@ -1,1029 +1,431 @@
 <template>
-  <div class="profile-container">
+  <div class="profile-page">
     <div class="profile-header">
-      <h1>My Profile</h1>
-      <p class="subtitle">Manage your account settings and preferences</p>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div>
-      <p>Loading profile...</p>
-    </div>
-
-    <!-- Profile Content -->
-    <div v-else class="profile-content">
-      <!-- Profile Card -->
-      <div class="profile-card glass-card">
-        <div class="profile-avatar">
-          <div class="avatar-circle">
-            <span>{{ userInitials }}</span>
-          </div>
-          <div class="role-badge" :class="roleClass">
-            <i :class="roleIcon"></i> {{ roleDisplayName }}
-          </div>
-        </div>
-
-        <div class="profile-info">
-          <div class="info-group">
-            <label>Full Name</label>
-            <div class="info-value">
-              <span>{{ user.full_name }}</span>
-              <button @click="editField('full_name')" class="edit-btn">
-                <i class="fas fa-pen"></i>
-              </button>
-            </div>
-          </div>
-
-          <div class="info-group">
-            <label>Email Address</label>
-            <div class="info-value">
-              <span>{{ user.email }}</span>
-              <span class="verified-badge" v-if="user.email_verified">
-                <i class="fas fa-check-circle"></i> Verified
-              </span>
-              <span class="unverified-badge" v-else>
-                <i class="fas fa-exclamation-circle"></i> Unverified
-              </span>
-            </div>
-          </div>
-
-          <div class="info-group">
-            <label>Role</label>
-            <div class="info-value">
-              <span>{{ roleDisplayName }}</span>
-            </div>
-          </div>
-
-          <div class="info-group">
-            <label>Member Since</label>
-            <div class="info-value">
-              <span>{{ formatDate(user.created_at) }}</span>
-            </div>
-          </div>
-
-          <div class="info-group">
-            <label>Last Login</label>
-            <div class="info-value">
-              <span>{{ user.last_login ? formatDate(user.last_login) : 'Never' }}</span>
-            </div>
-          </div>
-
-          <div class="info-group" v-if="user.referral_code">
-            <label>Referral Code</label>
-            <div class="info-value referral-code">
-              <code>{{ user.referral_code }}</code>
-              <button @click="copyReferralCode" class="copy-btn">
-                <i class="fas fa-copy"></i> Copy
-              </button>
-            </div>
-          </div>
-
-          <div class="info-group" v-if="user.is_tour_manager || user.is_tour_assistant">
-            <label>Tour Staff Status</label>
-            <div class="info-value">
-              <span class="tour-badge" v-if="user.is_tour_manager">
-                <i class="fas fa-user-tie"></i> Tour Manager
-              </span>
-              <span class="tour-badge assistant" v-else-if="user.is_tour_assistant">
-                <i class="fas fa-user"></i> Tour Assistant
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="profile-actions">
-          <button @click="openEditProfile" class="btn btn-primary">
-            <i class="fas fa-user-edit"></i> Edit Profile
-          </button>
-          <button @click="openChangePassword" class="btn btn-outline">
-            <i class="fas fa-key"></i> Change Password
-          </button>
-        </div>
+      <div class="profile-avatar">
+        <i class="fas fa-user-circle"></i>
       </div>
-
-      <!-- Activity Log -->
-      <div class="activity-section" v-if="activities.length > 0">
-        <h3><i class="fas fa-history"></i> Recent Activity</h3>
-        <div class="activity-list">
-          <div v-for="activity in activities" :key="activity.id" class="activity-item">
-            <div class="activity-icon" :class="activity.type">
-              <i :class="getActivityIcon(activity.action)"></i>
-            </div>
-            <div class="activity-content">
-              <p>{{ activity.description }}</p>
-              <span class="activity-time">{{ formatDate(activity.created_at) }}</span>
-            </div>
-          </div>
-        </div>
+      <div class="profile-title">
+        <h1>My Profile</h1>
+        <p>Manage your account settings and preferences</p>
       </div>
     </div>
 
-    <!-- Edit Profile Modal -->
-    <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
-      <div class="modal-container">
-        <div class="modal-header">
-          <h2>Edit Profile</h2>
-          <button @click="closeEditModal" class="modal-close">
-            <i class="fas fa-times"></i>
-          </button>
+    <div class="profile-grid">
+      <!-- Personal Information Card -->
+      <div class="profile-card">
+        <div class="card-header">
+          <i class="fas fa-user"></i>
+          <h3>Personal Information</h3>
         </div>
-        <div class="modal-body">
+        <form @submit.prevent="updateProfile" class="profile-form">
           <div class="form-group">
             <label>Full Name</label>
-            <input 
-              type="text" 
-              v-model="editForm.full_name" 
-              placeholder="Enter your full name"
-              class="form-input"
-            >
+            <input type="text" v-model="profile.full_name" required>
           </div>
-          <div class="form-actions">
-            <button @click="closeEditModal" class="btn btn-outline">Cancel</button>
-            <button @click="saveProfile" class="btn btn-primary" :disabled="saving">
-              <span v-if="!saving">Save Changes</span>
-              <span v-else><i class="fas fa-spinner fa-spin"></i> Saving...</span>
-            </button>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" v-model="profile.email" disabled class="disabled">
+            <small>Email cannot be changed</small>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Change Password Modal -->
-    <div v-if="showPasswordModal" class="modal-overlay" @click.self="closePasswordModal">
-      <div class="modal-container">
-        <div class="modal-header">
-          <h2>Change Password</h2>
-          <button @click="closePasswordModal" class="modal-close">
-            <i class="fas fa-times"></i>
+          <div class="form-group">
+            <label>Role</label>
+            <input type="text" :value="getRoleLabel(profile.role)" disabled class="disabled">
+          </div>
+          <button type="submit" class="btn-save" :disabled="savingProfile">
+            {{ savingProfile ? 'Saving...' : 'Save Changes' }}
           </button>
+        </form>
+      </div>
+
+      <!-- Change Password Card -->
+      <div class="profile-card">
+        <div class="card-header">
+          <i class="fas fa-lock"></i>
+          <h3>Change Password</h3>
         </div>
-        <div class="modal-body">
+        <form @submit.prevent="changePassword" class="profile-form">
           <div class="form-group">
             <label>Current Password</label>
-            <div class="input-wrapper">
-              <i class="fas fa-lock input-icon"></i>
-              <input 
-                :type="showCurrentPassword ? 'text' : 'password'" 
-                v-model="passwordForm.current_password" 
-                placeholder="Enter current password"
-                class="form-input"
-              >
-              <button @click="showCurrentPassword = !showCurrentPassword" class="toggle-password">
-                <i :class="showCurrentPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-              </button>
-            </div>
+            <input type="password" v-model="passwordForm.current_password" required>
           </div>
-
           <div class="form-group">
             <label>New Password</label>
-            <div class="input-wrapper">
-              <i class="fas fa-key input-icon"></i>
-              <input 
-                :type="showNewPassword ? 'text' : 'password'" 
-                v-model="passwordForm.new_password" 
-                placeholder="Enter new password"
-                class="form-input"
-              >
-              <button @click="showNewPassword = !showNewPassword" class="toggle-password">
-                <i :class="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-              </button>
-            </div>
-            <div class="password-requirements">
-              <p :class="{ valid: passwordValid.length >= 8 }">
-                <i :class="passwordValid.length >= 8 ? 'fas fa-check-circle' : 'fas fa-circle'"></i>
-                At least 8 characters
-              </p>
-              <p :class="{ valid: passwordValid.hasUpper }">
-                <i :class="passwordValid.hasUpper ? 'fas fa-check-circle' : 'fas fa-circle'"></i>
-                One uppercase letter
-              </p>
-              <p :class="{ valid: passwordValid.hasLower }">
-                <i :class="passwordValid.hasLower ? 'fas fa-check-circle' : 'fas fa-circle'"></i>
-                One lowercase letter
-              </p>
-              <p :class="{ valid: passwordValid.hasNumber }">
-                <i :class="passwordValid.hasNumber ? 'fas fa-check-circle' : 'fas fa-circle'"></i>
-                One number
-              </p>
-            </div>
+            <input type="password" v-model="passwordForm.new_password" required>
+            <small>Minimum 8 characters, at least one uppercase, one lowercase, and one number</small>
           </div>
-
           <div class="form-group">
             <label>Confirm New Password</label>
-            <div class="input-wrapper">
-              <i class="fas fa-check input-icon"></i>
-              <input 
-                :type="showConfirmPassword ? 'text' : 'password'" 
-                v-model="passwordForm.confirm_password" 
-                placeholder="Confirm new password"
-                class="form-input"
-              >
-              <button @click="showConfirmPassword = !showConfirmPassword" class="toggle-password">
-                <i :class="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-              </button>
-            </div>
-            <p v-if="passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password" class="error-message">
-              Passwords do not match
-            </p>
+            <input type="password" v-model="passwordForm.confirm_password" required>
           </div>
+          <button type="submit" class="btn-save" :disabled="savingPassword">
+            {{ savingPassword ? 'Changing...' : 'Change Password' }}
+          </button>
+        </form>
+      </div>
 
-          <div class="form-actions">
-            <button @click="closePasswordModal" class="btn btn-outline">Cancel</button>
-            <button 
-              @click="changePassword" 
-              class="btn btn-primary" 
-              :disabled="!canChangePassword || saving"
-            >
-              <span v-if="!saving">Update Password</span>
-              <span v-else><i class="fas fa-spinner fa-spin"></i> Updating...</span>
-            </button>
+      <!-- Account Information Card -->
+      <div class="profile-card">
+        <div class="card-header">
+          <i class="fas fa-info-circle"></i>
+          <h3>Account Information</h3>
+        </div>
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">Account Created:</span>
+            <span class="info-value">{{ formatDate(profile.created_at) }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Last Login:</span>
+            <span class="info-value">{{ formatDate(profile.last_login) || 'Never' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Last Login IP:</span>
+            <span class="info-value">{{ profile.last_login_ip || 'Unknown' }}</span>
+          </div>
+          <div class="info-item" v-if="profile.referral_code">
+            <span class="info-label">Referral Code:</span>
+            <span class="info-value code">{{ profile.referral_code }}</span>
+          </div>
+          <div class="info-item" v-if="profile.total_clicks !== undefined">
+            <span class="info-label">Total Referral Clicks:</span>
+            <span class="info-value">{{ profile.total_clicks || 0 }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Success/Error Messages -->
-    <div v-if="successMessage" class="alert-success">
-      <i class="fas fa-check-circle"></i> {{ successMessage }}
-    </div>
-    <div v-if="errorMessage" class="alert-error">
-      <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+    <!-- Notification Toast -->
+    <div v-if="notification.show" :class="['notification', notification.type]" @click="notification.show = false">
+      <i :class="notification.icon"></i>
+      <span>{{ notification.message }}</span>
     </div>
   </div>
 </template>
 
-<script>
-import authService from '@/services/auth'
+<script setup>
+import { ref, onMounted } from 'vue'
 import api from '@/services/api'
+import authService from '@/services/auth'
 
-export default {
-  name: 'MyProfile',
-  
-  data() {
-    return {
-      loading: true,
-      saving: false,
-      user: {},
-      activities: [],
-      
-      // Edit Profile
-      showEditModal: false,
-      editForm: {
-        full_name: ''
-      },
-      
-      // Change Password
-      showPasswordModal: false,
-      showCurrentPassword: false,
-      showNewPassword: false,
-      showConfirmPassword: false,
-      passwordForm: {
-        current_password: '',
-        new_password: '',
-        confirm_password: ''
-      },
-      
-      successMessage: '',
-      errorMessage: '',
-      messageTimeout: null
-    }
-  },
+const profile = ref({
+  full_name: '',
+  email: '',
+  role: '',
+  created_at: null,
+  last_login: null,
+  last_login_ip: null,
+  referral_code: null,
+  total_clicks: 0,
+  total_conversions: 0
+})
 
-  computed: {
-    userInitials() {
-      if (!this.user.full_name) return 'U'
-      return this.user.full_name
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    },
-    
-    roleDisplayName() {
-      return authService.getRoleDisplayName() || 'User'
-    },
-    
-    roleClass() {
-      const role = this.user.role || 'user'
-      return {
-        'super-admin': role === 'super_admin',
-        'admin': role === 'admin',
-        'tour-manager': role === 'tour_manager',
-        'tour-assistant': role === 'tour_assistant',
-        'partner': role === 'partner'
-      }
-    },
-    
-    roleIcon() {
-      const role = this.user.role || 'user'
-      const icons = {
-        'super_admin': 'fas fa-crown',
-        'admin': 'fas fa-user-shield',
-        'tour_manager': 'fas fa-user-tie',
-        'tour_assistant': 'fas fa-user',
-        'partner': 'fas fa-handshake'
-      }
-      return icons[role] || 'fas fa-user'
-    },
-    
-    passwordValid() {
-      const pwd = this.passwordForm.new_password || ''
-      return {
-        length: pwd.length >= 8,
-        hasUpper: /[A-Z]/.test(pwd),
-        hasLower: /[a-z]/.test(pwd),
-        hasNumber: /\d/.test(pwd)
-      }
-    },
-    
-    canChangePassword() {
-      return (
-        this.passwordForm.current_password &&
-        this.passwordForm.new_password &&
-        this.passwordForm.confirm_password &&
-        this.passwordForm.new_password === this.passwordForm.confirm_password &&
-        this.passwordValid.length &&
-        this.passwordValid.hasUpper &&
-        this.passwordValid.hasLower &&
-        this.passwordValid.hasNumber
-      )
-    }
-  },
+const passwordForm = ref({
+  current_password: '',
+  new_password: '',
+  confirm_password: ''
+})
 
-  mounted() {
-    this.loadProfile()
-  },
+const savingProfile = ref(false)
+const savingPassword = ref(false)
 
-  beforeUnmount() {
-    if (this.messageTimeout) {
-      clearTimeout(this.messageTimeout)
-    }
-  },
+const notification = ref({
+  show: false,
+  message: '',
+  type: 'success',
+  icon: 'fas fa-check-circle'
+})
 
-  methods: {
-    async loadProfile() {
-      this.loading = true
-      this.errorMessage = ''
-      
-      try {
-        const response = await api.get('/admin/profile')
-        this.user = response.data
-        this.editForm.full_name = this.user.full_name
-        
-        // Load activities
-        await this.loadActivities()
-        
-      } catch (error) {
-        
-        this.errorMessage = error.response?.data?.error || 'Failed to load profile'
-      } finally {
-        this.loading = false
-      }
-    },
-    
-    async loadActivities() {
-      try {
-        const response = await api.get('/admin/activities?limit=10')
-        this.activities = response.data.activities || []
-      } catch (error) {
-        this.activities = []
-      }
-    },
-    
-    editField(field) {
-      if (field === 'full_name') {
-        this.openEditProfile()
-      }
-    },
-    
-    openEditProfile() {
-      this.editForm.full_name = this.user.full_name
-      this.showEditModal = true
-    },
-    
-    closeEditModal() {
-      this.showEditModal = false
-    },
-    
-    async saveProfile() {
-      this.saving = true
-      this.errorMessage = ''
-      
-      try {
-        const response = await authService.updateProfile(this.editForm.full_name)
-        this.user = response.user || this.user
-        this.showEditModal = false
-        this.showSuccess('Profile updated successfully!')
-      } catch (error) {
-        this.errorMessage = error.response?.data?.error || 'Failed to update profile'
-        this.showError(this.errorMessage)
-      } finally {
-        this.saving = false
-      }
-    },
-    
-    openChangePassword() {
-      this.passwordForm = {
-        current_password: '',
-        new_password: '',
-        confirm_password: ''
-      }
-      this.showPasswordModal = true
-    },
-    
-    closePasswordModal() {
-      this.showPasswordModal = false
-    },
-    
-    async changePassword() {
-      if (!this.canChangePassword) return
-      
-      this.saving = true
-      this.errorMessage = ''
-      
-      try {
-        await authService.changePassword(
-          this.passwordForm.current_password,
-          this.passwordForm.new_password
-        )
-        this.showPasswordModal = false
-        this.showSuccess('Password changed successfully!')
-      } catch (error) {
-        this.errorMessage = error.response?.data?.error || 'Failed to change password'
-        this.showError(this.errorMessage)
-      } finally {
-        this.saving = false
-      }
-    },
-    
-    async copyReferralCode() {
-      if (!this.user.referral_code) return
-      
-      try {
-        await navigator.clipboard.writeText(this.user.referral_code)
-        this.showSuccess('Referral code copied!')
-      } catch (error) {
-        
-        // Fallback
-        const input = document.createElement('input')
-        input.value = this.user.referral_code
-        document.body.appendChild(input)
-        input.select()
-        document.execCommand('copy')
-        document.body.removeChild(input)
-        this.showSuccess('Referral code copied!')
-      }
-    },
-    
-    getActivityIcon(action) {
-      const icons = {
-        'login': 'fas fa-sign-in-alt',
-        'logout': 'fas fa-sign-out-alt',
-        'update': 'fas fa-edit',
-        'create': 'fas fa-plus',
-        'delete': 'fas fa-trash',
-        'view': 'fas fa-eye',
-        'booking': 'fas fa-calendar-check',
-        'payment': 'fas fa-money-bill'
-      }
-      return icons[action] || 'fas fa-circle'
-    },
-    
-    formatDate(dateStr) {
-      if (!dateStr) return 'N/A'
-      const date = new Date(dateStr)
-      return date.toLocaleDateString('en-KE', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    },
-    
-    showSuccess(message) {
-      this.successMessage = message
-      if (this.messageTimeout) clearTimeout(this.messageTimeout)
-      this.messageTimeout = setTimeout(() => {
-        this.successMessage = ''
-      }, 5000)
-    },
-    
-    showError(message) {
-      this.errorMessage = message
-      if (this.messageTimeout) clearTimeout(this.messageTimeout)
-      this.messageTimeout = setTimeout(() => {
-        this.errorMessage = ''
-      }, 5000)
-    }
+const showNotification = (message, type = 'success') => {
+  notification.value = {
+    show: true,
+    message,
+    type,
+    icon: type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'
+  }
+  setTimeout(() => {
+    notification.value.show = false
+  }, 3000)
+}
+
+const getRoleLabel = (role) => {
+  const roles = {
+    super_admin: 'Super Administrator',
+    admin: 'Administrator',
+    partner: 'Marketing Partner'
+  }
+  return roles[role] || role
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+const loadProfile = async () => {
+  try {
+    // Use existing endpoint: /api/admin/profile
+    const response = await api.get('/admin/profile')
+    profile.value = response.data
+  } catch (error) {
+    showNotification('Failed to load profile', 'error')
   }
 }
+
+const updateProfile = async () => {
+  savingProfile.value = true
+  try {
+    // Use existing endpoint: /api/admin/profile (PUT)
+    await api.put('/admin/profile', { full_name: profile.value.full_name })
+    showNotification('Profile updated successfully')
+    
+    // Update local user data
+    const user = authService.getUser()
+    if (user) {
+      user.full_name = profile.value.full_name
+      localStorage.setItem('user', JSON.stringify(user))
+    }
+  } catch (error) {
+    showNotification(error.response?.data?.error || 'Failed to update profile', 'error')
+  } finally {
+    savingProfile.value = false
+  }
+}
+
+const changePassword = async () => {
+  if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
+    showNotification('New passwords do not match', 'error')
+    return
+  }
+  
+  if (passwordForm.value.new_password.length < 8) {
+    showNotification('Password must be at least 8 characters', 'error')
+    return
+  }
+  
+  savingPassword.value = true
+  try {
+    // Use existing endpoint: /api/admin/change-password (PUT)
+    await api.put('/admin/change-password', {
+      current_password: passwordForm.value.current_password,
+      new_password: passwordForm.value.new_password
+    })
+    showNotification('Password changed successfully')
+    passwordForm.value = {
+      current_password: '',
+      new_password: '',
+      confirm_password: ''
+    }
+  } catch (error) {
+    showNotification(error.response?.data?.error || 'Failed to change password', 'error')
+  } finally {
+    savingPassword.value = false
+  }
+}
+
+onMounted(() => {
+  loadProfile()
+})
 </script>
 
 <style scoped>
-.profile-container {
-  padding: 24px;
-  max-width: 800px;
+.profile-page {
+  padding: 1rem;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
 .profile-header {
-  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  border-radius: 20px;
+  color: white;
 }
 
-.profile-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin: 0 0 8px 0;
+.profile-avatar i {
+  font-size: 4rem;
 }
 
-.profile-header .subtitle {
-  color: #666;
+.profile-title h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.profile-title p {
   margin: 0;
-  font-size: 16px;
+  opacity: 0.9;
 }
 
-.loading-state {
-  text-align: center;
-  padding: 40px;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top-color: #2563eb;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 16px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
 }
 
 .profile-card {
   background: white;
   border-radius: 16px;
-  padding: 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 1px solid #e5e7eb;
 }
 
-.profile-avatar {
+.card-header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.avatar-circle {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
+.card-header i {
+  font-size: 1.25rem;
+  color: #f59e0b;
 }
 
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 500;
+.card-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1e3a8a;
 }
 
-.role-badge.super-admin {
-  background: #fef3c7;
-  color: #92400e;
+.profile-form .form-group {
+  margin-bottom: 1rem;
 }
 
-.role-badge.admin {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.role-badge.tour-manager {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.role-badge.tour-assistant {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.role-badge.partner {
-  background: #fce4ec;
-  color: #9a3412;
-}
-
-.profile-info {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.info-group {
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.info-group:last-child {
-  border-bottom: none;
-}
-
-.info-group label {
+.profile-form label {
   display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.info-value {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 16px;
-  color: #1a1a2e;
-  flex-wrap: wrap;
-}
-
-.edit-btn {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.edit-btn:hover {
-  background: #f1f5f9;
-  color: #2563eb;
-}
-
-.verified-badge {
-  color: #16a34a;
-  font-size: 13px;
-}
-
-.unverified-badge {
-  color: #dc2626;
-  font-size: 13px;
-}
-
-.referral-code {
-  font-family: monospace;
-  background: #f1f5f9;
-  padding: 4px 12px;
-  border-radius: 6px;
-}
-
-.copy-btn {
-  background: #e2e8f0;
-  border: none;
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.copy-btn:hover {
-  background: #cbd5e1;
-}
-
-.tour-badge {
-  padding: 4px 12px;
-  border-radius: 4px;
-  font-size: 13px;
-}
-
-.tour-badge {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.tour-badge.assistant {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.profile-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #f1f5f9;
-}
-
-.btn {
-  padding: 10px 20px;
-  border-radius: 8px;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
+  color: #374151;
 }
 
-.btn-primary {
-  background: #2563eb;
-  color: white;
-  border: none;
+.profile-form input {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.85rem;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-.btn-outline {
-  background: transparent;
-  color: #1a1a2e;
-  border: 2px solid #e2e8f0;
-}
-
-.btn-outline:hover:not(:disabled) {
+.profile-form input.disabled {
   background: #f8fafc;
-  border-color: #94a3b8;
-}
-
-.btn:disabled {
-  opacity: 0.6;
+  color: #6b7280;
   cursor: not-allowed;
 }
 
-.activity-section {
-  background: white;
-  border-radius: 16px;
-  padding: 24px 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+.profile-form small {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  display: block;
+  margin-top: 0.25rem;
 }
 
-.activity-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  color: #1a1a2e;
-}
-
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.activity-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.activity-item:last-child {
-  border-bottom: none;
-}
-
-.activity-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.activity-icon.login {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.activity-icon.update {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.activity-icon.create {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.activity-icon.delete {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.activity-content {
-  flex: 1;
-}
-
-.activity-content p {
-  margin: 0;
-  font-size: 14px;
-  color: #1a1a2e;
-}
-
-.activity-time {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-container {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #1a1a2e;
-}
-
-.modal-close {
-  background: none;
+.btn-save {
+  background: #1e3a8a;
+  color: white;
   border: none;
-  font-size: 24px;
-  color: #94a3b8;
-  cursor: pointer;
-}
-
-.modal-close:hover {
-  color: #1a1a2e;
-}
-
-.modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
-.input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.input-icon {
-  position: absolute;
-  left: 12px;
-  color: #94a3b8;
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 12px 10px 40px;
-  border: 2px solid #e2e8f0;
+  padding: 0.6rem 1.2rem;
   border-radius: 8px;
-  font-size: 16px;
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
   transition: all 0.2s;
 }
 
-.form-input:focus {
-  outline: none;
-  border-color: #2563eb;
+.btn-save:hover {
+  background: #f59e0b;
 }
 
-.toggle-password {
-  position: absolute;
-  right: 12px;
-  background: none;
-  border: none;
-  color: #94a3b8;
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.info-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.info-value {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.info-value.code {
+  font-family: monospace;
+  background: #f1f5f9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Notification */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
   cursor: pointer;
 }
 
-.password-requirements {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.notification.success {
+  background: #10b981;
+  color: white;
 }
 
-.password-requirements p {
-  margin: 0;
-  font-size: 12px;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.notification.error {
+  background: #ef4444;
+  color: white;
 }
 
-.password-requirements p.valid {
-  color: #16a34a;
-}
-
-.error-message {
-  color: #dc2626;
-  font-size: 13px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.alert-success {
-  padding: 12px 16px;
-  background: #dcfce7;
-  border: 1px solid #bbf7d0;
-  color: #16a34a;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.alert-error {
-  padding: 12px 16px;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .profile-info {
+  .profile-grid {
     grid-template-columns: 1fr;
   }
   
-  .profile-actions {
-    flex-direction: column;
-  }
-  
-  .profile-avatar {
+  .profile-header {
     flex-direction: column;
     text-align: center;
   }
-}
-
-.glass-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
+  
+  .info-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
 }
 </style>

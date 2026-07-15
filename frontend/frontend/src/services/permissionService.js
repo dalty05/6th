@@ -1,5 +1,3 @@
-// frontend/src/services/permissionService.js
-
 import api from './api'
 import authService from './auth'
 
@@ -12,6 +10,7 @@ class PermissionService {
     this.loaded = false
     this.loadingPromise = null
     this.initialized = false
+    this.useDefaults = false // Flag to use defaults if API fails
   }
 
   async init() {
@@ -36,48 +35,161 @@ class PermissionService {
       return this.loadingPromise
     }
 
-    if (this.loaded && this.permissions) {
+    if (this.loaded && this.permissions && !this.useDefaults) {
       return true
     }
 
     this.loadingPromise = (async () => {
       try {
-        // ✅ Load permissions from admin debug endpoint
-        const permResponse = await api.get('/admin/debug/permissions')
-        this.permissions = permResponse.data.permissions
-        this.userRole = permResponse.data.role
+        // Get user info first
+        const user = authService.getUser()
+        const userRole = user?.role || 'user'
+        this.userRole = userRole
         
-        // ✅ Load dashboard config from admin endpoint
-        const configResponse = await api.get('/admin/dashboard/config')
-        this.dashboardComponents = configResponse.data.components || []
-        this.roleName = configResponse.data.role?.display_name || 'User'
+        // Try to load from API - handle 500 gracefully
+        try {
+          const response = await api.get('/admin/debug/permissions')
+          
+          if (response.status === 200 && response.data) {
+            // Check if the response has an error flag
+            if (response.data.success === false) {
+              console.warn('Permission API returned error:', response.data.error)
+              // Use defaults if there was an error
+              this.useDefaults = true
+              this.dashboardComponents = this.getDefaultComponentsForRole(userRole)
+              this.roleName = userRole.charAt(0).toUpperCase() + userRole.slice(1).replace('_', ' ')
+              this.loaded = true
+              return true
+            }
+            
+            // Success case
+            this.permissions = response.data.permissions || {}
+            this.userRole = response.data.role || userRole
+            this.dashboardComponents = response.data.components || this.getDefaultComponentsForRole(this.userRole)
+            this.roleName = response.data.role_name || userRole.charAt(0).toUpperCase() + userRole.slice(1).replace('_', ' ')
+            this.useDefaults = false
+            
+            // Ensure Super Admin gets all components
+            if (this.userRole === 'super_admin') {
+              const allComponents = this.getDefaultComponentsForRole('super_admin')
+              const existingKeys = new Set(this.dashboardComponents.map(c => c.key))
+              for (const comp of allComponents) {
+                if (!existingKeys.has(comp.key)) {
+                  this.dashboardComponents.push(comp)
+                }
+              }
+            }
+            
+            this.loaded = true
+            return true
+          }
+        } catch (apiError) {
+          console.warn('Failed to load permissions from API, using defaults:', apiError.message)
+          this.useDefaults = true
+        }
         
-        this.loaded = true
-        return true
-      } catch (error) {
-        
-        
-        if (error.response?.status === 403) {
-          this.dashboardComponents = []
-          this.roleName = 'User'
+        // If we reach here, API failed - use defaults
+        if (this.useDefaults || !this.dashboardComponents.length) {
+          this.dashboardComponents = this.getDefaultComponentsForRole(userRole)
+          this.roleName = userRole.charAt(0).toUpperCase() + userRole.slice(1).replace('_', ' ')
+          this.permissions = {}
           this.loaded = true
           return true
         }
         
-        if (error.response?.status === 401) {
-          authService.logout()
-          this.loaded = true
-          return false
-        }
+        this.loaded = true
+        return true
         
-        this.loaded = false
-        return false
+      } catch (error) {
+        console.error('Error in loadPermissions:', error)
+        // Ultimate fallback
+        const user = authService.getUser()
+        const role = user?.role || 'user'
+        this.userRole = role
+        this.dashboardComponents = this.getDefaultComponentsForRole(role)
+        this.roleName = role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')
+        this.permissions = {}
+        this.useDefaults = true
+        this.loaded = true
+        return true
       } finally {
         this.loadingPromise = null
       }
     })()
 
     return this.loadingPromise
+  }
+
+  //  Get default components for a specific role
+  getDefaultComponentsForRole(role) {
+    const roleComponents = {
+      'super_admin': [
+        { key: 'overview', label: 'Overview', icon: 'fas fa-home', section: 'Main' },
+        { key: 'products', label: 'Products', icon: 'fas fa-box', section: 'Main' },
+        { key: 'blog', label: 'Blog', icon: 'fas fa-blog', section: 'Content' },
+        { key: 'jobs', label: 'Jobs', icon: 'fas fa-briefcase', section: 'Content' },
+        { key: 'outlets', label: 'Outlets', icon: 'fas fa-store', section: 'Main' },
+        { key: 'statistics', label: 'Statistics', icon: 'fas fa-chart-bar', section: 'Analytics' },
+        { key: 'contacts', label: 'Contacts', icon: 'fas fa-address-book', section: 'Main' },
+        { key: 'newsletter', label: 'Newsletter', icon: 'fas fa-envelope', section: 'Content' },
+        { key: 'users', label: 'Users', icon: 'fas fa-users', section: 'Admin' },
+        { key: 'permissions', label: 'Permissions', icon: 'fas fa-lock', section: 'Admin' },
+        { key: 'roles', label: 'Roles', icon: 'fas fa-user-tag', section: 'Admin' },
+        { key: 'tours', label: 'Tours', icon: 'fas fa-map-marked-alt', section: 'Tour' },
+        { key: 'tour-packages', label: 'Tour Packages', icon: 'fas fa-boxes', section: 'Tour' },
+        { key: 'tour-calendar', label: 'Tour Calendar', icon: 'fas fa-calendar-alt', section: 'Tour' },
+        { key: 'tour-payments', label: 'Tour Payments', icon: 'fas fa-credit-card', section: 'Tour' },
+        { key: 'tour-reports', label: 'Tour Reports', icon: 'fas fa-file-alt', section: 'Tour' },
+        { key: 'tour-staff', label: 'Tour Staff', icon: 'fas fa-user-tie', section: 'Tour' },
+        { key: 'partners', label: 'Partners', icon: 'fas fa-handshake', section: 'Partners' },
+        { key: 'partner-links', label: 'Partner Links', icon: 'fas fa-link', section: 'Partners' },
+        { key: 'partner-analytics', label: 'Partner Analytics', icon: 'fas fa-chart-line', section: 'Partners' },
+        { key: 'profile', label: 'Profile', icon: 'fas fa-user', section: 'Admin' },
+        { key: 'activities', label: 'Activities', icon: 'fas fa-activity', section: 'Admin' }
+      ],
+      'admin': [
+        { key: 'overview', label: 'Overview', icon: 'fas fa-home', section: 'Main' },
+        { key: 'products', label: 'Products', icon: 'fas fa-box', section: 'Main' },
+        { key: 'blog', label: 'Blog', icon: 'fas fa-blog', section: 'Content' },
+        { key: 'jobs', label: 'Jobs', icon: 'fas fa-briefcase', section: 'Content' },
+        { key: 'outlets', label: 'Outlets', icon: 'fas fa-store', section: 'Main' },
+        { key: 'statistics', label: 'Statistics', icon: 'fas fa-chart-bar', section: 'Analytics' },
+        { key: 'contacts', label: 'Contacts', icon: 'fas fa-address-book', section: 'Main' },
+        { key: 'newsletter', label: 'Newsletter', icon: 'fas fa-envelope', section: 'Content' },
+        { key: 'users', label: 'Users', icon: 'fas fa-users', section: 'Admin' },
+        { key: 'profile', label: 'Profile', icon: 'fas fa-user', section: 'Admin' }
+      ],
+      'tour_manager': [
+        { key: 'overview', label: 'Overview', icon: 'fas fa-home', section: 'Main' },
+        { key: 'tours', label: 'Tours', icon: 'fas fa-map-marked-alt', section: 'Tour' },
+        { key: 'tour-packages', label: 'Tour Packages', icon: 'fas fa-boxes', section: 'Tour' },
+        { key: 'tour-calendar', label: 'Tour Calendar', icon: 'fas fa-calendar-alt', section: 'Tour' },
+        { key: 'tour-payments', label: 'Tour Payments', icon: 'fas fa-credit-card', section: 'Tour' },
+        { key: 'tour-reports', label: 'Tour Reports', icon: 'fas fa-file-alt', section: 'Tour' },
+        { key: 'tour-staff', label: 'Tour Staff', icon: 'fas fa-user-tie', section: 'Tour' },
+        { key: 'profile', label: 'Profile', icon: 'fas fa-user', section: 'Admin' }
+      ],
+      'tour_assistant': [
+        { key: 'overview', label: 'Overview', icon: 'fas fa-home', section: 'Main' },
+        { key: 'tours', label: 'Tours', icon: 'fas fa-map-marked-alt', section: 'Tour' },
+        { key: 'tour-calendar', label: 'Tour Calendar', icon: 'fas fa-calendar-alt', section: 'Tour' },
+        { key: 'tour-payments', label: 'Tour Payments', icon: 'fas fa-credit-card', section: 'Tour' },
+        { key: 'profile', label: 'Profile', icon: 'fas fa-user', section: 'Admin' }
+      ],
+      'partner': [
+        { key: 'overview', label: 'Overview', icon: 'fas fa-home', section: 'Main' },
+        { key: 'partners', label: 'Partners', icon: 'fas fa-handshake', section: 'Partners' },
+        { key: 'partner-links', label: 'Partner Links', icon: 'fas fa-link', section: 'Partners' },
+        { key: 'partner-analytics', label: 'Partner Analytics', icon: 'fas fa-chart-line', section: 'Partners' },
+        { key: 'profile', label: 'Profile', icon: 'fas fa-user', section: 'Admin' }
+      ],
+      'user': [
+        { key: 'overview', label: 'Overview', icon: 'fas fa-home', section: 'Main' },
+        { key: 'profile', label: 'Profile', icon: 'fas fa-user', section: 'Admin' }
+      ]
+    }
+
+    return roleComponents[role] || roleComponents['user']
   }
 
   can(resource, action = 'read') {
@@ -114,18 +226,32 @@ class PermissionService {
   }
 
   canViewComponent(componentKey) {
+    // ✅ Super Admin can view all components
     if (this.userRole === 'super_admin') {
       return true
     }
     return this.dashboardComponents.some(c => c.key === componentKey)
   }
 
+  // ✅ Get dashboard components (filtered by role)
   getDashboardComponents() {
-    return this.dashboardComponents
+    // ✅ Return the role-based components
+    if (this.dashboardComponents && this.dashboardComponents.length > 0) {
+      return this.dashboardComponents
+    }
+    
+    // Fallback: get components based on user's role
+    const user = authService.getUser()
+    const role = user?.role || 'user'
+    return this.getDefaultComponentsForRole(role)
   }
 
   getRoleName() {
     return this.roleName
+  }
+
+  getUserRole() {
+    return this.userRole
   }
 
   isDashboardLoaded() {
@@ -142,8 +268,40 @@ class PermissionService {
     this.initialized = false
   }
 
+  // Component actions
+  getComponentActions(componentKey) {
+    const actionMap = {
+      'overview': ['read'],
+      'products': ['create', 'read', 'update', 'delete'],
+      'blog': ['create', 'read', 'update', 'delete'],
+      'jobs': ['create', 'read', 'update', 'delete'],
+      'outlets': ['create', 'read', 'update', 'delete'],
+      'statistics': ['read'],
+      'contacts': ['read', 'update', 'delete'],
+      'newsletter': ['create', 'read', 'update', 'delete'],
+      'users': ['create', 'read', 'update', 'delete'],
+      'permissions': ['read', 'update'],
+      'roles': ['create', 'read', 'update', 'delete'],
+      'components': ['create', 'read', 'update', 'delete'],
+      'tours': ['create', 'read', 'update', 'delete'],
+      'tour-packages': ['create', 'read', 'update', 'delete'],
+      'tour-calendar': ['read', 'update'],
+      'tour-payments': ['read', 'update'],
+      'tour-reports': ['read'],
+      'tour-staff': ['read', 'update'],
+      'bookings': ['create', 'read', 'update', 'delete', 'approve', 'reject'],
+      'tour_settings': ['read', 'update'],
+      'partners': ['create', 'read', 'update', 'delete'],
+      'partner-links': ['create', 'read', 'update', 'delete'],
+      'partner-analytics': ['read'],
+      'profile': ['read', 'update'],
+      'activities': ['read'],
+    }
+    return actionMap[componentKey] || ['read']
+  }
+
   // ============================================================
-  // ADMIN COMPONENT HELPERS (Updated paths)
+  // ADMIN COMPONENT HELPERS
   // ============================================================
 
   canViewProducts() { return this.canView('products') }

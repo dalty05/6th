@@ -326,18 +326,26 @@
           </div>
           
           <div class="delete-items-list">
-            <p><strong>The following data will be deleted:</strong></p>
+            <p><strong>The following data will be permanently deleted:</strong></p>
             <ul>
               <li><i class="fas fa-link"></i> All referral links and click data</li>
               <li><i class="fas fa-lock"></i> All custom permissions</li>
               <li><i class="fas fa-history"></i> All activity logs</li>
               <li><i class="fas fa-key"></i> Login history and OTP records</li>
+              <li><i class="fas fa-calendar-check"></i> Tour bookings and payments</li>
+              <li><i class="fas fa-newspaper"></i> Blog posts (author will be removed)</li>
             </ul>
           </div>
           
           <div class="confirm-input">
             <label>Type <strong>"DELETE"</strong> to confirm:</label>
-            <input type="text" v-model="deleteConfirmText" placeholder="DELETE" class="delete-confirm-input">
+            <input 
+              type="text" 
+              v-model="deleteConfirmText" 
+              placeholder="DELETE" 
+              class="delete-confirm-input"
+              @keyup.enter="confirmDelete"
+            >
           </div>
           
           <div class="form-actions">
@@ -415,7 +423,6 @@ const adminCount = computed(() => users.value.filter(u => u.role === 'admin' || 
 const filteredUsers = computed(() => {
   let result = users.value
   
-  // Search filter
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(u => 
@@ -424,12 +431,10 @@ const filteredUsers = computed(() => {
     )
   }
   
-  // Role filter
   if (roleFilter.value) {
     result = result.filter(u => u.role === roleFilter.value)
   }
   
-  // Status filter
   if (statusFilter.value === 'active') {
     result = result.filter(u => u.is_active && u.is_approved)
   } else if (statusFilter.value === 'inactive') {
@@ -514,7 +519,7 @@ const saveUser = async () => {
       toast.success('User updated successfully')
     } else {
       const response = await api.post('/admin/users', form.value)
-      newUserPassword.value = response.data.user?.temporary_password
+      newUserPassword.value = response.data.temporary_password || response.data.user?.temporary_password
       toast.success('User created successfully')
     }
     closeModal()
@@ -630,7 +635,7 @@ const copyPassword = () => {
   }
 }
 
-// ========== DELETE ==========
+// ========== DELETE - WITH CASCADE ==========
 const openDeleteModal = (user) => {
   deleteUserData.value = user
   deleteConfirmText.value = ''
@@ -652,12 +657,15 @@ const confirmDelete = async () => {
   
   deleting.value = true
   try {
+    // ✅ This will trigger the cascade delete on the backend
     await api.delete(`/admin/users/${deleteUserData.value.id}`)
-    toast.success(`User ${deleteUserData.value.email} has been permanently deleted`)
+    toast.success(`User ${deleteUserData.value.email} has been permanently deleted with all related data`)
     closeDeleteModal()
     await loadUsers()
   } catch (error) {
-    toast.error(error.response?.data?.error || 'Failed to delete user')
+    console.error('Delete error:', error)
+    const errorMsg = error.response?.data?.error || 'Failed to delete user. Check console for details.'
+    toast.error(errorMsg)
   } finally {
     deleting.value = false
   }
@@ -702,6 +710,8 @@ onMounted(async () => {
   await loadUsers()
 })
 </script>
+
+
 
 <style scoped>
 .user-management {

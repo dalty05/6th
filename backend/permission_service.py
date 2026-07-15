@@ -131,7 +131,7 @@ COMPONENT_ACTION_MAP = {
     'tour-staff': ['read', 'update'],
     'bookings': ['create', 'read', 'update', 'delete', 'approve', 'reject'],
     'tour_settings': ['read', 'update'],
-    'partner-dashboard': ['read'],
+   
     'partner-links': ['create', 'read', 'update', 'delete'],
     'partner-analytics': ['read'],
     'profile': ['read', 'update'],
@@ -176,64 +176,100 @@ def require_permission(resource, action):
 # HAS PERMISSION
 # ============================================================
 
+
 def has_permission(user, resource, action, resource_id=None):
     """
     UNIFIED PERMISSION CHECK - Priority order:
     1. Super admin → always True
     2. Individual custom permission (UserPermission) - HIGHEST PRIORITY
-    3. Component-based permissions (from assigned components) - FOR ALL ROLES
-    4. System role permissions (from ROLE_PERMISSIONS)
-    5. Resource-specific permission (ResourcePermission)
+    3. Role-Component action overrides (RoleComponent.action_overrides)
+    4. Component-based permissions (from assigned components)
+    5. System role permissions (from ROLE_PERMISSIONS)
     6. Default deny
+
+    NOTE:
+    This function is used by /admin/debug/permissions during login.
+    It must never raise; missing DB rows or unexpected data should
+    safely deny permissions instead.
     """
-    if not user or not user.is_active:
-        return False
-    
-    # 1. Super admin override
-    if user.role == 'super_admin':
-        return True
-    
-    # 2. INDIVIDUAL CUSTOM PERMISSION
     try:
-        up = UserPermission.query.filter_by(
-            user_id=user.id,
-            resource=resource,
-            action=action
-        ).first()
-        if up:
-            return up.is_allowed
-    except Exception as e:
-        return False
-    
-    # 3. COMPONENT-BASED PERMISSIONS
-    if ComponentService.user_can_access_component(resource, user.id):
-        allowed_actions = COMPONENT_ACTION_MAP.get(resource, ['read'])
-        result = action in allowed_actions
-        if result:
-            return result
-    
-    # 4. SYSTEM ROLE PERMISSIONS
-    if user.role in SYSTEM_ROLES:
-        role_perms = ROLE_PERMISSIONS.get(user.role, {})
-        result = role_perms.get(resource, {}).get(action, False)
-        if result:
-            return result
-    
-    # 5. RESOURCE-SPECIFIC PERMISSION
-    if resource_id is not None:
+        if not user or not getattr(user, 'is_active', False):
+            return False
+
+        user_role = getattr(user, 'role', None)
+        user_email = getattr(user, 'email', 'unknown')
+
+        # 1. Super admin override
+        if user_role == 'super_admin':
+            return True
+
+        # 2. Individual custom permission (Highest priority)
         try:
-            rp = ResourcePermission.query.filter_by(
-                user_id=user.id,
-                resource_type=resource,
-                resource_id=resource_id,
+            up = UserPermission.query.filter_by(
+                user_id=getattr(user, 'id', None),
+                resource=resource,
                 action=action
             ).first()
-            if rp:
-                return rp.is_allowed
-        except:
+            if up:
+                return bool(up.is_allowed)
+        except Exception:
+            # ignore and continue fallback checks
             pass
-    
-    return False
+
+        # ✅ 3. ROLE-COMPONENT ACTION OVERRIDES
+        role_ids = []
+        if getattr(user, 'role_id', None):
+            role_ids.append(user.role_id)
+
+        if user_role in SYSTEM_ROLES:
+            role = Role.query.filter_by(name=user_role).first()
+            if role:
+                role_ids.append(role.id)
+
+        if role_ids:
+            component = DashboardComponent.query.filter_by(key=resource).first()
+            if component:
+                for role_id in role_ids:
+                    # Import to avoid undefined name for static analysis (Pylance)
+                    from models import RoleComponent
+                    role_component = RoleComponent.query.filter_by(
+                        role_id=role_id,
+                        component_id=component.id
+                    ).first()
+                    if role_component:
+                        # role_component.can(action) may not exist on all deployments
+                        if hasattr(role_component, 'can'):
+                            try:
+                                if role_component.can(action):
+                                    return True
+                                return False
+                            except Exception:
+                                pass
+                        # fallback to action_overrides JSON
+                        overrides = getattr(role_component, 'action_overrides', {}) or {}
+                        if action in overrides:
+                            return bool(overrides.get(action))
+
+        # 4. Component-based permissions (fallback)
+        if user_role not in SYSTEM_ROLES:
+            try:
+                if ComponentService.user_can_access_component(resource, user.id):
+                    allowed_actions = COMPONENT_ACTION_MAP.get(resource, ['read'])
+                    return action in allowed_actions
+            except Exception:
+                pass
+
+        # 5. SYSTEM ROLE PERMISSIONS
+        if user_role in SYSTEM_ROLES:
+            role_perms = ROLE_PERMISSIONS.get(user_role, {})
+            return bool(role_perms.get(resource, {}).get(action, False))
+
+        # 6. Default deny
+        return False
+    except Exception:
+        # Absolute last-resort: never crash permission debug
+        return False
+
 
 # GET USER PERMISSIONS
 

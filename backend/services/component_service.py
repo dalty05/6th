@@ -3,7 +3,6 @@ from flask_login import current_user
 
 class ComponentService:
     
-    # ✅ Define the exact components for super admin
     SUPER_ADMIN_COMPONENTS = [
         'overview',
         'products',
@@ -24,8 +23,7 @@ class ComponentService:
         'tour-reports',
         'tour-staff',
         'partners',
-        'partner-links',
-        'partner-analytics',
+        
         'profile',
         'activities'
     ]

@@ -1023,24 +1023,82 @@ def delete_contact(id):
 # NEWSLETTER
 # ============================================================
 
+
+
 @admin_bp.route('/newsletter/subscribers', methods=['GET'])
 @login_required
 def get_newsletter_subscribers():
-    """Get all newsletter subscribers"""
+    """Get all newsletter subscribers with pagination and search"""
     try:
         if not user_has_component('newsletter'):
             return jsonify({'error': 'Access denied'}), 403
         
-        subscribers = NewsletterSubscriber.query.order_by(NewsletterSubscriber.subscribed_at.desc()).all()
-        return jsonify([{
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '')
+        status = request.args.get('status', 'all')
+        
+        # Build query
+        query = NewsletterSubscriber.query
+        
+        # Apply search filter
+        if search:
+            query = query.filter(
+                db.or_(
+                    NewsletterSubscriber.name.ilike(f'%{search}%'),
+                    NewsletterSubscriber.email.ilike(f'%{search}%')
+                )
+            )
+        
+        # Apply status filter
+        if status == 'active':
+            query = query.filter_by(is_active=True)
+        elif status == 'inactive':
+            query = query.filter_by(is_active=False)
+        
+        # Order by subscribed_at desc
+        query = query.order_by(NewsletterSubscriber.subscribed_at.desc())
+        
+        # Paginate
+        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Format response with data and pagination
+        subscribers_data = [{
             'id': s.id,
             'name': s.name,
             'email': s.email,
             'is_active': s.is_active,
-            'subscribed_at': s.subscribed_at.isoformat() if s.subscribed_at else None
-        } for s in subscribers]), 200
+            'subscribed_at': s.subscribed_at.isoformat() if s.subscribed_at else None,
+            'last_sent': s.last_sent.isoformat() if hasattr(s, 'last_sent') and s.last_sent else None
+        } for s in paginated.items]
+        
+        return jsonify({
+            'data': subscribers_data,
+            'pagination': {
+                'current_page': paginated.page,
+                'total_pages': paginated.pages,
+                'total_items': paginated.total,
+                'has_next': paginated.has_next,
+                'has_prev': paginated.has_prev
+            }
+        }), 200
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Error in get_newsletter_subscribers: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'data': [],
+            'pagination': {
+                'current_page': 1,
+                'total_pages': 1,
+                'total_items': 0,
+                'has_next': False,
+                'has_prev': False
+            }
+        }), 200
+
 
 @admin_bp.route('/newsletter/subscribers/stats', methods=['GET'])
 @login_required
@@ -1067,7 +1125,13 @@ def get_subscriber_stats():
             'new_last_30_days': new_last_30
         }), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'total': 0,
+            'active': 0,
+            'inactive': 0,
+            'new_last_30_days': 0
+        }), 500
+
 
 @admin_bp.route('/newsletter/subscribers/<int:subscriber_id>', methods=['DELETE'])
 @login_required
@@ -1869,26 +1933,242 @@ def update_user(id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+
+
 @admin_bp.route('/users/<int:id>', methods=['DELETE'])
 @login_required
 @require_permission('users', 'delete')
 def delete_user(id):
-    """Delete a user"""
+    """
+    Permanently delete a user and ALL associated data.
+    Handles all foreign key constraints properly.
+    """
     try:
         if not user_has_component('users'):
             return jsonify({'error': 'Access denied'}), 403
         
         user = User.query.get_or_404(id)
         
+        # Prevent deleting yourself
         if user.id == current_user.id:
-            return jsonify({'error': 'Cannot delete yourself'}), 400
+            return jsonify({'error': 'Cannot delete your own account'}), 400
         
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify({'message': 'User deleted'}), 200
+        # Prevent deleting super_admin if you're not one
+        if user.role == 'super_admin' and current_user.role != 'super_admin':
+            return jsonify({'error': 'Cannot delete super admin'}), 403
+        
+        # Store user info for logging
+        user_email = user.email
+        user_name = user.full_name
+        user_id = user.id
+        
+        print(f"🗑️ Starting cascade delete for user: {user_email} (ID: {user_id})")
+        
+        from models import (
+            ReferralLink, ReferralClick, ReferralNavigation,
+            UserPermission, ResourcePermission,
+            ActivityLog, BlogPost, JobApplication,
+            TourBooking, TourPayment, TourInvoice, TourAvailability,
+            NewsletterSubscriber, ContactMessage,
+            LoginAttempt, OTP, PasswordResetToken,
+            EmailVerificationToken, TourPackage, Job, Role
+        )
+        
+        try:
+            # ============================================================
+            # DELETE IN CORRECT ORDER (Children first, then parents)
+            # ============================================================
+            
+            # 1. REFERRAL DATA (deepest first)
+            print("  📌 Deleting referral data...")
+            referral_links = ReferralLink.query.filter_by(user_id=user_id).all()
+            for link in referral_links:
+                # Delete referral clicks
+                ReferralClick.query.filter_by(link_id=link.id).delete()
+                # Delete referral navigation data
+                ReferralNavigation.query.filter_by(link_id=link.id).delete()
+            # Delete referral links
+            ReferralLink.query.filter_by(user_id=user_id).delete()
+            print("     ✅ Deleted referral links and clicks")
+            
+            # 2. PERMISSIONS
+            print("  📌 Deleting permissions...")
+            # User permissions
+            UserPermission.query.filter_by(user_id=user_id).delete()
+            UserPermission.query.filter_by(created_by=user_id).delete()
+            # Resource permissions
+            ResourcePermission.query.filter_by(user_id=user_id).delete()
+            ResourcePermission.query.filter_by(created_by=user_id).delete()
+            print("     ✅ Deleted permissions")
+            
+            # 3. AUTH DATA
+            print("  📌 Deleting auth data...")
+            OTP.query.filter_by(user_id=user_id).delete()
+            PasswordResetToken.query.filter_by(user_id=user_id).delete()
+            EmailVerificationToken.query.filter_by(user_id=user_id).delete()
+            LoginAttempt.query.filter_by(user_id=user_id).delete()
+            print("     ✅ Deleted auth data")
+            
+            # 4. ACTIVITY LOGS
+            print("  📌 Deleting activity logs...")
+            ActivityLog.query.filter_by(user_id=user_id).delete()
+            print("     ✅ Deleted activity logs")
+            
+            # 5. TOUR DATA
+            print("  📌 Deleting tour data...")
+            
+            # Get all bookings where user is customer
+            tour_bookings = TourBooking.query.filter_by(customer_user_id=user_id).all()
+            for booking in tour_bookings:
+                # Delete tour invoices (they reference booking_id)
+                TourInvoice.query.filter_by(booking_id=booking.id).delete()
+                # Delete tour payments (they reference booking_id)
+                TourPayment.query.filter_by(booking_id=booking.id).delete()
+            
+            # Delete the bookings
+            TourBooking.query.filter_by(customer_user_id=user_id).delete()
+            
+            # Update bookings created by this user
+            TourBooking.query.filter_by(created_by_id=user_id).update({'created_by_id': None})
+            
+            # Update tour packages created by this user
+            TourPackage.query.filter_by(created_by_id=user_id).update({'created_by_id': None})
+            
+            # Update tour payments verified by this user
+            TourPayment.query.filter_by(verified_by_id=user_id).update({'verified_by_id': None})
+            
+            # Update tour availability (if it has created_by)
+            if hasattr(TourAvailability, 'created_by_id'):
+                TourAvailability.query.filter_by(created_by_id=user_id).update({'created_by_id': None})
+            
+            print("     ✅ Deleted/updated tour data")
+            
+            # 6. BLOG POSTS - Update author to NULL
+            print("  📌 Updating blog posts...")
+            BlogPost.query.filter_by(author_id=user_id).update({'author_id': None})
+            print("     ✅ Updated blog posts")
+            
+            # 7. JOBS - Update created_by to NULL
+            print("  📌 Updating jobs...")
+            Job.query.filter_by(created_by=user_id).update({'created_by': None})
+            print("     ✅ Updated jobs")
+            
+            # 8. JOB APPLICATIONS - Update replied_by to NULL
+            print("  📌 Updating job applications...")
+            JobApplication.query.filter_by(replied_by=user_id).update({'replied_by': None})
+            print("     ✅ Updated job applications")
+            
+            # 9. ROLES - Update created_by_id to NULL
+            print("  📌 Updating roles...")
+            Role.query.filter_by(created_by_id=user_id).update({'created_by_id': None})
+            print("     ✅ Updated roles")
+            
+            # 10. NEWSLETTER - Deactivate
+            print("  📌 Deactivating newsletter subscriptions...")
+            NewsletterSubscriber.query.filter_by(email=user_email).update({'is_active': False})
+            print("     ✅ Deactivated newsletter subscriptions")
+            
+            # 11. CONTACT MESSAGES
+            print("  📌 Updating contact messages...")
+            ContactMessage.query.filter_by(email=user_email).update({'status': 'archived'})
+            print("     ✅ Updated contact messages")
+            
+            # 12. ✅ COMMIT all changes before deleting the user
+            db.session.commit()
+            print("  ✅ All related data deleted/updated")
+            
+            # ============================================================
+            # FINALLY DELETE THE USER
+            # ============================================================
+            print(f"  🗑️ Deleting user: {user_email}")
+            
+            # Check if user has any remaining references
+            # This catches any missed relationships
+            db.session.delete(user)
+            db.session.commit()
+            print(f"  ✅ User {user_email} permanently deleted")
+            
+            # Log the deletion
+            log_activity(
+                user=current_user,
+                action='delete_permanent',
+                resource_type='user',
+                resource_id=user_id,
+                description=f'Permanently deleted user: {user_email} ({user_name}) with all related data'
+            )
+            
+            return jsonify({
+                'message': f'User {user_email} and all related data have been permanently deleted',
+                'success': True,
+                'deleted_user': {
+                    'id': user_id,
+                    'email': user_email,
+                    'name': user_name
+                }
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Error during cascade delete: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
+            
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Error deleting user {id}: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/users/<int:id>/relations', methods=['GET'])
+@login_required
+def get_user_relations(id):
+    """Debug: See all relations for a user"""
+    try:
+        user = User.query.get_or_404(id)
+        
+        from models import (
+            ReferralLink, ReferralClick, UserPermission, 
+            ResourcePermission, ActivityLog, BlogPost, 
+            JobApplication, TourBooking, TourPayment,
+            TourInvoice, OTP, PasswordResetToken,
+            EmailVerificationToken, LoginAttempt
+        )
+        
+        relations = {
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'is_active': user.is_active
+            },
+            'counts': {
+                'referral_links': ReferralLink.query.filter_by(user_id=user.id).count(),
+                'referral_clicks': ReferralClick.query.join(ReferralLink).filter(ReferralLink.user_id == user.id).count(),
+                'user_permissions': UserPermission.query.filter_by(user_id=user.id).count(),
+                'resource_permissions': ResourcePermission.query.filter_by(user_id=user.id).count(),
+                'activity_logs': ActivityLog.query.filter_by(user_id=user.id).count(),
+                'blog_posts_author': BlogPost.query.filter_by(author_id=user.id).count(),
+                'job_applications_replied': JobApplication.query.filter_by(replied_by=user.id).count(),
+                'tour_bookings_customer': TourBooking.query.filter_by(customer_user_id=user.id).count(),
+                'tour_payments_verified': TourPayment.query.filter_by(verified_by_id=user.id).count(),
+                'tour_invoices': TourInvoice.query.join(TourBooking).filter(TourBooking.customer_user_id == user.id).count(),
+                'otp_codes': OTP.query.filter_by(user_id=user.id).count(),
+                'password_reset_tokens': PasswordResetToken.query.filter_by(user_id=user.id).count(),
+                'email_verification_tokens': EmailVerificationToken.query.filter_by(user_id=user.id).count(),
+                'login_attempts': LoginAttempt.query.filter_by(user_id=user.id).count()
+            }
+        }
+        
+        return jsonify(relations), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
 
 # ============================================================
 # ROLES
@@ -1946,6 +2226,14 @@ def create_role():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# ROLES
+# ============================================================
+
+
+
 
 @admin_bp.route('/roles/<int:id>', methods=['PUT'])
 @login_required
@@ -2007,6 +2295,149 @@ def delete_role(id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+
+
+# ============================================================
+# ROLE COMPONENT MANAGEMENT
+# ============================================================
+
+
+@admin_bp.route('/roles/<int:role_id>/components/<int:component_id>', methods=['PUT'])
+@login_required
+def update_role_component_actions_simple(role_id, component_id):
+    """Simple version - Update action overrides"""
+    try:
+        print(f"🔍 Simple update: role {role_id}, component {component_id}")
+        
+        # Check permission
+        if not user_has_component('roles'):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Get the role-component pair
+        role_component = RoleComponent.query.filter_by(
+            role_id=role_id,
+            component_id=component_id
+        ).first()
+        
+        if not role_component:
+            return jsonify({'error': 'Role-component pair not found'}), 404
+        
+        data = request.json
+        action_overrides = data.get('action_overrides', {})
+        
+        # Simple update
+        role_component.action_overrides = action_overrides
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Actions updated successfully',
+            'action_overrides': action_overrides
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/roles/<int:role_id>/components', methods=['POST'])
+@login_required
+@require_permission('roles', 'update')
+def assign_component_to_role(role_id):
+    """Assign a component to a role with action overrides"""
+    try:
+        if not user_has_component('roles'):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        role = Role.query.get_or_404(role_id)
+        data = request.json
+        component_id = data.get('component_id')
+        action_overrides = data.get('action_overrides', {})
+        
+        if not component_id:
+            return jsonify({'error': 'Component ID is required'}), 400
+        
+        component = DashboardComponent.query.get_or_404(component_id)
+        
+        # Check if already assigned
+        existing = RoleComponent.query.filter_by(
+            role_id=role_id,
+            component_id=component_id
+        ).first()
+        
+        if existing:
+            return jsonify({'error': 'Component already assigned to this role'}), 400
+        
+        # Create new role-component with action overrides
+        role_component = RoleComponent(
+            role_id=role_id,
+            component_id=component_id,
+            action_overrides=action_overrides
+        )
+        db.session.add(role_component)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Component assigned to role',
+            'role_component': role_component.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error in assign_component_to_role: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/roles/<int:role_id>/components/<int:component_id>', methods=['DELETE'])
+@login_required
+@require_permission('roles', 'update')
+def remove_component_from_role(role_id, component_id):
+    """Remove a component from a role"""
+    try:
+        if not user_has_component('roles'):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        role_component = RoleComponent.query.filter_by(
+            role_id=role_id,
+            component_id=component_id
+        ).first_or_404()
+        
+        db.session.delete(role_component)
+        db.session.commit()
+        
+        return jsonify({'message': 'Component removed from role'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error in remove_component_from_role: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/roles/<int:role_id>/components', methods=['GET'])
+@login_required
+@require_permission('roles', 'read')
+def get_role_components(role_id):
+    """Get all components assigned to a role with their actions"""
+    try:
+        if not user_has_component('roles'):
+            return jsonify({'error': 'Access denied'}), 403
+        
+        role = Role.query.get_or_404(role_id)
+        
+        role_components = RoleComponent.query.filter_by(role_id=role_id).all()
+        
+        return jsonify({
+            'role': role.to_dict(),
+            'components': [rc.to_dict() for rc in role_components]
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error in get_role_components: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+
 # ============================================================
 # PERMISSIONS
 # ============================================================
@@ -2030,6 +2461,8 @@ def get_my_permissions():
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
 
 @admin_bp.route('/permissions/resources', methods=['GET'])
 @login_required
@@ -2625,37 +3058,278 @@ def create_partner_link(partner_id):
 
 
 
-
 @admin_bp.route('/referral/analytics', methods=['GET'])
 @login_required
 def get_referral_analytics():
-    """Get referral analytics"""
+    """Get referral analytics for the logged-in partner"""
     try:
         if not user_has_component('partner-analytics'):
             return jsonify({'error': 'Access denied'}), 403
         
-        total_links = ReferralLink.query.count()
-        total_clicks = db.session.query(db.func.sum(ReferralLink.total_clicks)).scalar() or 0
-        total_conversions = db.session.query(db.func.sum(ReferralLink.conversions)).scalar() or 0
+        # ✅ Only partners can access this
+        if current_user.role != 'partner':
+            return jsonify({'error': 'Partner access required'}), 403
         
-        # Get recent links
-        recent_links = ReferralLink.query.order_by(ReferralLink.created_at.desc()).limit(5).all()
+        # Get days parameter (default: 30)
+        days = request.args.get('days', 30, type=int)
+        days = min(max(days, 1), 365)
+        
+        from datetime import timedelta
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        # ✅ Get ONLY the logged-in user's referral links
+        links = ReferralLink.query.filter_by(user_id=current_user.id).all()
+        link_ids = [l.id for l in links] if links else []
+        
+        # ============================================================
+        # 1. OVERVIEW STATISTICS
+        # ============================================================
+        
+        total_links = len(links)
+        total_clicks = sum(l.total_clicks for l in links) if links else 0
+        total_unique_clicks = sum(l.unique_clicks for l in links) if links else 0
+        total_conversions = sum(l.conversions for l in links) if links else 0
+        
+        recent_links = len([l for l in links if l.created_at >= start_date]) if links else 0
+        recent_clicks = sum(l.total_clicks for l in links if l.created_at >= start_date) if links else 0
+        
+        conversion_rate = round((total_conversions / total_clicks * 100), 2) if total_clicks > 0 else 0
+        
+        # ============================================================
+        # 2. TOP PERFORMING LINKS
+        # ============================================================
+        
+        top_links = sorted(links, key=lambda x: x.total_clicks, reverse=True)[:10] if links else []
+        
+        top_links_data = [{
+            'id': l.id,
+            'name': l.name,
+            'link_code': l.link_code,
+            'total_clicks': l.total_clicks,
+            'unique_clicks': l.unique_clicks,
+            'conversions': l.conversions,
+            'conversion_rate': round((l.conversions / l.total_clicks * 100), 2) if l.total_clicks > 0 else 0,
+            'created_at': l.created_at.isoformat() if l.created_at else None
+        } for l in top_links]
+        
+        # ============================================================
+        # 3. DAILY TREND DATA - FIXED
+        # ============================================================
+        
+        daily_data = {}
+        
+        # Create date range
+        for i in range(days):
+            date = datetime.utcnow() - timedelta(days=i)
+            date_key = date.strftime('%Y-%m-%d')
+            date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            # Count clicks for this day for this partner's links
+            day_clicks = 0
+            if link_ids:
+                day_clicks = ReferralClick.query.filter(
+                    ReferralClick.link_id.in_(link_ids),
+                    ReferralClick.clicked_at >= date_start,
+                    ReferralClick.clicked_at <= date_end
+                ).count()
+            
+            # Also count conversions for this day
+            day_conversions = 0
+            if link_ids:
+                day_conversions = ReferralClick.query.filter(
+                    ReferralClick.link_id.in_(link_ids),
+                    ReferralClick.clicked_at >= date_start,
+                    ReferralClick.clicked_at <= date_end,
+                    ReferralClick.converted == True
+                ).count()
+            
+            daily_data[date_key] = {
+                'date': date_key,
+                'clicks': day_clicks,
+                'conversions': day_conversions
+            }
+        
+        # Sort dates (oldest to newest)
+        sorted_dates = sorted(daily_data.keys())
+        daily_clicks = [daily_data[d]['clicks'] for d in sorted_dates]
+        daily_conversions = [daily_data[d]['conversions'] for d in sorted_dates]
+        daily_dates = [d for d in sorted_dates]
+        
+        # ============================================================
+        # 4. RECENT ACTIVITY
+        # ============================================================
+        
+        recent_clicks_list = []
+        if link_ids:
+            recent_clicks_list = ReferralClick.query.filter(
+                ReferralClick.link_id.in_(link_ids)
+            ).order_by(
+                ReferralClick.clicked_at.desc()
+            ).limit(20).all()
+        
+        recent_activity = [{
+            'id': c.id,
+            'link_name': c.link.name if c.link else 'Unknown',
+            'link_code': c.link.link_code if c.link else 'Unknown',
+            'clicked_at': c.clicked_at.isoformat() if c.clicked_at else None,
+            'referrer_url': c.referrer_url,
+            'converted': c.converted
+        } for c in recent_clicks_list]
+        
+        # ============================================================
+        # 5. SOURCE ANALYTICS - FIXED
+        # ============================================================
+        
+        source_data = {}
+        if link_ids:
+            # Get all clicks for partner's links
+            all_clicks = ReferralClick.query.filter(
+                ReferralClick.link_id.in_(link_ids)
+            ).all()
+            
+            for click in all_clicks:
+                referrer = click.referrer_url or 'Direct'
+                
+                # Try to extract domain from URL
+                if referrer and referrer != 'Direct':
+                    import re
+                    # Remove protocol
+                    clean_referrer = re.sub(r'^https?://', '', referrer)
+                    # Get domain and path (first part)
+                    if '/' in clean_referrer:
+                        domain = clean_referrer.split('/')[0]
+                    else:
+                        domain = clean_referrer
+                    
+                    # Limit domain length for display
+                    if len(domain) > 30:
+                        domain = domain[:27] + '...'
+                    
+                    referrer = domain
+                
+                source_data[referrer] = source_data.get(referrer, 0) + 1
+        
+        # Sort by count and get top sources
+        sorted_sources = sorted(source_data.items(), key=lambda x: x[1], reverse=True)
+        top_sources = [{'source': s, 'count': c} for s, c in sorted_sources[:10]]
+        
+        # If no source data, add a placeholder
+        if not top_sources and total_clicks > 0:
+            top_sources = [{'source': 'Direct', 'count': total_clicks}]
+        
+        # ============================================================
+        # 6. REFERRAL CODE
+        # ============================================================
+        
+        referral_code = current_user.referral_code or 'No code yet'
+        
+        # ============================================================
+        # RESPONSE
+        # ============================================================
         
         return jsonify({
-            'total_links': total_links,
-            'total_clicks': total_clicks,
-            'total_conversions': total_conversions,
-            'conversion_rate': round((total_conversions / total_clicks * 100), 2) if total_clicks > 0 else 0,
-            'recent_links': [l.to_dict() for l in recent_links]
+            'overview': {
+                'total_links': total_links,
+                'total_clicks': total_clicks,
+                'total_unique_clicks': total_unique_clicks,
+                'total_conversions': total_conversions,
+                'conversion_rate': conversion_rate,
+                'recent_links': recent_links,
+                'recent_clicks': recent_clicks,
+                'period_days': days,
+                'referral_code': referral_code
+            },
+            'top_links': top_links_data,
+            'daily_trend': {
+                'dates': daily_dates,
+                'clicks': daily_clicks,
+                'conversions': daily_conversions
+            },
+            'recent_activity': recent_activity,
+            'top_sources': top_sources,
+            'filters': {
+                'days': days,
+                'start_date': start_date.isoformat() if start_date else None,
+                'end_date': datetime.utcnow().isoformat()
+            }
         }), 200
+        
     except Exception as e:
+        print(f"❌ Error in get_referral_analytics: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
 
-
-
-
-
-
-
+def get_components_for_role(role):
+    """Get default components for a role"""
+    role_components = {
+        'super_admin': [
+            {'key': 'overview', 'label': 'Overview', 'icon': 'fas fa-home', 'section': 'Main'},
+            {'key': 'products', 'label': 'Products', 'icon': 'fas fa-box', 'section': 'Main'},
+            {'key': 'blog', 'label': 'Blog', 'icon': 'fas fa-blog', 'section': 'Content'},
+            {'key': 'jobs', 'label': 'Jobs', 'icon': 'fas fa-briefcase', 'section': 'Content'},
+            {'key': 'outlets', 'label': 'Outlets', 'icon': 'fas fa-store', 'section': 'Main'},
+            {'key': 'statistics', 'label': 'Statistics', 'icon': 'fas fa-chart-bar', 'section': 'Analytics'},
+            {'key': 'contacts', 'label': 'Contacts', 'icon': 'fas fa-address-book', 'section': 'Main'},
+            {'key': 'newsletter', 'label': 'Newsletter', 'icon': 'fas fa-envelope', 'section': 'Content'},
+            {'key': 'users', 'label': 'Users', 'icon': 'fas fa-users', 'section': 'Admin'},
+            {'key': 'permissions', 'label': 'Permissions', 'icon': 'fas fa-lock', 'section': 'Admin'},
+            {'key': 'roles', 'label': 'Roles', 'icon': 'fas fa-user-tag', 'section': 'Admin'},
+            {'key': 'tours', 'label': 'Tours', 'icon': 'fas fa-map-marked-alt', 'section': 'Tour'},
+            {'key': 'tour-packages', 'label': 'Tour Packages', 'icon': 'fas fa-boxes', 'section': 'Tour'},
+            {'key': 'tour-calendar', 'label': 'Tour Calendar', 'icon': 'fas fa-calendar-alt', 'section': 'Tour'},
+            {'key': 'tour-payments', 'label': 'Tour Payments', 'icon': 'fas fa-credit-card', 'section': 'Tour'},
+            {'key': 'tour-reports', 'label': 'Tour Reports', 'icon': 'fas fa-file-alt', 'section': 'Tour'},
+            {'key': 'tour-staff', 'label': 'Tour Staff', 'icon': 'fas fa-user-tie', 'section': 'Tour'},
+            {'key': 'partners', 'label': 'Partners', 'icon': 'fas fa-handshake', 'section': 'Partners'},
+            {'key': 'partner-links', 'label': 'Partner Links', 'icon': 'fas fa-link', 'section': 'Partners'},
+            {'key': 'partner-analytics', 'label': 'Partner Analytics', 'icon': 'fas fa-chart-line', 'section': 'Partners'},
+            {'key': 'profile', 'label': 'Profile', 'icon': 'fas fa-user', 'section': 'Admin'},
+            {'key': 'activities', 'label': 'Activities', 'icon': 'fas fa-activity', 'section': 'Admin'}
+        ],
+        'admin': [
+            {'key': 'overview', 'label': 'Overview', 'icon': 'fas fa-home', 'section': 'Main'},
+            {'key': 'products', 'label': 'Products', 'icon': 'fas fa-box', 'section': 'Main'},
+            {'key': 'blog', 'label': 'Blog', 'icon': 'fas fa-blog', 'section': 'Content'},
+            {'key': 'jobs', 'label': 'Jobs', 'icon': 'fas fa-briefcase', 'section': 'Content'},
+            {'key': 'outlets', 'label': 'Outlets', 'icon': 'fas fa-store', 'section': 'Main'},
+            {'key': 'statistics', 'label': 'Statistics', 'icon': 'fas fa-chart-bar', 'section': 'Analytics'},
+            {'key': 'contacts', 'label': 'Contacts', 'icon': 'fas fa-address-book', 'section': 'Main'},
+            {'key': 'newsletter', 'label': 'Newsletter', 'icon': 'fas fa-envelope', 'section': 'Content'},
+            {'key': 'users', 'label': 'Users', 'icon': 'fas fa-users', 'section': 'Admin'},
+            {'key': 'profile', 'label': 'Profile', 'icon': 'fas fa-user', 'section': 'Admin'}
+        ],
+        'tour_manager': [
+            {'key': 'overview', 'label': 'Overview', 'icon': 'fas fa-home', 'section': 'Main'},
+            {'key': 'tours', 'label': 'Tours', 'icon': 'fas fa-map-marked-alt', 'section': 'Tour'},
+            {'key': 'tour-packages', 'label': 'Tour Packages', 'icon': 'fas fa-boxes', 'section': 'Tour'},
+            {'key': 'tour-calendar', 'label': 'Tour Calendar', 'icon': 'fas fa-calendar-alt', 'section': 'Tour'},
+            {'key': 'tour-payments', 'label': 'Tour Payments', 'icon': 'fas fa-credit-card', 'section': 'Tour'},
+            {'key': 'tour-reports', 'label': 'Tour Reports', 'icon': 'fas fa-file-alt', 'section': 'Tour'},
+            {'key': 'tour-staff', 'label': 'Tour Staff', 'icon': 'fas fa-user-tie', 'section': 'Tour'},
+            {'key': 'profile', 'label': 'Profile', 'icon': 'fas fa-user', 'section': 'Admin'}
+        ],
+        'tour_assistant': [
+            {'key': 'overview', 'label': 'Overview', 'icon': 'fas fa-home', 'section': 'Main'},
+            {'key': 'tours', 'label': 'Tours', 'icon': 'fas fa-map-marked-alt', 'section': 'Tour'},
+            {'key': 'tour-calendar', 'label': 'Tour Calendar', 'icon': 'fas fa-calendar-alt', 'section': 'Tour'},
+            {'key': 'tour-payments', 'label': 'Tour Payments', 'icon': 'fas fa-credit-card', 'section': 'Tour'},
+            {'key': 'profile', 'label': 'Profile', 'icon': 'fas fa-user', 'section': 'Admin'}
+        ],
+        'partner': [
+            {'key': 'overview', 'label': 'Overview', 'icon': 'fas fa-home', 'section': 'Main'},
+            {'key': 'partners', 'label': 'Partners', 'icon': 'fas fa-handshake', 'section': 'Partners'},
+            {'key': 'partner-links', 'label': 'Partner Links', 'icon': 'fas fa-link', 'section': 'Partners'},
+            {'key': 'partner-analytics', 'label': 'Partner Analytics', 'icon': 'fas fa-chart-line', 'section': 'Partners'},
+            {'key': 'profile', 'label': 'Profile', 'icon': 'fas fa-user', 'section': 'Admin'}
+        ],
+        'user': [
+            {'key': 'overview', 'label': 'Overview', 'icon': 'fas fa-home', 'section': 'Main'},
+            {'key': 'profile', 'label': 'Profile', 'icon': 'fas fa-user', 'section': 'Admin'}
+        ]
+    }
+    
+    return role_components.get(role, role_components['user'])

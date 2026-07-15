@@ -1256,24 +1256,27 @@ class DashboardComponent(db.Model):
     def __repr__(self):
         return f'<DashboardComponent {self.key}>'
 
+#  RoleComponent
 
 class RoleComponent(db.Model):
-    """Mapping between roles and dashboard components"""
+    """Mapping between roles and dashboard components with action overrides"""
     __tablename__ = 'role_components'
     
     id = db.Column(db.Integer, primary_key=True)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
     component_id = db.Column(db.Integer, db.ForeignKey('dashboard_components.id'), nullable=False)
-    order = db.Column(db.Integer, default=0)
     
-    # Timestamps
+    order = db.Column(db.Integer, default=0)  
+    
+    # ✅ Action overrides
+    action_overrides = db.Column(db.JSON, default={})
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
     role = db.relationship('Role', back_populates='components')
     component = db.relationship('DashboardComponent', back_populates='roles')
     
-    # Ensure unique role-component pairs
     __table_args__ = (
         db.UniqueConstraint('role_id', 'component_id', name='unique_role_component'),
     )
@@ -1282,9 +1285,8 @@ class RoleComponent(db.Model):
         return {
             'id': self.id,
             'role_id': self.role_id,
-            'component': self.component.to_dict(),
-            'order': self.order
+            'component_id': self.component_id,
+            'component': self.component.to_dict() if self.component else None,
+            'action_overrides': self.action_overrides or {},
+            'order': self.order  
         }
-    
-    def __repr__(self):
-        return f'<RoleComponent role={self.role_id} component={self.component_id}>'

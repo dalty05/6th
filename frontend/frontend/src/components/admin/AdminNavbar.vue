@@ -1,7 +1,7 @@
-<!-- DEPRECATED: keep only AdminNavbar.vue (casing fix). -->
+<!-- frontend/src/components/admin/AdminNavbar.vue -->
+
 <template>
   <header class="admin-navbar">
-
     <div class="navbar-left">
       <button @click="toggleSidebar" class="menu-btn">
         <i class="fas fa-bars"></i>
@@ -10,12 +10,6 @@
     </div>
     
     <div class="navbar-right">
-      <!-- Notifications -->
-      <button class="nav-btn" @click="toggleNotifications">
-        <i class="fas fa-bell"></i>
-        <span v-if="notificationCount > 0" class="badge">{{ notificationCount }}</span>
-      </button>
-      
       <!-- User Menu -->
       <div class="user-menu" @click="toggleUserMenu">
         <div class="user-avatar">
@@ -33,7 +27,7 @@
             <i class="fas fa-home"></i> Dashboard
           </router-link>
           <hr class="dropdown-divider">
-          <button @click="handleLogout" class="dropdown-item logout">
+          <button @click="redirectToLogin" class="dropdown-item logout">
             <i class="fas fa-sign-out-alt"></i> Logout
           </button>
         </div>
@@ -43,9 +37,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import authService from '@/services/auth'
 
 const props = defineProps({
   user: {
@@ -54,18 +47,15 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['logout', 'toggle-sidebar'])
+const emit = defineEmits(['toggle-sidebar'])
 
 const route = useRoute()
 const router = useRouter()
 const userMenuOpen = ref(false)
-const notificationOpen = ref(false)
 
 const pageTitle = computed(() => {
   return route.meta.title || 'Dashboard'
 })
-
-const notificationCount = ref(3)
 
 const toggleSidebar = () => {
   emit('toggle-sidebar')
@@ -75,22 +65,25 @@ const toggleUserMenu = () => {
   userMenuOpen.value = !userMenuOpen.value
 }
 
-const toggleNotifications = () => {
-  notificationOpen.value = !notificationOpen.value
-}
-
-const handleLogout = async () => {
+const redirectToLogin = () => {
   userMenuOpen.value = false
-  await authService.logout()
   router.push('/admin/login')
 }
 
 // Close dropdown when clicking outside
-document.addEventListener('click', (e) => {
+const handleClickOutside = (e) => {
   const menu = document.querySelector('.user-menu')
   if (menu && !menu.contains(e.target)) {
     userMenuOpen.value = false
   }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -100,9 +93,10 @@ document.addEventListener('click', (e) => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   min-height: 64px;
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.1);
 }
 
 .navbar-left {
@@ -112,24 +106,32 @@ document.addEventListener('click', (e) => {
 }
 
 .menu-btn {
-  background: none;
-  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 20px;
-  color: #64748b;
+  color: #ffffff;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
 .menu-btn:hover {
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.menu-btn:active {
+  transform: scale(0.95);
 }
 
 .page-title {
   font-size: 20px;
   font-weight: 600;
-  color: #1a1a2e;
+  color: #ffffff;
   margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .navbar-right {
@@ -138,69 +140,43 @@ document.addEventListener('click', (e) => {
   gap: 16px;
 }
 
-.nav-btn {
-  position: relative;
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: #64748b;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.2s;
-}
-
-.nav-btn:hover {
-  background: #f1f5f9;
-  color: #1a1a2e;
-}
-
-.nav-btn .badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: #dc2626;
-  color: white;
-  font-size: 10px;
-  font-weight: 600;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .user-menu {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px 4px 4px;
-  border-radius: 8px;
+  padding: 6px 14px 6px 8px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .user-menu:hover {
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .user-avatar {
   font-size: 32px;
-  color: #94a3b8;
+  color: #ffffff;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .user-name {
   font-size: 14px;
   font-weight: 500;
-  color: #1a1a2e;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .user-menu .fa-chevron-down {
   font-size: 12px;
-  color: #94a3b8;
-  transition: transform 0.2s;
+  color: rgba(255, 255, 255, 0.7);
+  transition: transform 0.3s ease;
 }
 
 .user-menu .fa-chevron-down.rotated {
@@ -212,24 +188,36 @@ document.addEventListener('click', (e) => {
   top: 100%;
   right: 0;
   margin-top: 8px;
-  min-width: 200px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border: 1px solid #e2e8f0;
+  min-width: 220px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(30, 58, 138, 0.2);
+  border: 1px solid rgba(30, 58, 138, 0.1);
   overflow: hidden;
   z-index: 1000;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  color: #1a1a2e;
+  gap: 12px;
+  padding: 12px 18px;
+  color: #1e293b;
   text-decoration: none;
   font-size: 14px;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   cursor: pointer;
   background: none;
   border: none;
@@ -238,12 +226,18 @@ document.addEventListener('click', (e) => {
 }
 
 .dropdown-item:hover {
-  background: #f1f5f9;
+  background: #eff6ff;
+  color: #1e3a8a;
 }
 
 .dropdown-item i {
   width: 18px;
-  color: #64748b;
+  color: #3b82f6;
+  transition: color 0.2s ease;
+}
+
+.dropdown-item:hover i {
+  color: #1e3a8a;
 }
 
 .dropdown-item.logout {
@@ -254,12 +248,22 @@ document.addEventListener('click', (e) => {
   color: #dc2626;
 }
 
-.dropdown-divider {
-  border: none;
-  border-top: 1px solid #f1f5f9;
-  margin: 4px 0;
+.dropdown-item.logout:hover {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
+.dropdown-item.logout:hover i {
+  color: #b91c1c;
+}
+
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 4px 12px;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .admin-navbar {
     padding: 12px 16px;
@@ -272,8 +276,9 @@ document.addEventListener('click', (e) => {
   .user-name {
     display: none;
   }
+  
+  .user-menu {
+    padding: 6px 8px;
+  }
 }
 </style>
-
-
-

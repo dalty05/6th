@@ -1,6 +1,6 @@
 """
-Role Component Management Script
-Usage: python manage_role_components.py [command] [options]
+Role and Component Management Script
+Usage: python manage_components.py [command] [options]
 
 Commands:
   list-roles                    - List all roles
@@ -8,15 +8,18 @@ Commands:
   list-role-components <role>   - List components assigned to a role
   add-component <role> <component>  - Add component to role
   remove-component <role> <component> - Remove component from role
+  delete-component <component>  - Delete a component and its assignments
+  batch-delete-components       - Interactive batch deletion of components
   show-role-users <role>        - Show users assigned to a role
-  batch-remove <role>           - Interactive batch removal from a role
   find-component <component>    - Find which roles have a component
   stats                         - Show statistics
+  cleanup-orphaned              - Remove orphaned component assignments
 """
 
 import sys
 import os
 import re
+from datetime import datetime
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -24,11 +27,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app import app, db
 from models import Role, DashboardComponent, RoleComponent, User
 
-def print_header(title):
+def print_header(title, char="="):
     """Print a formatted header"""
-    print("\n" + "=" * 70)
+    print("\n" + char * 70)
     print(f"  {title}")
-    print("=" * 70)
+    print(char * 70)
 
 def print_table(headers, rows):
     """Print a formatted table"""
@@ -69,7 +72,7 @@ def list_roles():
         rows = []
         for role in roles:
             user_count = len(role.users) if hasattr(role, 'users') else 0
-            comp_count = len(role.components) if hasattr(role, 'components') else 0
+            comp_count = RoleComponent.query.filter_by(role_id=role.id).count()
             rows.append([
                 role.id,
                 role.name,
@@ -90,15 +93,17 @@ def list_components():
         
         print_header("📦 ALL COMPONENTS")
         
-        headers = ["ID", "Key", "Label", "Section", "Active"]
+        headers = ["ID", "Key", "Label", "Section", "Active", "Roles"]
         rows = []
         for comp in components:
+            role_count = RoleComponent.query.filter_by(component_id=comp.id).count()
             rows.append([
                 comp.id,
                 comp.key,
                 comp.label,
                 comp.section or "Uncategorized",
-                "✅" if comp.is_active else "❌"
+                "✅" if comp.is_active else "❌",
+                role_count
             ])
         
         print_table(headers, rows)
@@ -252,62 +257,101 @@ def remove_component(role_identifier, component_key):
         
         print(f"✅ Removed component '{component_key}' from role '{role.name}'")
 
-def batch_remove(role_identifier):
-    """Interactive batch removal of components from a role"""
+def delete_component(component_key, force=False):
+    """Delete a component and all its assignments from the system"""
     with app.app_context():
-        # Find role
-        role = None
-        if role_identifier.isdigit():
-            role = Role.query.get(int(role_identifier))
+        # Find component
+        component = DashboardComponent.query.filter_by(key=component_key).first()
+        if not component:
+            print(f"❌ Component '{component_key}' not found")
+            return
+        
+        print_header(f"🗑️ DELETE COMPONENT: {component.label} ({component.key})")
+        print(f"  ID: {component.id}")
+        print(f"  Section: {component.section or 'Uncategorized'}")
+        print(f"  Active: {component.is_active}")
+        
+        # Check assignments
+        assignments = RoleComponent.query.filter_by(component_id=component.id).all()
+        roles_with_component = []
+        for rc in assignments:
+            role = Role.query.get(rc.role_id)
+            if role:
+                roles_with_component.append(role.name)
+        
+        if assignments:
+            print(f"\n⚠️ This component is assigned to {len(assignments)} role(s):")
+            for role_name in roles_with_component:
+                print(f"  - {role_name}")
         else:
-            role = Role.query.filter_by(name=role_identifier).first()
+            print("\n✅ No roles have this component assigned")
         
-        if not role:
-            print(f"❌ Role '{role_identifier}' not found")
+        if not force:
+            print("\nOptions:")
+            print("  yes - Confirm deletion")
+            print("  no - Cancel")
+            choice = input("\nAre you sure you want to delete this component? (yes/no): ").strip().lower()
+            
+            if choice != 'yes':
+                print("❌ Deletion cancelled")
+                return
+        
+        # Delete all assignments first
+        for rc in assignments:
+            db.session.delete(rc)
+            print(f"  ✅ Removed assignment from role: {Role.query.get(rc.role_id).name}")
+        
+        # Delete the component
+        db.session.delete(component)
+        db.session.commit()
+        
+        print(f"\n✅ Component '{component_key}' has been permanently deleted")
+        print(f"   Removed {len(assignments)} role assignments")
+
+def batch_delete_components():
+    """Interactive batch deletion of components"""
+    with app.app_context():
+        components = DashboardComponent.query.order_by(
+            DashboardComponent.section, DashboardComponent.order
+        ).all()
+        
+        if not components:
+            print("⚠️ No components found in the system")
             return
         
-        # Get components
-        role_components = RoleComponent.query.filter_by(role_id=role.id).join(
-            DashboardComponent
-        ).order_by(DashboardComponent.section, DashboardComponent.order).all()
-        
-        if not role_components:
-            print(f"⚠️ No components assigned to '{role.name}'")
-            return
-        
-        print_header(f"🗑️ BATCH REMOVE: Components from '{role.name}'")
+        print_header("🗑️ BATCH DELETE COMPONENTS")
         
         # Display components with numbers
-        comps = []
-        for i, rc in enumerate(role_components, 1):
-            comp = DashboardComponent.query.get(rc.component_id)
-            if comp:
-                comps.append(comp)
-                print(f"  {i}. {comp.key} - {comp.label} ({comp.section})")
+        comp_list = []
+        for i, comp in enumerate(components, 1):
+            role_count = RoleComponent.query.filter_by(component_id=comp.id).count()
+            comp_list.append(comp)
+            print(f"  {i}. {comp.key} - {comp.label} ({comp.section or 'Uncategorized'}) - {role_count} role(s)")
         
         print("\nOptions:")
         print("  Enter numbers separated by commas (e.g., 1,3,5)")
-        print("  Enter 'all' to remove all components")
+        print("  Enter 'all' to delete all components")
         print("  Enter 'q' to quit")
         
-        choice = input("\nSelect components to remove: ").strip()
+        choice = input("\nSelect components to delete: ").strip()
         
         if choice.lower() == 'q':
             print("Cancelled")
             return
         
         if choice.lower() == 'all':
-            confirm = input(f"⚠️ Remove ALL {len(comps)} components from '{role.name}'? (yes/no): ")
+            print(f"\n⚠️ You are about to delete ALL {len(comp_list)} components")
+            print("This will also remove all role assignments for these components")
+            confirm = input("Are you sure? (yes/no): ")
             if confirm.lower() == 'yes':
-                for comp in comps:
-                    rc = RoleComponent.query.filter_by(
-                        role_id=role.id,
-                        component_id=comp.id
-                    ).first()
-                    if rc:
+                for comp in comp_list:
+                    # Delete assignments
+                    assignments = RoleComponent.query.filter_by(component_id=comp.id).all()
+                    for rc in assignments:
                         db.session.delete(rc)
+                    db.session.delete(comp)
                 db.session.commit()
-                print(f"✅ Removed ALL {len(comps)} components from '{role.name}'")
+                print(f"✅ Deleted ALL {len(comp_list)} components")
             else:
                 print("Cancelled")
             return
@@ -318,8 +362,8 @@ def batch_remove(role_identifier):
             part = part.strip()
             if part.isdigit():
                 idx = int(part) - 1
-                if 0 <= idx < len(comps):
-                    selected.append(comps[idx])
+                if 0 <= idx < len(comp_list):
+                    selected.append(comp_list[idx])
                 else:
                     print(f"⚠️ Invalid number: {part}")
         
@@ -327,22 +371,54 @@ def batch_remove(role_identifier):
             print("No valid selections made")
             return
         
-        # Confirm and remove
-        print(f"\nComponents to remove: {len(selected)}")
+        # Show summary
+        print(f"\nComponents to delete: {len(selected)}")
         for comp in selected:
-            print(f"  - {comp.key} - {comp.label}")
+            role_count = RoleComponent.query.filter_by(component_id=comp.id).count()
+            print(f"  - {comp.key} - {comp.label} ({role_count} role(s))")
         
-        confirm = input(f"\nRemove these components from '{role.name}'? (yes/no): ")
+        confirm = input(f"\nDelete these {len(selected)} components? (yes/no): ")
         if confirm.lower() == 'yes':
             for comp in selected:
-                rc = RoleComponent.query.filter_by(
-                    role_id=role.id,
-                    component_id=comp.id
-                ).first()
-                if rc:
+                # Delete assignments
+                assignments = RoleComponent.query.filter_by(component_id=comp.id).all()
+                for rc in assignments:
                     db.session.delete(rc)
+                db.session.delete(comp)
             db.session.commit()
-            print(f"✅ Removed {len(selected)} components from '{role.name}'")
+            print(f"✅ Deleted {len(selected)} components")
+        else:
+            print("Cancelled")
+
+def cleanup_orphaned():
+    """Remove orphaned component assignments (components that don't exist)"""
+    with app.app_context():
+        print_header("🧹 CLEANUP ORPHANED ASSIGNMENTS")
+        
+        # Find all role components
+        all_rc = RoleComponent.query.all()
+        orphaned = []
+        
+        for rc in all_rc:
+            comp = DashboardComponent.query.get(rc.component_id)
+            if not comp:
+                orphaned.append(rc)
+        
+        if not orphaned:
+            print("✅ No orphaned assignments found")
+            return
+        
+        print(f"Found {len(orphaned)} orphaned assignment(s)")
+        for rc in orphaned:
+            role = Role.query.get(rc.role_id)
+            print(f"  - Role: {role.name if role else 'Unknown'} (Role ID: {rc.role_id}), Component ID: {rc.component_id}")
+        
+        confirm = input(f"\nDelete these {len(orphaned)} orphaned assignments? (yes/no): ")
+        if confirm.lower() == 'yes':
+            for rc in orphaned:
+                db.session.delete(rc)
+            db.session.commit()
+            print(f"✅ Deleted {len(orphaned)} orphaned assignments")
         else:
             print("Cancelled")
 
@@ -394,10 +470,19 @@ def show_stats():
         total_assignments = RoleComponent.query.count()
         total_users = User.query.count()
         
+        # Check for orphaned assignments
+        orphaned = 0
+        all_rc = RoleComponent.query.all()
+        for rc in all_rc:
+            comp = DashboardComponent.query.get(rc.component_id)
+            if not comp:
+                orphaned += 1
+        
         print(f"  Total Roles:        {total_roles}")
         print(f"  Total Components:   {total_components}")
         print(f"  Total Assignments:  {total_assignments}")
         print(f"  Total Users:        {total_users}")
+        print(f"  Orphaned Assignments: {orphaned}")
         
         print("\n📋 ROLES WITH COMPONENT COUNT:")
         roles = Role.query.all()
@@ -414,15 +499,68 @@ def show_stats():
         
         for section, count in sorted(sections.items()):
             print(f"  - {section}: {count} components")
+        
+        if orphaned > 0:
+            print(f"\n⚠️ {orphaned} orphaned assignments detected. Run 'cleanup-orphaned' to fix.")
+
+def interactive_mode():
+    """Interactive mode for component management"""
+    print_header("🛠️ COMPONENT MANAGEMENT INTERACTIVE MODE")
+    
+    commands = {
+        '1': ('List all roles', list_roles),
+        '2': ('List all components', list_components),
+        '3': ('List components for a role', lambda: list_role_components(input("Enter role name or ID: "))),
+        '4': ('Add component to role', lambda: add_component(input("Enter role name or ID: "), input("Enter component key: "))),
+        '5': ('Remove component from role', lambda: remove_component(input("Enter role name or ID: "), input("Enter component key: "))),
+        '6': ('Delete a component', lambda: delete_component(input("Enter component key: "))),
+        '7': ('Batch delete components', batch_delete_components),
+        '8': ('Find component in roles', lambda: find_component(input("Enter component key: "))),
+        '9': ('Cleanup orphaned assignments', cleanup_orphaned),
+        '10': ('Show statistics', show_stats),
+        'q': ('Quit', None)
+    }
+    
+    while True:
+        print("\n" + "-" * 40)
+        print("Available commands:")
+        for key, (desc, _) in commands.items():
+            print(f"  {key}. {desc}")
+        
+        choice = input("\nSelect an option: ").strip().lower()
+        
+        if choice == 'q':
+            print("Goodbye!")
+            break
+        
+        if choice in commands:
+            cmd_name, cmd_func = commands[choice]
+            if cmd_func:
+                try:
+                    cmd_func()
+                except Exception as e:
+                    print(f"❌ Error: {e}")
+            else:
+                print("Goodbye!")
+                break
+        else:
+            print("❌ Invalid option. Please try again.")
 
 def main():
     """Main entry point"""
     if len(sys.argv) < 2:
         print(__doc__)
+        print("\nFor interactive mode, run: python manage_components.py --interactive")
         return
     
     command = sys.argv[1].lower()
     
+    # Interactive mode
+    if command == "--interactive" or command == "-i":
+        interactive_mode()
+        return
+    
+    # Command mode
     if command == "list-roles":
         list_roles()
     elif command == "list-components":
@@ -435,8 +573,13 @@ def main():
         add_component(sys.argv[2], sys.argv[3])
     elif command == "remove-component" and len(sys.argv) > 3:
         remove_component(sys.argv[2], sys.argv[3])
-    elif command == "batch-remove" and len(sys.argv) > 2:
-        batch_remove(sys.argv[2])
+    elif command == "delete-component" and len(sys.argv) > 2:
+        force = "--force" in sys.argv
+        delete_component(sys.argv[2], force)
+    elif command == "batch-delete-components":
+        batch_delete_components()
+    elif command == "cleanup-orphaned":
+        cleanup_orphaned()
     elif command == "show-role-users" and len(sys.argv) > 2:
         show_role_users(sys.argv[2])
     elif command == "stats":

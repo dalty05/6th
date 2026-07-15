@@ -1,7 +1,6 @@
 <template>
   <div class="partner-layout">
     <!-- Sidebar -->
-    <PartnerSidebar ref="sidebarRef" />
 
     <!-- Main Content -->
     <main class="partner-main">
@@ -222,7 +221,7 @@
 import { ref, onMounted } from 'vue'
 import referralService from '@/services/referral'
 import AnalyticsChart from '@/components/partner/AnalyticsChart.vue'
-import PartnerSidebar from '@/components/partner/PartnerSidebar.vue'
+
 
 const sidebarRef = ref(null)
 const loading = ref(false)

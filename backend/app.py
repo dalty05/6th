@@ -90,10 +90,10 @@ mail = Mail()
 # BLUEPRINT REGISTRATION
 # ============================================================================
 
-# ✅ Register unified blueprints
-app.register_blueprint(admin_bp)          # /api/admin/* - All admin endpoints
-app.register_blueprint(public_bp)         # /api/* - All public endpoints
-app.register_blueprint(auth_bp, url_prefix='/api')  # /api/auth/* - Auth endpoints
+#  Register blueprints
+app.register_blueprint(admin_bp)          # admin endpoints
+app.register_blueprint(public_bp)         # / public endpoints
+app.register_blueprint(auth_bp, url_prefix='/api')  # Auth endpoints
 
 # ============================================================================
 # MIDDLEWARE

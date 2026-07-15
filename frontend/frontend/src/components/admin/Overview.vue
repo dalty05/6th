@@ -15,9 +15,9 @@
       </div>
     </div>
 
-    <!-- Stats Grid -->
+    <!-- Stats Grid - Dynamic based on available components -->
     <div class="stats-grid">
-      <div class="stat-card" v-for="stat in stats" :key="stat.label">
+      <div v-for="stat in availableStats" :key="stat.label" class="stat-card">
         <div class="stat-icon" :class="stat.color">
           <i :class="stat.icon"></i>
         </div>
@@ -32,8 +32,8 @@
       </div>
     </div>
 
-    <!-- Charts Row -->
-    <div class="charts-row">
+    <!-- Charts Row - Only if tours component is available -->
+    <div v-if="hasComponent('tours')" class="charts-row">
       <div class="chart-card">
         <div class="chart-header">
           <h3>Recent Bookings</h3>
@@ -54,40 +54,80 @@
       </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Quick Actions - Dynamic based on available components -->
     <div class="quick-actions">
       <h3>Quick Actions</h3>
       <div class="actions-grid">
-        <router-link to="/admin/dashboard?tab=products" class="action-card">
+        <router-link 
+          v-if="hasComponent('products')" 
+          to="/admin/dashboard?tab=products" 
+          class="action-card"
+        >
           <i class="fas fa-plus-circle"></i>
           <span>Add Product</span>
         </router-link>
-        <router-link to="/admin/dashboard?tab=blog" class="action-card">
+        <router-link 
+          v-if="hasComponent('blog')" 
+          to="/admin/dashboard?tab=blog" 
+          class="action-card"
+        >
           <i class="fas fa-pen-fancy"></i>
           <span>Write Blog</span>
         </router-link>
-        <router-link to="/admin/dashboard?tab=tours" class="action-card">
+        <router-link 
+          v-if="hasComponent('tours')" 
+          to="/admin/dashboard?tab=tours" 
+          class="action-card"
+        >
           <i class="fas fa-calendar-plus"></i>
           <span>Create Tour</span>
         </router-link>
-        <router-link to="/admin/dashboard?tab=jobs" class="action-card">
+        <router-link 
+          v-if="hasComponent('jobs')" 
+          to="/admin/dashboard?tab=jobs" 
+          class="action-card"
+        >
           <i class="fas fa-briefcase"></i>
           <span>Post Job</span>
         </router-link>
-        <router-link to="/admin/dashboard?tab=partners" class="action-card">
+        <router-link 
+          v-if="hasComponent('partners')" 
+          to="/admin/dashboard?tab=partners" 
+          class="action-card"
+        >
           <i class="fas fa-user-plus"></i>
           <span>Add Partner</span>
         </router-link>
-        <router-link to="/admin/dashboard?tab=newsletter" class="action-card">
+        <router-link 
+          v-if="hasComponent('newsletter')" 
+          to="/admin/dashboard?tab=newsletter" 
+          class="action-card"
+        >
           <i class="fas fa-envelope"></i>
           <span>Send Newsletter</span>
+        </router-link>
+        <router-link 
+          v-if="hasComponent('partner-links')" 
+          to="/admin/dashboard?tab=partner-links" 
+          class="action-card"
+        >
+          <i class="fas fa-link"></i>
+          <span>Create Link</span>
+        </router-link>
+        <router-link 
+          v-if="hasComponent('outlets')" 
+          to="/admin/dashboard?tab=outlets" 
+          class="action-card"
+        >
+          <i class="fas fa-store"></i>
+          <span>Add Outlet</span>
         </router-link>
       </div>
     </div>
 
-    <!-- Two Column Layout -->
+    <!-- Two Column Layout - Dynamic sections -->
     <div class="two-column">
-      <!-- Recent Activity -->
+      <!-- Recent Activity - Always visible -->
       <div class="activity-section">
         <div class="section-header">
           <h3><i class="fas fa-history"></i> Recent Activity</h3>
@@ -112,8 +152,8 @@
         </div>
       </div>
 
-      <!-- Upcoming Tours -->
-      <div class="upcoming-section">
+      <!-- Upcoming Tours - Only if tours component is available -->
+      <div v-if="hasComponent('tours')" class="upcoming-section">
         <div class="section-header">
           <h3><i class="fas fa-calendar-check"></i> Upcoming Tours</h3>
           <router-link to="/admin/dashboard?tab=tours" class="view-all">
@@ -143,36 +183,117 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Recent Jobs -->
-    <div class="jobs-section">
-      <div class="section-header">
-        <h3><i class="fas fa-briefcase"></i> Recent Jobs</h3>
-        <router-link to="/admin/dashboard?tab=jobs" class="view-all">
-          View All <i class="fas fa-arrow-right"></i>
-        </router-link>
-      </div>
-      <div class="jobs-grid">
-        <div v-for="job in recentJobs" :key="job.id" class="job-card">
-          <div class="job-header">
-            <h4>{{ job.title }}</h4>
-            <span class="job-status" :class="job.is_active ? 'active' : 'inactive'">
-              {{ job.is_active ? 'Active' : 'Closed' }}
-            </span>
+      <!-- Recent Jobs - Only if jobs component is available -->
+      <div v-if="hasComponent('jobs')" class="jobs-section">
+        <div class="section-header">
+          <h3><i class="fas fa-briefcase"></i> Recent Jobs</h3>
+          <router-link to="/admin/dashboard?tab=jobs" class="view-all">
+            View All <i class="fas fa-arrow-right"></i>
+          </router-link>
+        </div>
+        <div class="jobs-grid">
+          <div v-for="job in recentJobs" :key="job.id" class="job-card">
+            <div class="job-header">
+              <h4>{{ job.title }}</h4>
+              <span class="job-status" :class="job.is_active ? 'active' : 'inactive'">
+                {{ job.is_active ? 'Active' : 'Closed' }}
+              </span>
+            </div>
+            <p class="job-location">
+              <i class="fas fa-map-marker-alt"></i> {{ job.location || 'Remote' }}
+            </p>
+            <div class="job-meta">
+              <span><i class="fas fa-calendar-alt"></i> {{ formatDate(job.created_at) }}</span>
+              <span><i class="fas fa-eye"></i> {{ job.views_count || 0 }} views</span>
+              <span><i class="fas fa-users"></i> {{ job.applications_count || 0 }} applicants</span>
+            </div>
           </div>
-          <p class="job-location">
-            <i class="fas fa-map-marker-alt"></i> {{ job.location || 'Remote' }}
-          </p>
-          <div class="job-meta">
-            <span><i class="fas fa-calendar-alt"></i> {{ formatDate(job.created_at) }}</span>
-            <span><i class="fas fa-eye"></i> {{ job.views_count || 0 }} views</span>
-            <span><i class="fas fa-users"></i> {{ job.applications_count || 0 }} applicants</span>
+          <div v-if="recentJobs.length === 0" class="no-jobs">
+            <i class="fas fa-briefcase"></i>
+            <p>No recent jobs</p>
           </div>
         </div>
-        <div v-if="recentJobs.length === 0" class="no-jobs">
-          <i class="fas fa-briefcase"></i>
-          <p>No recent jobs</p>
+      </div>
+
+      <!-- Recent Partners - Only if partners component is available -->
+      <div v-if="hasComponent('partners')" class="partners-section">
+        <div class="section-header">
+          <h3><i class="fas fa-handshake"></i> Recent Partners</h3>
+          <router-link to="/admin/dashboard?tab=partners" class="view-all">
+            View All <i class="fas fa-arrow-right"></i>
+          </router-link>
+        </div>
+        <div class="partners-grid">
+          <div v-for="partner in recentPartners" :key="partner.id" class="partner-card">
+            <div class="partner-avatar">
+              <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="partner-info">
+              <h4>{{ partner.full_name }}</h4>
+              <p class="partner-email">{{ partner.email }}</p>
+              <span class="partner-status" :class="partner.is_active ? 'active' : 'inactive'">
+                {{ partner.is_active ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+          </div>
+          <div v-if="recentPartners.length === 0" class="no-partners">
+            <i class="fas fa-handshake"></i>
+            <p>No recent partners</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Products - Only if products component is available -->
+      <div v-if="hasComponent('products')" class="products-section">
+        <div class="section-header">
+          <h3><i class="fas fa-boxes"></i> Recent Products</h3>
+          <router-link to="/admin/dashboard?tab=products" class="view-all">
+            View All <i class="fas fa-arrow-right"></i>
+          </router-link>
+        </div>
+        <div class="products-grid">
+          <div v-for="product in recentProducts" :key="product.id" class="product-card">
+            <div class="product-image">
+              <img v-if="product.image_url" :src="product.image_url" :alt="product.name" @error="handleImageError">
+              <div v-else class="product-placeholder"><i class="fas fa-box"></i></div>
+            </div>
+            <div class="product-info">
+              <h4>{{ product.name }}</h4>
+              <p class="product-category">{{ product.category || 'Uncategorized' }}</p>
+            </div>
+          </div>
+          <div v-if="recentProducts.length === 0" class="no-products">
+            <i class="fas fa-box-open"></i>
+            <p>No recent products</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Blog Posts - Only if blog component is available -->
+      <div v-if="hasComponent('blog')" class="blog-section">
+        <div class="section-header">
+          <h3><i class="fas fa-newspaper"></i> Recent Blog Posts</h3>
+          <router-link to="/admin/dashboard?tab=blog" class="view-all">
+            View All <i class="fas fa-arrow-right"></i>
+          </router-link>
+        </div>
+        <div class="blog-grid">
+          <div v-for="post in recentBlogs" :key="post.id" class="blog-card">
+            <div class="blog-image">
+              <img v-if="post.featured_image" :src="post.featured_image" :alt="post.title" @error="handleImageError">
+              <div v-else class="blog-placeholder"><i class="fas fa-newspaper"></i></div>
+            </div>
+            <div class="blog-info">
+              <h4>{{ post.title }}</h4>
+              <p class="blog-excerpt">{{ truncate(post.excerpt || post.content, 80) }}</p>
+              <span class="blog-status" :class="post.status">{{ post.status }}</span>
+            </div>
+          </div>
+          <div v-if="recentBlogs.length === 0" class="no-blogs">
+            <i class="fas fa-edit"></i>
+            <p>No recent blog posts</p>
+          </div>
         </div>
       </div>
     </div>
@@ -180,13 +301,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, computed, nextTick } from 'vue'  // ✅ Add nextTick import
+import { ref, onMounted, reactive, computed, nextTick } from 'vue'
 import api from '@/services/api'
 import authService from '@/services/auth'
+import permissionService from '@/services/permissionService'
 import { toast } from 'vue3-toastify'
 import { Chart, registerables } from 'chart.js'
 
-// Register Chart.js components
 Chart.register(...registerables)
 
 // ============================================================
@@ -195,18 +316,24 @@ Chart.register(...registerables)
 
 const user = ref(null)
 const loading = ref(false)
-const stats = ref([
-  { label: 'Total Products', value: 0, icon: 'fas fa-boxes', color: 'blue', change: 0 },
-  { label: 'Active Jobs', value: 0, icon: 'fas fa-briefcase', color: 'green', change: 0 },
-  { label: 'Total Tours', value: 0, icon: 'fas fa-calendar-check', color: 'orange', change: 0 },
-  { label: 'Total Partners', value: 0, icon: 'fas fa-handshake', color: 'purple', change: 0 },
-  { label: 'Total Bookings', value: 0, icon: 'fas fa-ticket-alt', color: 'teal', change: 0 },
-  { label: 'Revenue', value: 0, icon: 'fas fa-money-bill-wave', color: 'emerald', change: 0 },
-])
+const userComponents = ref([])
+
+// Stats data
+const stats = ref({
+  total_products: 0,
+  total_jobs: 0,
+  total_tours: 0,
+  total_partners: 0,
+  total_bookings: 0,
+  total_revenue: 0
+})
 
 const recentActivities = ref([])
 const upcomingTours = ref([])
 const recentJobs = ref([])
+const recentPartners = ref([])
+const recentProducts = ref([])
+const recentBlogs = ref([])
 
 // Chart refs
 const bookingsChart = ref(null)
@@ -229,9 +356,85 @@ const currentDate = computed(() => {
   })
 })
 
+// ✅ Check if user has a specific component
+const hasComponent = (componentKey) => {
+  return userComponents.value.some(c => c.key === componentKey)
+}
+
+// ✅ Dynamic stats based on available components
+const availableStats = computed(() => {
+  const statsList = []
+  
+  if (hasComponent('products')) {
+    statsList.push({
+      label: 'Total Products',
+      value: stats.value.total_products,
+      icon: 'fas fa-boxes',
+      color: 'blue',
+      change: 0
+    })
+  }
+  
+  if (hasComponent('jobs')) {
+    statsList.push({
+      label: 'Active Jobs',
+      value: stats.value.total_jobs,
+      icon: 'fas fa-briefcase',
+      color: 'green',
+      change: 0
+    })
+  }
+  
+  if (hasComponent('tours')) {
+    statsList.push({
+      label: 'Total Tours',
+      value: stats.value.total_tours,
+      icon: 'fas fa-calendar-check',
+      color: 'orange',
+      change: 0
+    })
+    statsList.push({
+      label: 'Total Bookings',
+      value: stats.value.total_bookings,
+      icon: 'fas fa-ticket-alt',
+      color: 'teal',
+      change: 0
+    })
+    statsList.push({
+      label: 'Revenue',
+      value: stats.value.total_revenue,
+      icon: 'fas fa-money-bill-wave',
+      color: 'emerald',
+      change: 0
+    })
+  }
+  
+  if (hasComponent('partners')) {
+    statsList.push({
+      label: 'Total Partners',
+      value: stats.value.total_partners,
+      icon: 'fas fa-handshake',
+      color: 'purple',
+      change: 0
+    })
+  }
+  
+  return statsList
+})
+
 // ============================================================
 // METHODS
 // ============================================================
+
+const loadUserComponents = async () => {
+  try {
+    await permissionService.loadPermissions()
+    userComponents.value = permissionService.getDashboardComponents() || []
+  } catch (error) {
+    console.error('Error loading user components:', error)
+    userComponents.value = []
+  }
+}
 
 const loadOverview = async () => {
   loading.value = true
@@ -239,61 +442,27 @@ const loadOverview = async () => {
     const response = await api.get('/admin/dashboard/overview')
     const data = response.data
     
-    // Update stats
-    stats.value = [
-      { 
-        label: 'Total Products', 
-        value: data.total_products || 0, 
-        icon: 'fas fa-boxes', 
-        color: 'blue',
-        change: data.products_change || 0
-      },
-      { 
-        label: 'Active Jobs', 
-        value: data.total_jobs || 0, 
-        icon: 'fas fa-briefcase', 
-        color: 'green',
-        change: data.jobs_change || 0
-      },
-      { 
-        label: 'Total Tours', 
-        value: data.total_tours || 0, 
-        icon: 'fas fa-calendar-check', 
-        color: 'orange',
-        change: data.tours_change || 0
-      },
-      { 
-        label: 'Total Partners', 
-        value: data.total_partners || 0, 
-        icon: 'fas fa-handshake', 
-        color: 'purple',
-        change: data.partners_change || 0
-      },
-      { 
-        label: 'Total Bookings', 
-        value: data.total_bookings || 0, 
-        icon: 'fas fa-ticket-alt', 
-        color: 'teal',
-        change: data.bookings_change || 0
-      },
-      { 
-        label: 'Revenue', 
-        value: data.total_revenue || 0, 
-        icon: 'fas fa-money-bill-wave', 
-        color: 'emerald',
-        change: data.revenue_change || 0
-      },
-    ]
+    stats.value = {
+      total_products: data.total_products || 0,
+      total_jobs: data.total_jobs || 0,
+      total_tours: data.total_tours || 0,
+      total_partners: data.total_partners || 0,
+      total_bookings: data.total_bookings || 0,
+      total_revenue: data.total_revenue || 0
+    }
     
     recentActivities.value = data.recent_activities || []
     upcomingTours.value = data.upcoming_tours || []
     recentJobs.value = data.recent_jobs || []
+    recentPartners.value = data.recent_partners || []
+    recentProducts.value = data.recent_products || []
+    recentBlogs.value = data.recent_blogs || []
     
-    // Initialize charts after data is loaded
     await nextTick()
     initCharts()
     
   } catch (error) {
+    console.error('Error loading overview:', error)
     toast.error('Failed to load dashboard data')
   } finally {
     loading.value = false
@@ -301,6 +470,9 @@ const loadOverview = async () => {
 }
 
 const initCharts = () => {
+  // Only initialize charts if tours component is available
+  if (!hasComponent('tours')) return
+  
   // Bookings Chart
   if (bookingsChartInstance) {
     bookingsChartInstance.destroy()
@@ -325,21 +497,15 @@ const initCharts = () => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            display: false
-          }
+          legend: { display: false }
         },
         scales: {
           y: {
             beginAtZero: true,
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
-            }
+            grid: { color: 'rgba(0, 0, 0, 0.05)' }
           },
           x: {
-            grid: {
-              display: false
-            }
+            grid: { display: false }
           }
         }
       }
@@ -370,16 +536,12 @@ const initCharts = () => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            display: false
-          }
+          legend: { display: false }
         },
         scales: {
           y: {
             beginAtZero: true,
-            grid: {
-              color: 'rgba(0, 0, 0, 0.05)'
-            },
+            grid: { color: 'rgba(0, 0, 0, 0.05)' },
             ticks: {
               callback: function(value) {
                 return 'KES ' + value.toLocaleString()
@@ -387,9 +549,7 @@ const initCharts = () => {
             }
           },
           x: {
-            grid: {
-              display: false
-            }
+            grid: { display: false }
           }
         }
       }
@@ -470,18 +630,175 @@ const formatMonth = (dateStr) => {
   return months[date.getMonth()]
 }
 
+const truncate = (text, length) => {
+  if (!text) return ''
+  return text.length > length ? text.substring(0, length) + '...' : text
+}
+
+const handleImageError = (event) => {
+  event.target.src = '/images/placeholder.png'
+}
+
 // ============================================================
 // LIFECYCLE
 // ============================================================
 
-onMounted(() => {
+onMounted(async () => {
   user.value = authService.getUser()
-  loadOverview()
+  await loadUserComponents()
+  await loadOverview()
 })
 </script>
 
-
 <style scoped>
+
+.partners-section,
+.products-section,
+.blog-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  margin-top: 20px;
+}
+
+.partners-grid,
+.products-grid,
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.partner-card,
+.product-card,
+.blog-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.partner-card:hover,
+.product-card:hover,
+.blog-card:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.partner-avatar {
+  font-size: 32px;
+  color: #94a3b8;
+}
+
+.partner-info h4,
+.product-info h4,
+.blog-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0;
+}
+
+.partner-email,
+.product-category {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+
+.partner-status,
+.blog-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.partner-status.active,
+.blog-status.published {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.partner-status.inactive,
+.blog-status.draft {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.product-image,
+.blog-image {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f1f5f9;
+}
+
+.product-image img,
+.blog-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-placeholder,
+.blog-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #94a3b8;
+}
+
+.blog-excerpt {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.no-partners,
+.no-products,
+.no-blogs {
+  text-align: center;
+  padding: 24px 0;
+  color: #94a3b8;
+}
+
+.no-partners i,
+.no-products i,
+.no-blogs i {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.no-partners p,
+.no-products p,
+.no-blogs p {
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .partners-grid,
+  .products-grid,
+  .blog-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
 .overview-dashboard {
   padding: 0;
   max-width: 1400px;
