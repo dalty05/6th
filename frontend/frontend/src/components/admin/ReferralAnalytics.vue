@@ -75,11 +75,10 @@ const partnerColumns = [
 const fetchStats = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/referral/analytics')
+    const response = await axios.get('/referral/analytics')
     stats.value = response.data.stats || stats.value
     topPartners.value = response.data.topPartners || []
   } catch (error) {
-    console.error('Error fetching referral stats:', error)
   } finally {
     loading.value = false
   }

@@ -13,12 +13,8 @@ class NotificationService {
     this.webSocketEnabled = false // Temporarily disable WebSocket until backend is ready
   }
 
-  /**
-   * Initialize WebSocket connection for real-time notifications
-   */
   initWebSocket() {
     if (!this.webSocketEnabled) {
-      console.log('WebSocket disabled - backend endpoints not ready')
       return
     }
     
@@ -29,7 +25,6 @@ class NotificationService {
       this.ws = new WebSocket(wsUrl)
       
       this.ws.onopen = () => {
-        console.log('WebSocket connected')
         this.reconnectAttempts = 0
       }
       
@@ -38,26 +33,23 @@ class NotificationService {
           const data = JSON.parse(event.data)
           this.handleNotification(data)
         } catch (e) {
-          console.error('Error parsing WebSocket message:', e)
         }
       }
       
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
+        throw new Error(`WebSocket error: ${error.message}`)
       }
       
       this.ws.onclose = () => {
-        console.log('WebSocket disconnected')
+
         this.reconnect()
       }
     } catch (error) {
-      console.error('WebSocket initialization error:', error)
+      throw(error)
     }
   }
 
-  /**
-   * Reconnect WebSocket
-   */
+ 
   reconnect() {
     if (!this.webSocketEnabled) return
     
@@ -128,15 +120,10 @@ class NotificationService {
       this.updateUnreadCount()
       return response.data
     } catch (error) {
-      console.error('Error fetching notifications:', error)
-      // Return fallback empty array
       return []
     }
   }
 
-  /**
-   * Mark notification as read
-   */
   async markAsRead(notificationId) {
     try {
       await api.put(`/notifications/${notificationId}/read`)
@@ -146,39 +133,27 @@ class NotificationService {
         this.updateUnreadCount()
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error)
     }
   }
 
-  /**
-   * Mark all notifications as read
-   */
   async markAllAsRead() {
     try {
       await api.put('/notifications/read-all')
       this.notifications.value.forEach(n => n.read = true)
       this.unreadCount.value = 0
     } catch (error) {
-      console.error('Error marking all as read:', error)
     }
   }
 
-  /**
-   * Delete notification
-   */
   async deleteNotification(notificationId) {
     try {
       await api.delete(`/notifications/${notificationId}`)
       this.notifications.value = this.notifications.value.filter(n => n.id !== notificationId)
       this.updateUnreadCount()
     } catch (error) {
-      console.error('Error deleting notification:', error)
     }
   }
 
-  /**
-   * Update unread count
-   */
   updateUnreadCount() {
     this.unreadCount.value = this.notifications.value.filter(n => !n.read).length
   }

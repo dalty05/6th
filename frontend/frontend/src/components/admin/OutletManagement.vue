@@ -253,7 +253,6 @@ const loadOutlets = async () => {
     const response = await api.get('/admin/outlets')
     outlets.value = response.data
   } catch (error) {
-    console.error('Error loading outlets:', error)
     toast.error('Failed to load locations')
   } finally {
     loading.value = false
@@ -338,7 +337,6 @@ const saveOutlet = async () => {
     closeModal()
     await loadOutlets()
   } catch (error) {
-    console.error('Error saving outlet:', error)
     toast.error(error.response?.data?.error || 'Failed to save location')
   } finally {
     saving.value = false
@@ -352,7 +350,6 @@ const deleteOutlet = async (id) => {
       toast.success('Location deleted')
       await loadOutlets()
     } catch (error) {
-      console.error('Error deleting outlet:', error)
       toast.error('Failed to delete location')
     }
   }

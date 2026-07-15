@@ -38,5 +38,4 @@ def log_activity(user, action, resource_type, resource_id=None, description=None
         db.session.commit()
         return True
     except Exception as e:
-        print(f"Failed to log activity: {e}")
         return False

@@ -353,7 +353,6 @@ const loadProducts = async () => {
     const response = await api.get('/admin/products')
     products.value = response.data
   } catch (error) {
-    console.error('Error loading products:', error)
     toast.error('Failed to load products')
   } finally {
     loading.value = false
@@ -386,7 +385,6 @@ const generateQR = async (product) => {
     toast.success('QR Code generated successfully')
     await loadProducts()
   } catch (error) {
-    console.error('Error generating QR:', error)
     toast.error('Failed to generate QR code')
   }
 }
@@ -577,7 +575,6 @@ const saveProduct = async () => {
     closeModal()
     await loadProducts()
   } catch (error) {
-    console.error('Error saving product:', error)
     toast.error(error.response?.data?.error || 'Failed to save product')
   } finally {
     saving.value = false
@@ -592,7 +589,6 @@ const deleteProduct = async (id) => {
       toast.success('Product deleted')
       await loadProducts()
     } catch (error) {
-      console.error('Error deleting product:', error)
       toast.error('Failed to delete product')
     }
   }
@@ -606,7 +602,6 @@ const toggleFeatured = async (product) => {
     toast.success(product.featured ? 'Removed from featured' : 'Added to featured')
     await loadProducts()
   } catch (error) {
-    console.error('Error toggling featured:', error)
     toast.error('Failed to update featured status')
   }
 }

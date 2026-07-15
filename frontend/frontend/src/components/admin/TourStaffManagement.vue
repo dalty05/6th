@@ -502,27 +502,16 @@ const loadStaff = async () => {
     const response = await api.get('/admin/users')
     allUsers.value = response.data
     
-    console.log('✅ Total users loaded:', allUsers.value.length)
     
-    // Debug: Show sample user fields
-    if (allUsers.value.length > 0) {
-      const sample = allUsers.value[0]
-      console.log('🔍 Sample user fields:', Object.keys(sample))
-      console.log('🔍 Sample user tour flags:', {
-        is_tour_manager: sample.is_tour_manager,
-        is_tour_assistant: sample.is_tour_assistant,
-        role: sample.role
-      })
-    }
     
-    // ✅ Filter users who are tour staff (check BOTH flags AND role)
+   
+    
     staffList.value = allUsers.value.filter(u => isTourStaff(u))
     
-    console.log('✅ Tour staff found:', staffList.value.length)
     
     // Debug: Show all user roles
     const roles = allUsers.value.map(u => `${u.full_name}: role=${u.role}, is_tour_manager=${u.is_tour_manager}, is_tour_assistant=${u.is_tour_assistant}`)
-    console.log('📋 All user tour status:', roles)
+   
     
     if (staffList.value.length === 0) {
       debugInfo.value = `ℹ️ No tour staff found. Found ${allUsers.value.length} total users. Use "View All Users" to see them.`
@@ -535,7 +524,6 @@ const loadStaff = async () => {
     }, 8000)
     
   } catch (error) {
-    console.error('Error loading staff:', error)
     
     if (error.response?.status === 400) {
       errorMessage.value = `Server returned 400: ${error.response?.data?.error || 'Bad request.'}`
@@ -586,7 +574,6 @@ const confirmPromote = async () => {
     closePromoteModal()
     await loadStaff()
   } catch (error) {
-    console.error('Error promoting user:', error)
     toast.error(error.response?.data?.error || 'Failed to promote user')
   }
 }
@@ -710,7 +697,6 @@ const confirmResetPassword = async () => {
     toast.success('Password reset successfully')
     resetting.value = false
   } catch (error) {
-    console.error('Error resetting password:', error)
     toast.error(error.response?.data?.error || 'Failed to reset password')
     resetting.value = false
   }
@@ -759,7 +745,6 @@ const confirmDelete = async () => {
     closeDeleteModal()
     await loadStaff()
   } catch (error) {
-    console.error('Error deleting staff:', error)
     toast.error(error.response?.data?.error || 'Failed to delete staff')
   } finally {
     deleting.value = false

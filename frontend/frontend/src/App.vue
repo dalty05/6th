@@ -1,86 +1,91 @@
 <template>
-<div id="app">
-    <Navbar v-if="!isAdminRoute" />
+  <div id="app">
+    <!-- Loading state to prevent flash -->
+    <div v-if="isLoading" class="app-loading">
+      <div class="loading-spinner"></div>
+    </div>
     
-    <router-view />
-    <Footer v-if="!isAdminRoute" />
+    <!-- Main content -->
+    <template v-else>
+      <Navbar v-show="!isAdminRoute" />
+      <router-view />
+      <Footer v-show="!isAdminRoute" />
+    </template>
   </div>
 </template>
 
 <script>
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Navbar from './components/Navbar.vue'
 import Footer from './components/Footer.vue'
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 
 export default {
   name: 'App',
-  setup() {
-    const route = useRoute()
-    
-    const isAdminRoute = computed(() => {
-      return (
-        route.path.startsWith('/admin') ||
-        route.path.startsWith('/partner') ||
-        route.path.startsWith('/tour-manager')
-      )
-    })
-    
-    return {
-      isAdminRoute
-    }
-  },
   components: {
     Navbar,
     Footer
+  },
+  setup() {
+    const route = useRoute()
+    const router = useRouter()
+    const isLoading = ref(true)
+    const isAdminRoute = ref(false)
+
+    // Check if current path is an admin route
+    const checkAdminRoute = (path) => {
+      const adminPrefixes = ['/admin', '/partner', '/tour-manager']
+      return adminPrefixes.some(prefix => path.startsWith(prefix))
+    }
+
+    // Update admin route status
+    const updateAdminStatus = (path) => {
+      isAdminRoute.value = checkAdminRoute(path)
+    }
+
+    // Watch for route changes
+    watch(
+      () => route.path,
+      (newPath) => {
+        updateAdminStatus(newPath)
+      },
+      { immediate: true }
+    )
+
+    // Handle initial load
+    onMounted(async () => {
+      // Set initial admin status
+      updateAdminStatus(route.path)
+      
+      // Wait for router to be ready
+      await router.isReady()
+      
+      // Allow the app to render
+      await nextTick()
+      
+      // Hide loading state
+      isLoading.value = false
+    })
+
+    return {
+      isLoading,
+      isAdminRoute
+    }
   }
 }
 </script>
 
-
-
 <style>
+/* Reset and base styles */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-
-
-
-/* Image loading optimization */
-img {
-  image-rendering: crisp-edges;
-  image-rendering: -webkit-optimize-contrast;
-}
-
-/* Lazy loading effect */
-.product-image,
-.product-main-image {
-  opacity: 0;
-  animation: fadeIn 0.5s ease-in forwards;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-
-
-
-
 body {
-  font-family: 'Poppins', 'Segoe UI', sans-serif;
-  color: #333;
-  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f8fafc;
 }
 
 #app {
@@ -89,78 +94,30 @@ body {
   flex-direction: column;
 }
 
-main {
-  flex: 1;
+/* Loading state */
+.app-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  z-index: 9999;
 }
 
-/* Color scheme */
-:root {
-  --primary-blue: #1e3a8a;
-  --primary-light: #3b82f6;
-  --accent-blue: #0ea5e9;
-  --white: #ffffff;
-  --gray-light: #f3f4f6;
-  --gray: #6b7280;
-  --success: #10b981;
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
-.container {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.btn {
-  display: inline-block;
-  padding: 12px 24px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  border: none;
-}
-
-.btn-primary {
-  background: var(--primary-blue);
-  color: var(--white);
-}
-
-.btn-primary:hover {
-  background: var(--primary-light);
-  transform: translateY(-2px);
-}
-
-.btn-outline {
-  border: 2px solid var(--primary-blue);
-  color: var(--primary-blue);
-  background: transparent;
-}
-
-.btn-outline:hover {
-  background: var(--primary-blue);
-  color: var(--white);
-}
-
-.section-title {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 3rem;
-  color: var(--primary-blue);
-  position: relative;
-}
-
-.section-title::after {
-  content: '';
-  position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 80px;
-  height: 4px;
-  background: var(--accent-blue);
-  border-radius: 2px;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>
-
-

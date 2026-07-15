@@ -44,7 +44,7 @@ const uploadFile = async (file) => {
     toast.success('Image uploaded successfully')
     
   } catch (err) {
-    console.error('Upload error:', err)
+    
     error.value = err.response?.data?.error || 'Failed to upload image'
     toast.error(error.value)
   } finally {

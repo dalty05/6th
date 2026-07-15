@@ -33,7 +33,6 @@ class QRCodeService:
         """Ensure the QR code directory exists"""
         if not os.path.exists(self.qr_dir):
             os.makedirs(self.qr_dir)
-            print(f"✅ Created QR directory: {self.qr_dir}")
     
     def generate_product_qr(self, product_slug, product_name, size=300, include_label=True):
         """
@@ -99,7 +98,6 @@ class QRCodeService:
             img = img.convert('RGB')
         
         img.save(filepath, 'PNG', quality=95)
-        print(f"✅ Branded QR code saved: {filepath}")
         
         qr_url = f"/static/qr_codes/{filename}"
         return qr_url, filepath
@@ -140,7 +138,6 @@ class QRCodeService:
                     return img
                     
                 except Exception as e:
-                    print(f"Could not add logo from {logo_path}: {e}")
                     continue
         
         return img
@@ -228,7 +225,6 @@ class QRCodeService:
             return labeled
             
         except Exception as e:
-            print(f"Could not add label: {e}")
             return img
     
     def regenerate_product_qr(self, product):
@@ -243,9 +239,8 @@ class QRCodeService:
             if os.path.exists(old_path):
                 try:
                     os.remove(old_path)
-                    print(f"🗑️ Deleted old QR: {old_path}")
                 except Exception as e:
-                    print(f"Could not delete old QR code: {e}")
+                    return False
         
         # Generate new branded QR code
         qr_url, filepath = self.generate_product_qr(
@@ -302,9 +297,8 @@ class QRCodeService:
             if os.path.exists(old_path):
                 try:
                     os.remove(old_path)
-                    print(f"🗑️ Deleted QR: {old_path}")
                 except Exception as e:
-                    print(f"Could not delete QR code: {e}")
+                    return False
             product.qr_code_url = None
             product.qr_code_generated_at = None
     

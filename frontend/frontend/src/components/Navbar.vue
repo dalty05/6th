@@ -6,12 +6,18 @@
         <span class="brand-name">Mount Kenya Milk</span>
       </div>
       
-      <!-- Mobile Toggle Button -->
-      <div class="mobile-toggle" @click="toggleMobileMenu">
+      <!-- ✅ FIXED MOBILE TOGGLE -->
+      <button 
+        class="mobile-toggle" 
+        @click.stop="toggleMobileMenu"
+        :aria-label="mobileMenuOpen ? 'Close menu' : 'Open menu'"
+        :aria-expanded="mobileMenuOpen"
+        type="button"
+      >
         <span :class="{ active: mobileMenuOpen }"></span>
         <span :class="{ active: mobileMenuOpen }"></span>
         <span :class="{ active: mobileMenuOpen }"></span>
-      </div>
+      </button>
       
       <div class="navbar-menu" :class="{ 'is-active': mobileMenuOpen }">
         <a 
@@ -57,11 +63,13 @@
           <i class="fas fa-envelope"></i> Contact Us
         </a>
         
-        <div class="dropdown">
-          <button class="dropdown-btn" @click="toggleDropdown">
-            <i class="fas fa-ellipsis-h"></i> More <span>▼</span>
+        <div class="dropdown" ref="dropdownRef">
+          <button class="dropdown-btn" @click.stop="toggleDropdown">
+            <i class="fas fa-ellipsis-h"></i> 
+            <span class="dropdown-label">More</span> 
+            <span class="dropdown-arrow">▼</span>
           </button>
-          <div class="dropdown-content" v-show="dropdownOpen" @click.stop>
+          <div class="dropdown-content" v-show="dropdownOpen">
             <button @click="openCareersModal" class="dropdown-item">
               <i class="fas fa-briefcase"></i> Job Opportunities
             </button>
@@ -78,10 +86,10 @@
               </button>
             </template>
             <template v-else>
-              <router-link to="/admin/login" class="dropdown-item" @click="closeLoginModal">
+              <button @click="openLoginModal" class="dropdown-item">
                 <i class="fas fa-lock"></i> Admin Login
-              </router-link>
-            </template> 
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -153,7 +161,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { scrollToSection, handleInitialHash } from '@/utils/scroll'
 import { useSectionObserver } from '@/composables/useSectionObserver'
@@ -171,6 +179,7 @@ export default {
   },
   setup() {
     const router = useRouter()
+    const dropdownRef = ref(null)
     const mobileMenuOpen = ref(false)
     const dropdownOpen = ref(false)
     const showAdminLogin = ref(false)
@@ -200,10 +209,22 @@ export default {
       closeMenu()
     }
     
+    const openLoginModal = () => {
+      dropdownOpen.value = false
+      showAdminLogin.value = true
+      loginStep.value = 1
+      loginForm.value = { email: '', password: '' }
+      otpCodes.value = ['', '', '', '', '', '']
+      errorMessage.value = ''
+    }
+    
     const handleClickOutside = (event) => {
-      const dropdown = document.querySelector('.dropdown')
+      const navbar = document.querySelector('.navbar')
+      if (navbar && !navbar.contains(event.target) && mobileMenuOpen.value) {
+        mobileMenuOpen.value = false
+      }
       
-      if (dropdown && !dropdown.contains(event.target) && dropdownOpen.value) {
+      if (dropdownRef.value && !dropdownRef.value.contains(event.target) && dropdownOpen.value) {
         dropdownOpen.value = false
       }
     }
@@ -223,10 +244,23 @@ export default {
     
     const toggleMobileMenu = () => {
       mobileMenuOpen.value = !mobileMenuOpen.value
-      // Close dropdown when toggling mobile menu
+      
+      // Close dropdown when mobile menu opens/closes
       if (dropdownOpen.value) {
         dropdownOpen.value = false
       }
+      
+      // Toggle body scroll
+      if (mobileMenuOpen.value) {
+        document.body.style.overflow = 'hidden'
+      } else {
+        document.body.style.overflow = ''
+      }
+    }
+    
+    const toggleDropdown = (event) => {
+      event?.stopPropagation()
+      dropdownOpen.value = !dropdownOpen.value
     }
     
     const handleStep1 = async () => {
@@ -241,9 +275,14 @@ export default {
         
         if (response.requires_otp) {
           loginStep.value = 2
+          await nextTick()
+          const inputs = document.querySelectorAll('.otp-input')
+          if (inputs.length > 0) {
+            inputs[0].focus()
+          }
         }
       } catch (error) {
-        errorMessage.value = error.response?.data?.error || 'Login failed'
+        errorMessage.value = error.response?.data?.error || 'Login failed. Please check your credentials.'
       } finally {
         loading.value = false
       }
@@ -252,7 +291,7 @@ export default {
     const handleStep2 = async () => {
       const otpCode = otpCodes.value.join('')
       if (otpCode.length !== 6) {
-        errorMessage.value = 'Please enter the 6-digit code'
+        errorMessage.value = 'Please enter the complete 6-digit code'
         return
       }
       
@@ -263,33 +302,40 @@ export default {
         const response = await authService.loginStep2(otpCode)
         
         if (response.user) {
-          // ✅ Use the new method that handles redirect properly
-          await authService.setUserAndReload(response.user)
-          // The page will reload, so no need to do anything else
-        } else {
-          // Fallback for older versions
-          router.push('/admin/dashboard')
+          closeLoginModal()
+          const dashboard = authService.getRoleBasedDashboard()
+          router.push(dashboard)
         }
       } catch (error) {
-        errorMessage.value = error.response?.data?.error || 'Invalid code'
+        errorMessage.value = error.response?.data?.error || 'Invalid verification code'
         otpCodes.value = ['', '', '', '', '', '']
+        await nextTick()
+        const inputs = document.querySelectorAll('.otp-input')
+        if (inputs.length > 0) {
+          inputs[0].focus()
+        }
       } finally {
         loading.value = false
       }
     }
+    
     const handleOtpInput = (index, event) => {
       const value = event.target.value.replace(/[^0-9]/g, '')
       otpCodes.value[index] = value
       if (value && index < 5) {
-        const nextInput = document.querySelectorAll('.otp-input')[index + 1]
-        nextInput?.focus()
+        const inputs = document.querySelectorAll('.otp-input')
+        if (inputs[index + 1]) {
+          inputs[index + 1].focus()
+        }
       }
     }
     
     const handleOtpKeyup = (index, event) => {
       if (event.key === 'Backspace' && !otpCodes.value[index] && index > 0) {
-        const prevInput = document.querySelectorAll('.otp-input')[index - 1]
-        prevInput?.focus()
+        const inputs = document.querySelectorAll('.otp-input')
+        if (inputs[index - 1]) {
+          inputs[index - 1].focus()
+        }
       }
     }
     
@@ -309,17 +355,14 @@ export default {
         }, 1000)
         errorMessage.value = ''
       } catch (error) {
-        errorMessage.value = 'Failed to resend code'
+        errorMessage.value = 'Failed to resend code. Please try again.'
       }
-    }
-    
-    const toggleDropdown = () => {
-      dropdownOpen.value = !dropdownOpen.value
     }
     
     const closeMenu = () => {
       mobileMenuOpen.value = false
       dropdownOpen.value = false
+      document.body.style.overflow = ''
     }
     
     const closeLoginModal = () => {
@@ -331,9 +374,15 @@ export default {
     }
     
     const handleLogout = async () => {
-      await authService.logout()
-      router.push('/')
-      closeMenu()
+      try {
+        await authService.logout()
+        closeMenu()
+        router.push('/')
+      } catch (error) {
+        authService.clearUser()
+        closeMenu()
+        router.push('/')
+      }
     }
     
     const handleImageError = (e) => {
@@ -344,14 +393,30 @@ export default {
       window.addEventListener('scroll', handleScroll)
       document.addEventListener('click', handleClickOutside)
       handleInitialHash()
+      
+      // Close mobile menu on resize to desktop
+      const handleResize = () => {
+        if (window.innerWidth > 768 && mobileMenuOpen.value) {
+          mobileMenuOpen.value = false
+          document.body.style.overflow = ''
+        }
+      }
+      window.addEventListener('resize', handleResize)
+      
+      // Clean up resize listener
+      onUnmounted(() => {
+        window.removeEventListener('resize', handleResize)
+      })
     })
     
     onUnmounted(() => {
       window.removeEventListener('scroll', handleScroll)
       document.removeEventListener('click', handleClickOutside)
+      document.body.style.overflow = ''
     })
     
     return {
+      dropdownRef,
       mobileMenuOpen,
       dropdownOpen,
       showAdminLogin,
@@ -369,15 +434,16 @@ export default {
       showCSRModal,
       openCareersModal,
       openCSRModal,
+      openLoginModal,
       scrollTo,
       scrollToHome,
       toggleMobileMenu,
+      toggleDropdown,
       handleStep1,
       handleStep2,
       handleOtpInput,
       handleOtpKeyup,
       resendOtp,
-      toggleDropdown,
       closeMenu,
       closeLoginModal,
       handleLogout,
@@ -388,6 +454,198 @@ export default {
 </script>
 
 <style scoped>
+/* ========== MOBILE TOGGLE FIXES ========== */
+.mobile-toggle {
+  display: none;
+  flex-direction: column;
+  cursor: pointer;
+  gap: 5px;
+  flex-shrink: 0;
+  z-index: 1001;
+  padding: 5px;
+  background: none;
+  border: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-toggle:hover,
+.mobile-toggle:focus {
+  opacity: 0.8;
+}
+
+.mobile-toggle span {
+  display: block;
+  width: 28px;
+  height: 3px;
+  background: #1e3a8a;
+  transition: all 0.3s ease;
+  border-radius: 3px;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.mobile-toggle span.active:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.mobile-toggle span.active:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+
+.mobile-toggle span.active:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+  .mobile-toggle {
+    display: flex;
+  }
+  
+  .navbar-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    flex-direction: column;
+    padding: 1.5rem 1.5rem 2rem;
+    gap: 0.75rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+    justify-content: flex-start;
+    margin: 0;
+    flex: none;
+    border-top: 1px solid rgba(0,0,0,0.05);
+  }
+  
+  .navbar-menu.is-active {
+    display: flex;
+    animation: slideDown 0.3s ease;
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  body.menu-open {
+    overflow: hidden;
+  }
+}
+
+/* ========== DROPDOWN RESPONSIVE ========== */
+@media (max-width: 768px) {
+  .dropdown {
+    width: 100%;
+  }
+  
+  .dropdown-btn {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    font-size: 1rem;
+  }
+  
+  .dropdown-content {
+    position: static;
+    left: 0;
+    transform: none;
+    box-shadow: none;
+    padding-left: 1rem;
+    margin-top: 0.25rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    width: 100%;
+    animation: none;
+  }
+}
+
+/* ========== DROPDOWN FIXES ========== */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-btn {
+  background: none;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #333;
+  transition: color 0.3s;
+  user-select: none;
+}
+
+.dropdown-btn:hover {
+  color: #f59e0b;
+}
+
+.dropdown-label {
+  display: inline;
+}
+
+.dropdown-arrow {
+  font-size: 0.7rem;
+  transition: transform 0.3s;
+}
+
+.dropdown-content {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  min-width: 220px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 100;
+  margin-top: 10px;
+  animation: fadeInDown 0.2s ease;
+}
+
+/* Responsive dropdown */
+@media (max-width: 768px) {
+  .dropdown {
+    width: 100%;
+  }
+  
+  .dropdown-btn {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    font-size: 1rem;
+  }
+  
+  .dropdown-content {
+    position: static;
+    left: 0;
+    transform: none;
+    box-shadow: none;
+    padding-left: 1rem;
+    margin-top: 0.25rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    width: 100%;
+    animation: none;
+  }
+}
+
 /* ========== BASE NAVBAR ========== */
 .navbar {
   background: rgba(255,255,255,0.95);
@@ -1001,6 +1259,4 @@ export default {
     padding: 1.25rem;
   }
 }
-
-
 </style>

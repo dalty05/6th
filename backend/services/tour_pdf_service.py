@@ -1,8 +1,3 @@
-# backend/services/tour_pdf_service.py
-"""
-Tour PDF Service - Generates PDF certificates and reports
-"""
-
 import os
 from datetime import datetime
 from io import BytesIO
@@ -145,8 +140,6 @@ class TourPDFService:
             return filepath, filename
             
         except ImportError:
-            # Fallback: Create a simple text file if reportlab is not installed
-            print("⚠️ reportlab not installed, creating text certificate")
             filename = f"certificate_{booking.reference}_{datetime.now().strftime('%Y%m%d')}.txt"
             filepath = os.path.join(self.static_dir, 'certificates', filename)
             

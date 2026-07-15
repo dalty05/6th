@@ -350,7 +350,7 @@ const loadPosts = async () => {
     const response = await api.get('/admin/blog')
     posts.value = response.data
   } catch (error) {
-    console.error('Error loading posts:', error)
+    
     toast.error('Failed to load blog posts')
   } finally {
     loading.value = false
@@ -485,7 +485,7 @@ const savePost = async () => {
     closeModal()
     await loadPosts()
   } catch (error) {
-    console.error('Error saving post:', error)
+    
     toast.error(error.response?.data?.error || 'Failed to save post')
   } finally {
     saving.value = false
@@ -499,7 +499,7 @@ const publishPost = async (id) => {
       toast.success('Blog post published successfully')
       await loadPosts()
     } catch (error) {
-      console.error('Error publishing post:', error)
+      
       toast.error('Failed to publish post')
     }
   }
@@ -512,7 +512,6 @@ const unpublishPost = async (id) => {
       toast.success('Blog post unpublished')
       await loadPosts()
     } catch (error) {
-      console.error('Error unpublishing post:', error)
       toast.error('Failed to unpublish post')
     }
   }
@@ -525,7 +524,6 @@ const deletePost = async (id) => {
       toast.success('Blog post deleted')
       await loadPosts()
     } catch (error) {
-      console.error('Error deleting post:', error)
       toast.error('Failed to delete post')
     }
   }

@@ -229,7 +229,7 @@ const loadStats = async () => {
     const response = await api.get('/admin/contacts/stats')
     stats.value = response.data
   } catch (error) {
-    console.error('Error loading stats:', error)
+    
   }
 }
 
@@ -240,7 +240,7 @@ const loadMessages = async () => {
     messages.value = response.data
     await loadStats()
   } catch (error) {
-    console.error('Error loading messages:', error)
+    
     toast.error('Failed to load messages')
   } finally {
     loading.value = false
@@ -259,7 +259,7 @@ const markAsRead = async () => {
     await loadMessages()
     toast.success('Message marked as read')
   } catch (error) {
-    console.error('Error marking as read:', error)
+    
     toast.error('Failed to update status')
   }
 }
@@ -286,7 +286,7 @@ const sendReply = async () => {
     closeReplyModal()
     await loadMessages()
   } catch (error) {
-    console.error('Error sending reply:', error)
+    
     toast.error('Failed to send reply')
   } finally {
     sendingReply.value = false
@@ -300,7 +300,7 @@ const deleteMessage = async (id) => {
       toast.success('Message deleted')
       await loadMessages()
     } catch (error) {
-      console.error('Error deleting message:', error)
+      
       toast.error('Failed to delete message')
     }
   }

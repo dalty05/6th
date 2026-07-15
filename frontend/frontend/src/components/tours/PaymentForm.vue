@@ -234,7 +234,7 @@ export default {
         }
 
         const response = await axios.put(
-          `/api/tour/admin/bookings/${this.booking.id}/payment`,
+          `/api/admin/tour/bookings/${this.booking.id}/payment`,
           payload
         )
         
@@ -243,7 +243,6 @@ export default {
           this.$emit('close')
         }
       } catch (error) {
-        console.error('Error processing payment:', error)
         alert(error.response?.data?.error || 'Failed to process payment. Please try again.')
       } finally {
         this.submitting = false

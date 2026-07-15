@@ -231,7 +231,6 @@ export default {
 
       } catch (error) {
         this.errorMessage = error.response?.data?.error || error.message || 'Login failed. Please try again.'
-        console.error('Login step 1 error:', error)
       } finally {
         this.loading = false
       }
@@ -271,9 +270,7 @@ export default {
 
       } catch (error) {
         this.errorMessage = error.response?.data?.error || 'Invalid verification code. Please try again.'
-        console.error('Login step 2 error:', error)
         
-        // ✅ Clear OTP on error
         this.otpCodes = ['', '', '', '', '', '']
         this.$nextTick(() => {
           if (this.$refs.otpInputs && this.$refs.otpInputs[0]) {

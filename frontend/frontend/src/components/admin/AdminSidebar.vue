@@ -1,69 +1,64 @@
+<!-- frontend/src/components/admin/AdminSidebar.vue -->
+
 <template>
-  <aside class="admin-sidebar" :class="{ collapsed: isCollapsed, mobile: isMobile }">
-    <!-- Sidebar Header -->
+  <aside class="admin-sidebar" :class="{ collapsed: isCollapsed }">
+    <!-- Logo -->
     <div class="sidebar-header">
-      <img src="/logo.png" alt="Meru Dairy" class="sidebar-logo">
-      <div class="sidebar-brand" v-if="!isCollapsed">
-        <h3>Meru Dairy</h3>
-        <span>{{ roleName || 'Dashboard' }}</span>
+      <div class="logo-container">
+        <img src="/logo.png" alt="Meru Dairy" class="logo-img" />
+        <span v-if="!isCollapsed" class="logo-text">Meru Dairy</span>
       </div>
-      <button class="sidebar-toggle" @click="toggleSidebar" v-if="!isMobile">
+      <button @click="toggleCollapse" class="collapse-btn">
         <i :class="isCollapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left'"></i>
       </button>
     </div>
 
-    <!-- User Profile -->
-    <div class="user-profile" v-if="!isCollapsed">
-      <div class="user-avatar">
-        <i class="fas fa-user-circle"></i>
-      </div>
-      <div class="user-info">
-        <h4>{{ user?.full_name || 'Administrator' }}</h4>
-        <span class="user-role">
-          <i class="fas fa-tag"></i> {{ formatRole(roleName) }}
-        </span>
-      </div>
-    </div>
-
     <!-- Navigation -->
     <nav class="sidebar-nav">
-      <div class="nav-section" v-for="section in groupedComponents" :key="section.name">
-        <div class="nav-section-title" v-if="!isCollapsed">{{ section.name }}</div>
+      <!-- Group by section -->
+      <div v-for="(group, section) in groupedComponents" :key="section" class="nav-section">
+        <span v-if="!isCollapsed" class="nav-section-title">{{ section }}</span>
         
-        <button
-          v-for="component in section.components"
-          :key="component.key"
+        <router-link
+          v-for="comp in group"
+          :key="comp.key"
+          :to="`/admin/dashboard?tab=${comp.key}`"
           class="nav-item"
-          :class="{ active: activeTab === component.key }"
-          @click="navigate(component)"
+          :class="{ active: activeComponent === comp.key }"
+          @click="navigate(comp.key)"
         >
-          <i :class="component.icon || 'fas fa-cube'"></i>
-          <span v-if="!isCollapsed">{{ component.label }}</span>
-          <span v-if="isCollapsed" class="tooltip">{{ component.label }}</span>
-        </button>
-      </div>
-
-      <!-- Logout -->
-      <div class="nav-section" v-if="!isCollapsed">
-        <div class="nav-section-title">Account</div>
-        <button class="nav-item logout-btn" @click="handleLogout">
-          <i class="fas fa-sign-out-alt"></i>
-          <span>Logout</span>
-        </button>
+          <i :class="comp.icon"></i>
+          <span v-if="!isCollapsed">{{ comp.label }}</span>
+          <span v-if="isCollapsed" class="tooltip">{{ comp.label }}</span>
+        </router-link>
       </div>
     </nav>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">
+          <i class="fas fa-user-circle"></i>
+        </div>
+        <div v-if="!isCollapsed" class="user-details">
+          <span class="user-name">{{ user?.full_name || 'User' }}</span>
+          <span class="user-role">{{ user?.role || 'User' }}</span>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import authService from '@/services/auth'
-import api from '@/services/api'
-import permissionService from '@/services/permissionService'
+import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const props = defineProps({
-  activeTab: {
+  components: {
+    type: Array,
+    default: () => []
+  },
+  activeComponent: {
     type: String,
     default: 'overview'
   }
@@ -71,313 +66,264 @@ const props = defineProps({
 
 const emit = defineEmits(['navigate'])
 
-const router = useRouter()
-const user = ref(null)
-const components = ref([])
-const roleName = ref('')
+const route = useRoute()
 const isCollapsed = ref(false)
-const isMobile = ref(false)
-const loading = ref(false)
-
-const loadDashboardConfig = async () => {
-  loading.value = true
-  try {
-    const response = await api.get('/dashboard/config')
-    components.value = response.data.components || []
-    roleName.value = response.data.role?.name || 'User'
-    
-    console.log('✅ Dashboard config loaded:', components.value.length, 'components')
-  } catch (error) {
-    console.error('Error loading dashboard config:', error)
-  } finally {
-    loading.value = false
-  }
-}
+const user = ref(null)
 
 // Group components by section
 const groupedComponents = computed(() => {
   const groups = {}
-  components.value.forEach(comp => {
+  
+  // Sort components by order
+  const sorted = [...props.components].sort((a, b) => (a.order || 0) - (b.order || 0))
+  
+  for (const comp of sorted) {
     const section = comp.section || 'Main'
     if (!groups[section]) groups[section] = []
     groups[section].push(comp)
-  })
-  return Object.entries(groups).map(([name, comps]) => ({
-    name,
-    components: comps.sort((a, b) => (a.order || 0) - (b.order || 0))
-  }))
+  }
+  
+  return groups
 })
 
-const navigate = (component) => {
-  emit('navigate', component.key)
-  if (component.path) {
-    router.push(component.path)
-  }
+const navigate = (key) => {
+  emit('navigate', key)
 }
 
-const toggleSidebar = () => {
+const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
-  localStorage.setItem('admin_sidebar_collapsed', isCollapsed.value)
 }
 
-const handleLogout = async () => {
-    await authService.logout()
-  this.$router.push('/admin/login')
-  router.push('/admin/login')
-}
-
-const formatRole = (role) => {
-  const roles = {
-    super_admin: 'Super Admin',
-    admin: 'Admin',
-    tour_manager: 'Tour Manager',
-    tour_assistant: 'Tour Assistant',
-    partner: 'Partner'
+// Watch route changes to update active component
+watch(() => route.query.tab, (tab) => {
+  if (tab) {
+    // Active component will be updated by parent
   }
-  return roles[role] || role
-}
+}, { immediate: true })
 
-onMounted(() => {
-  user.value = authService.getUser()
-  loadDashboardConfig()
-  
-  const saved = localStorage.getItem('admin_sidebar_collapsed')
-  if (saved !== null) {
-    isCollapsed.value = saved === 'true'
-  }
+// Load user data
+import authService from '@/services/auth'
+user.value = authService.getUser()
+
+defineExpose({
+  isCollapsed
 })
 </script>
-
-
 
 <style scoped>
 .admin-sidebar {
   position: fixed;
-  left: 0;
   top: 0;
-  bottom: 0;
+  left: 0;
   width: 280px;
-  background: linear-gradient(180deg, #1e3a8a 0%, #1e293b 100%);
-  color: white;
-  z-index: 1000;
-  transition: all 0.3s ease;
+  height: 100vh;
+  background: white;
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  transition: width 0.3s ease;
+  z-index: 100;
+  overflow: hidden;
 }
 
 .admin-sidebar.collapsed {
-  width: 80px;
-}
-
-.admin-sidebar.mobile {
-  transform: translateX(-100%);
-  width: 280px;
-}
-
-.admin-sidebar.mobile.open {
-  transform: translateX(0);
+  width: 72px;
 }
 
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  min-height: 70px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
 }
 
-.sidebar-logo {
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-img {
   width: 40px;
   height: 40px;
   object-fit: contain;
-  flex-shrink: 0;
 }
 
-.sidebar-brand {
-  flex: 1;
-  margin-left: 0.75rem;
+.logo-text {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a2e;
+  white-space: nowrap;
 }
 
-.sidebar-brand h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.sidebar-brand span {
-  font-size: 0.7rem;
-  opacity: 0.7;
-}
-
-.sidebar-toggle {
-  background: #f59e0b;
+.collapse-btn {
+  background: none;
   border: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: white;
+  color: #94a3b8;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
-.sidebar-toggle:hover {
-  transform: scale(1.1);
-}
-
-.user-profile {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.user-avatar i {
-  font-size: 2.5rem;
-  color: #f59e0b;
-}
-
-.user-info h4 {
-  margin: 0 0 0.25rem;
-  font-size: 0.85rem;
-}
-
-.user-role {
-  font-size: 0.7rem;
-  opacity: 0.8;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+.collapse-btn:hover {
+  background: #f1f5f9;
+  color: #1a1a2e;
 }
 
 .sidebar-nav {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 1rem 0;
+  overflow-y: auto;
+  padding: 12px 0;
 }
 
 .nav-section {
-  margin-bottom: 1rem;
+  margin-bottom: 8px;
 }
 
 .nav-section-title {
-  padding: 0.5rem 1rem;
-  font-size: 0.7rem;
+  display: block;
+  padding: 8px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.5px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.8);
+  gap: 12px;
+  padding: 10px 20px;
+  color: #64748b;
+  text-decoration: none;
   cursor: pointer;
-  transition: all 0.3s;
-  font-size: 0.9rem;
-  text-align: left;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
   position: relative;
+}
+
+.nav-item:hover {
+  background: #f1f5f9;
+  color: #1a1a2e;
+}
+
+.nav-item.active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-left-color: #2563eb;
 }
 
 .nav-item i {
   width: 20px;
-  font-size: 1rem;
+  font-size: 16px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
-.nav-item:hover {
-  background: rgba(255,255,255,0.1);
-  color: white;
+.nav-item span {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.nav-item.active {
-  background: rgba(245,158,11,0.2);
-  color: #f59e0b;
-  border-left: 3px solid #f59e0b;
-}
-
-.logout-btn {
-  color: #ef4444;
-  margin-top: auto;
-}
-
-.logout-btn:hover {
-  background: rgba(239,68,68,0.2);
-  color: #ef4444;
-}
-
-/* Tooltip for collapsed mode */
-.admin-sidebar.collapsed .nav-item {
+.collapsed .nav-item {
   justify-content: center;
-  padding: 0.75rem;
-  position: relative;
+  padding: 10px;
 }
 
-.admin-sidebar.collapsed .nav-item span {
+.collapsed .nav-section-title {
   display: none;
 }
 
-.admin-sidebar.collapsed .nav-item:hover .tooltip {
-  display: block;
+.tooltip {
   position: absolute;
-  left: 100%;
+  left: 60px;
   top: 50%;
   transform: translateY(-50%);
-  background: #1e293b;
+  background: #1a1a2e;
   color: white;
-  padding: 0.25rem 0.5rem;
+  padding: 4px 12px;
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 12px;
   white-space: nowrap;
-  margin-left: 0.5rem;
-  z-index: 100;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
 }
 
-.sidebar-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: 999;
+.nav-item:hover .tooltip {
+  opacity: 1;
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  font-size: 32px;
+  color: #94a3b8;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
+}
+
+.user-role {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: capitalize;
+}
+
+.collapsed .user-details {
+  display: none;
 }
 
 /* Scrollbar */
-.admin-sidebar::-webkit-scrollbar {
+.sidebar-nav::-webkit-scrollbar {
   width: 4px;
 }
 
-.admin-sidebar::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.1);
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.admin-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.3);
-  border-radius: 4px;
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
 }
 
-/* Responsive */
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 @media (max-width: 768px) {
   .admin-sidebar {
     transform: translateX(-100%);
+    width: 280px;
   }
   
-  .admin-sidebar.open {
+  .admin-sidebar.mobile-open {
     transform: translateX(0);
   }
 }

@@ -35,7 +35,6 @@ class AuthService {
       })
       return response.data
     } catch (error) {
-      console.error('Login step 1 error:', error)
       throw error
     }
   }
@@ -53,7 +52,6 @@ class AuthService {
 
       return response.data
     } catch (error) {
-      console.error('Login step 2 error:', error)
       throw error
     }
   }
@@ -67,7 +65,6 @@ class AuthService {
       })
       return response.data
     } catch (error) {
-      console.error('Registration error:', error)
       throw error
     }
   }
@@ -79,7 +76,6 @@ class AuthService {
       })
       return response.data
     } catch (error) {
-      console.error('Forgot password error:', error)
       throw error
     }
   }
@@ -92,7 +88,6 @@ class AuthService {
       })
       return response.data
     } catch (error) {
-      console.error('Reset password error:', error)
       throw error
     }
   }
@@ -101,7 +96,6 @@ class AuthService {
     try {
       await authAxios.post(`${API_URL}/auth/logout`)
     } catch (error) {
-      console.warn('Logout request failed:', error)
     } finally {
       this.clearUser()
       await this.clearPermissions()
@@ -117,7 +111,6 @@ class AuthService {
       const response = await authAxios.get(`${API_URL}/admin/profile`)
       return response.data
     } catch (error) {
-      console.error('Get profile error:', error)
       throw error
     }
   }
@@ -132,7 +125,6 @@ class AuthService {
       }
       return response.data
     } catch (error) {
-      console.error('Update profile error:', error)
       throw error
     }
   }
@@ -145,7 +137,6 @@ class AuthService {
       })
       return response.data
     } catch (error) {
-      console.error('Change password error:', error)
       throw error
     }
   }
@@ -153,7 +144,6 @@ class AuthService {
   async checkAuth() {
     try {
       const response = await authAxios.get(`${API_URL}/admin/check-auth`)
-      console.debug('checkAuth response:', response.status, response.data)
       if (response.data.is_admin) {
         await this.setUserAndReload(response.data.user)
         return true
@@ -162,9 +152,7 @@ class AuthService {
       await this.clearUserAndPermissions()
       return false
     } catch (error) {
-      console.warn('Auth check failed:', error)
       const status = error.response?.status
-      console.debug('checkAuth error response:', status, error.response?.data)
       if (status === 401 || status === 403) {
         await this.clearUserAndPermissions()
       }
@@ -182,7 +170,6 @@ class AuthService {
       await permissionService.init()
       return true
     } catch (err) {
-      console.warn('Failed to load permissions:', err)
       return false
     }
   }
@@ -192,7 +179,7 @@ class AuthService {
       const { default: permissionService } = await import('./permissionService')
       permissionService.clear()
     } catch (err) {
-      console.warn('Failed to clear permission cache:', err)
+      throw(err)
     }
   }
 
@@ -203,7 +190,6 @@ class AuthService {
       await permissionService.init()
       return true
     } catch (err) {
-      console.warn('Failed to refresh permissions:', err)
       return false
     }
   }
@@ -264,19 +250,16 @@ class AuthService {
     const user = this.getUser()
     if (!user) return '/admin/login'
 
-    console.log('User object for redirect:', user)
     
     if (user.role === 'super_admin' || user.role === 'admin') {
       return '/admin/dashboard'
     }
     
     if (user.is_tour_manager === true || user.role === 'tour_manager') {
-      console.log('Redirecting to Tour Manager Portal')
       return '/tour-manager/dashboard'
     }
     
     if (user.is_tour_assistant === true || user.role === 'tour_assistant') {
-      console.log('Redirecting to Tour Assistant Portal')
       return '/tour-manager/dashboard'
     }
     
@@ -376,28 +359,9 @@ class AuthService {
     return user && (this.isTourAssistant() || this.isTourManager() || this.isAdmin() || this.isSuperAdmin())
   }
 
-  // ============================================================
-  // SESSION MANAGEMENT
-  // ============================================================
-
-  // Removed refreshSession - using session-only auth
-
-  // ============================================================
-  // DEBUG
-  // ============================================================
-
-  debugAuth() {
-    console.log('🔍 Auth Debug:')
-    console.log('  Authenticated:', this.isAuthenticated())
-    console.log('  User:', this.getUser())
-    console.log('  Role:', this.getAccessLevel())
-    console.log('  Dashboard:', this.getRoleBasedDashboard())
-  }
 }
 
-// ✅ Create and export singleton instance
 const authService = new AuthService()
 
-// ❌ REMOVED: Token-related code since we're using session-only auth
 
 export default authService

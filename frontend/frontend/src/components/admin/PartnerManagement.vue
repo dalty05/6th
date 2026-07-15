@@ -403,13 +403,12 @@ const loadPartners = async () => {
     // Get additional stats for each partner
     for (const partner of partnersData) {
       try {
-        const statsRes = await api.get(`/referral/partner/${partner.id}/stats`)
+        const statsRes = await api.get(`/admin/referral/partner/${partner.id}/stats`)
         partner.link_count = statsRes.data.total_links || 0
         partner.total_clicks = statsRes.data.total_clicks || 0
         partner.unique_clicks = statsRes.data.total_unique_clicks || 0
         partner.referral_links = statsRes.data.links || []
       } catch (e) {
-        console.error(`Error loading stats for partner ${partner.id}:`, e)
         partner.link_count = 0
         partner.total_clicks = 0
         partner.unique_clicks = 0
@@ -419,7 +418,6 @@ const loadPartners = async () => {
     
     partners.value = partnersData
   } catch (error) {
-    console.error('Error loading partners:', error)
     showNotification('Failed to load partners', 'error')
   } finally {
     loading.value = false

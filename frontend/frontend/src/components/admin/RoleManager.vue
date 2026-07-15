@@ -1,10 +1,12 @@
+<!-- frontend/src/components/admin/RoleManager.vue -->
+
 <template>
   <div class="role-manager">
     <!-- Header -->
-    <div class="page-header">
-      <div>
-        <h2><i class="fas fa-user-tag"></i> Role Management</h2>
-        <p>Create and manage roles with specific dashboard components</p>
+    <div class="role-header">
+      <div class="header-left">
+        <h1><i class="fas fa-user-tag"></i> Role Management</h1>
+        <p>Create and manage roles with component-based permissions</p>
       </div>
       <button @click="openCreateModal" class="btn-primary">
         <i class="fas fa-plus"></i> Create Role
@@ -12,685 +14,811 @@
     </div>
 
     <!-- Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon blue"><i class="fas fa-user-tag"></i></div>
-        <div class="stat-info">
-          <h3>{{ roles.length }}</h3>
-          <p>Total Roles</p>
+    <div class="stats-row">
+      <div class="stat-box">
+        <span class="stat-number">{{ roles.length }}</span>
+        <span class="stat-label">Total Roles</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">{{ systemRoles }}</span>
+        <span class="stat-label">System Roles</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">{{ customRoles }}</span>
+        <span class="stat-label">Custom Roles</span>
+      </div>
+    </div>
+
+    <!-- Role List -->
+    <div class="role-list">
+      <div v-for="role in sortedRoles" :key="role.id" class="role-card">
+        <div class="role-card-header">
+          <div class="role-info">
+            <h3>
+              {{ role.name }}
+              <span v-if="role.is_system" class="system-badge">System</span>
+            </h3>
+            <p>{{ role.description || 'No description' }}</p>
+          </div>
+          <div class="role-stats">
+            <span class="user-count">
+              <i class="fas fa-users"></i> {{ role.user_count || 0 }} users
+            </span>
+            <span class="component-count">
+              <i class="fas fa-cubes"></i> {{ role.component_count || 0 }} components
+            </span>
+          </div>
+        </div>
+
+        <div class="role-card-body">
+          <!-- Assigned Components -->
+          <div class="assigned-components">
+            <span class="label">Components:</span>
+            <div class="component-tags">
+              <span 
+                v-for="comp in role.components" 
+                :key="comp.id"
+                class="component-tag"
+              >
+                <i :class="comp.icon"></i> {{ comp.label }}
+              </span>
+              <span v-if="!role.components || role.components.length === 0" class="no-components">
+                No components assigned
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="role-card-footer">
+          <button @click="editRole(role)" class="btn-edit">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button 
+            v-if="!role.is_system" 
+            @click="deleteRole(role.id)" 
+            class="btn-delete"
+          >
+            <i class="fas fa-trash"></i> Delete
+          </button>
+          <button @click="assignUsers(role)" class="btn-users">
+            <i class="fas fa-user-plus"></i> Assign Users
+          </button>
         </div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
-        <div class="stat-info">
-          <h3>{{ activeRoles }}</h3>
-          <p>Active Roles</p>
-        </div>
+
+      <div v-if="roles.length === 0" class="no-roles">
+        <i class="fas fa-user-tag"></i>
+        <h3>No Roles Created</h3>
+        <p>Create your first role to start managing permissions</p>
+        <button @click="openCreateModal" class="btn-primary">Create Role</button>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon purple"><i class="fas fa-cubes"></i></div>
-        <div class="stat-info">
-          <h3>{{ totalComponents }}</h3>
-          <p>Available Components</p>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-container large">
+        <div class="modal-header">
+          <h2>{{ editingRole ? 'Edit Role' : 'Create New Role' }}</h2>
+          <button class="close-btn" @click="closeModal">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Role Details -->
+          <div class="form-section">
+            <h4>Role Details</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Role Name *</label>
+                <input 
+                  type="text" 
+                  v-model="form.name" 
+                  placeholder="e.g., Content Manager"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <input 
+                  type="text" 
+                  v-model="form.description" 
+                  placeholder="Brief description of this role"
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Component Assignment -->
+          <div class="form-section">
+            <h4>Assign Components</h4>
+            <p class="hint">Select the components this role should have access to</p>
+            
+            <!-- Search & Filter -->
+            <div class="component-toolbar">
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input 
+                  type="text" 
+                  v-model="componentSearch" 
+                  placeholder="Search components..."
+                >
+              </div>
+              <div class="toolbar-actions">
+                <button @click="selectAllComponents" class="btn-sm btn-outline">
+                  Select All
+                </button>
+                <button @click="deselectAllComponents" class="btn-sm btn-outline">
+                  Deselect All
+                </button>
+              </div>
+            </div>
+
+            <!-- Component Grid -->
+            <div class="component-grid">
+              <div 
+                v-for="comp in filteredComponents" 
+                :key="comp.id"
+                class="component-item"
+                :class="{ selected: isComponentSelected(comp.id) }"
+                @click="toggleComponent(comp.id)"
+              >
+                <div class="component-check">
+                  <i 
+                    class="fas" 
+                    :class="isComponentSelected(comp.id) ? 'fa-check-square' : 'fa-square'"
+                  ></i>
+                </div>
+                <div class="component-info">
+                  <i :class="comp.icon"></i>
+                  <span>{{ comp.label }}</span>
+                  <small class="component-key">{{ comp.key }}</small>
+                </div>
+              </div>
+            </div>
+            
+            <div v-if="filteredComponents.length === 0" class="no-components">
+              <i class="fas fa-cubes"></i>
+              <p>No components available</p>
+            </div>
+          </div>
+
+          <!-- Role Templates -->
+          <div class="form-section" v-if="!editingRole">
+            <h4>Use Template (Optional)</h4>
+            <p class="hint">Start with a pre-configured role template</p>
+            <div class="template-grid">
+              <div 
+                v-for="template in roleTemplates" 
+                :key="template.name"
+                class="template-item"
+                :class="{ active: selectedTemplate === template.name }"
+                @click="applyTemplate(template)"
+              >
+                <i :class="template.icon"></i>
+                <div>
+                  <strong>{{ template.label }}</strong>
+                  <span>{{ template.description }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button @click="closeModal" class="btn-cancel">Cancel</button>
+          <button @click="saveRole" class="btn-primary" :disabled="saving">
+            <i v-if="saving" class="fas fa-spinner fa-spin"></i>
+            {{ saving ? 'Saving...' : (editingRole ? 'Update Role' : 'Create Role') }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Roles Grid -->
-    <div class="roles-grid">
-      <div v-for="role in roles" :key="role.id" class="role-card">
-        <div class="role-header">
-          <div>
-            <h3>{{ role.name }}</h3>
-            <span class="role-badge" :class="role.is_system ? 'system' : 'custom'">
-              {{ role.is_system ? 'System' : 'Custom' }}
-            </span>
-          </div>
-          <span class="user-count">{{ role.user_count || 0 }} users</span>
-        </div>
-        
-        <p class="role-description">{{ role.description || 'No description' }}</p>
-        
-        <div class="component-list">
-          <span class="component-count">{{ role.component_count || 0 }} components</span>
-          <div class="component-tags">
-            <span v-for="comp in role.components" :key="comp.id" class="component-tag">
-              <i :class="comp.icon"></i> {{ comp.label }}
-            </span>
-          </div>
-        </div>
-        
-        <div class="role-actions">
-          <button @click="editRole(role)" class="btn-icon edit" title="Edit Role">
-            <i class="fas fa-edit"></i>
-          </button>
-          <button 
-            @click="manageComponents(role)" 
-            class="btn-icon components" 
-            :disabled="role.is_system"
-            :title="role.is_system ? 'Cannot modify system role' : 'Manage Components'"
-          >
-            <i class="fas fa-cubes"></i>
-          </button>
-          <button @click="viewUsers(role)" class="btn-icon users" title="View Users">
-            <i class="fas fa-users"></i>
-          </button>
-          <button 
-            @click="deleteRole(role)" 
-            class="btn-icon delete" 
-            :disabled="role.is_system"
-            title="Delete Role"
-          >
-            <i class="fas fa-trash"></i>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create/Edit Role Modal -->
-    <div v-if="showRoleModal" class="modal-overlay" @click.self="closeRoleModal">
+    <!-- Assign Users Modal -->
+    <div v-if="showAssignModal" class="modal-overlay" @click.self="closeAssignModal">
       <div class="modal-container">
         <div class="modal-header">
-          <h3>{{ isEditing ? 'Edit Role' : 'Create New Role' }}</h3>
-          <button @click="closeRoleModal" class="close-btn">&times;</button>
+          <h2>Assign Users to {{ selectedRole?.name }}</h2>
+          <button class="close-btn" @click="closeAssignModal">&times;</button>
         </div>
+        
         <div class="modal-body">
-          <form @submit.prevent="saveRole">
-            <div class="form-group">
-              <label>Role Name *</label>
-              <input 
-                type="text" 
-                v-model="roleForm.name" 
-                placeholder="e.g., Content Manager"
-                required
-                :disabled="isEditing && roleForm.is_system"
-              >
-            </div>
-            <div class="form-group">
-              <label>Description</label>
-              <textarea v-model="roleForm.description" placeholder="Describe this role's purpose"></textarea>
-            </div>
-            <div class="checkbox-group">
-              <label class="checkbox">
-                <input type="checkbox" v-model="roleForm.is_active"> Active
+          <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input 
+              type="text" 
+              v-model="userSearch" 
+              placeholder="Search users..."
+            >
+          </div>
+          
+          <div class="user-list">
+            <div 
+              v-for="user in filteredUsers" 
+              :key="user.id"
+              class="user-item"
+            >
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :value="user.id"
+                  v-model="selectedUserIds"
+                >
+                <div class="user-info">
+                  <span class="user-name">{{ user.full_name }}</span>
+                  <span class="user-email">{{ user.email }}</span>
+                  <span class="user-role-badge">{{ user.role }}</span>
+                </div>
               </label>
             </div>
-            <div class="form-actions">
-              <button type="button" @click="closeRoleModal" class="btn-cancel">Cancel</button>
-              <button type="submit" class="btn-submit">{{ isEditing ? 'Update' : 'Create' }}</button>
-            </div>
-          </form>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Component Assignment Modal -->
-    <div v-if="showComponentModal" class="modal-overlay" @click.self="closeComponentModal">
-      <div class="modal-container modal-lg">
-        <div class="modal-header">
-          <h3>Assign Components to {{ selectedRole?.name }}</h3>
-          <button @click="closeComponentModal" class="close-btn">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p class="help-text">Select the components that users with this role should see in their dashboard.</p>
-          
-          <div class="component-grid">
-            <div 
-              v-for="comp in availableComponents" 
-              :key="comp.id"
-              class="component-select-item"
-              :class="{ selected: selectedComponentIds.includes(comp.id) }"
-              @click="toggleComponent(comp.id)"
-            >
-              <div class="component-icon">
-                <i :class="comp.icon || 'fas fa-cube'"></i>
-              </div>
-              <div class="component-info">
-                <h4>{{ comp.label }}</h4>
-                <p>{{ comp.description || comp.key }}</p>
-              </div>
-              <div class="component-check">
-                <i v-if="selectedComponentIds.includes(comp.id)" class="fas fa-check-circle"></i>
-              </div>
-            </div>
-          </div>
-          
-          <div class="form-actions">
-            <button @click="closeComponentModal" class="btn-cancel">Cancel</button>
-            <button @click="saveComponentAssignments" class="btn-submit">Save Assignments</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Users List Modal -->
-    <div v-if="showUsersModal" class="modal-overlay" @click.self="closeUsersModal">
-      <div class="modal-container">
-        <div class="modal-header">
-          <h3>Users with {{ selectedRole?.name }} Role</h3>
-          <button @click="closeUsersModal" class="close-btn">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div v-if="roleUsers.length === 0" class="empty-state">
-            <i class="fas fa-users"></i>
-            <p>No users assigned to this role yet</p>
-          </div>
-          <div v-else class="user-list">
-            <div v-for="user in roleUsers" :key="user.id" class="user-item">
-              <div class="user-avatar">
-                <i class="fas fa-user-circle"></i>
-              </div>
-              <div class="user-info">
-                <span class="user-name">{{ user.full_name }}</span>
-                <span class="user-email">{{ user.email }}</span>
-              </div>
-              <button @click="removeUserFromRole(user)" class="btn-remove" title="Remove from role">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          </div>
+        <div class="modal-footer">
+          <span class="selected-count">{{ selectedUserIds.length }} users selected</span>
+          <button @click="closeAssignModal" class="btn-cancel">Cancel</button>
+          <button @click="assignUsersToRole" class="btn-primary" :disabled="saving">
+            <i v-if="saving" class="fas fa-spinner fa-spin"></i>
+            {{ saving ? 'Assigning...' : 'Assign Users' }}
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { toast } from 'vue3-toastify'
 import api from '@/services/api'
 
-// ========== STATE ==========
+// State
 const roles = ref([])
-const availableComponents = ref([])
-const selectedRole = ref(null)
-const selectedComponentIds = ref([])
-const roleUsers = ref([])
-
-const showRoleModal = ref(false)
-const showComponentModal = ref(false)
-const showUsersModal = ref(false)
-const isEditing = ref(false)
+const allComponents = ref([])
 const loading = ref(false)
+const saving = ref(false)
+const showModal = ref(false)
+const showAssignModal = ref(false)
+const editingRole = ref(null)
+const selectedRole = ref(null)
+const selectedUserIds = ref([])
+const componentSearch = ref('')
+const userSearch = ref('')
+const selectedTemplate = ref('')
 
-const roleForm = ref({
-  id: null,
+// Form
+const form = ref({
   name: '',
   description: '',
-  is_active: true,
-  is_system: false
+  component_ids: []
 })
 
-// ========== COMPUTED ==========
-const activeRoles = computed(() => roles.value.filter(r => r.is_active).length)
-const totalComponents = computed(() => availableComponents.value.length)
+// Role Templates
+const roleTemplates = [
+  {
+    name: 'tour_manager',
+    label: 'Tour Manager',
+    description: 'Full tour management access',
+    icon: 'fas fa-ticket-alt',
+    components: ['overview', 'tours', 'tour-packages', 'tour-calendar', 'tour-payments', 'tour-reports', 'tour-staff', 'profile']
+  },
+  {
+    name: 'partner',
+    label: 'Partner',
+    description: 'Partner portal access',
+    icon: 'fas fa-handshake',
+    components: ['overview', 'partners', 'partner-links', 'partner-analytics', 'profile']
+  },
+  {
+    name: 'content_manager',
+    label: 'Content Manager',
+    description: 'Manage all content',
+    icon: 'fas fa-newspaper',
+    components: ['overview', 'products', 'blog', 'jobs', 'outlets', 'newsletter', 'contacts', 'profile']
+  },
+  {
+    name: 'hr',
+    label: 'HR Manager',
+    description: 'Manage jobs and contacts',
+    icon: 'fas fa-users',
+    components: ['overview', 'jobs', 'contacts', 'profile']
+  },
+  {
+    name: 'custom',
+    label: 'Custom',
+    description: 'Start with empty role',
+    icon: 'fas fa-cog',
+    components: []
+  }
+]
 
-// ========== LOAD DATA ==========
+// Computed
+const sortedRoles = computed(() => {
+  return [...roles.value].sort((a, b) => {
+    // System roles first
+    if (a.is_system && !b.is_system) return -1
+    if (!a.is_system && b.is_system) return 1
+    return a.name.localeCompare(b.name)
+  })
+})
+
+const systemRoles = computed(() => {
+  return roles.value.filter(r => r.is_system).length
+})
+
+const customRoles = computed(() => {
+  return roles.value.filter(r => !r.is_system).length
+})
+
+const filteredComponents = computed(() => {
+  if (!componentSearch.value) return allComponents.value
+  const search = componentSearch.value.toLowerCase()
+  return allComponents.value.filter(c => 
+    c.label.toLowerCase().includes(search) || 
+    c.key.toLowerCase().includes(search)
+  )
+})
+
+const filteredUsers = computed(() => {
+  if (!userSearch.value) return users.value
+  const search = userSearch.value.toLowerCase()
+  return users.value.filter(u => 
+    u.full_name.toLowerCase().includes(search) || 
+    u.email.toLowerCase().includes(search)
+  )
+})
+
+// Methods
 const loadRoles = async () => {
-  try {
-    const response = await api.get('/roles')
-    roles.value = response.data
-    console.log('✅ Roles loaded:', roles.value.length)
-  } catch (error) {
-    console.error('Error loading roles:', error)
-    toast.error('Failed to load roles')
-  }
-}
-
-const loadComponents = async () => {
-  try {
-    const response = await api.get('/components')
-    availableComponents.value = response.data
-    console.log('✅ Components loaded:', availableComponents.value.length)
-  } catch (error) {
-    console.error('Error loading components:', error)
-    toast.error('Failed to load components')
-  }
-}
-
-// ========== ROLE CRUD ==========
-const openCreateModal = () => {
-  isEditing.value = false
-  roleForm.value = {
-    id: null,
-    name: '',
-    description: '',
-    is_active: true,
-    is_system: false
-  }
-  showRoleModal.value = true
-}
-
-const editRole = (role) => {
-  isEditing.value = true
-  roleForm.value = {
-    id: role.id,
-    name: role.name,
-    description: role.description || '',
-    is_active: role.is_active,
-    is_system: role.is_system
-  }
-  showRoleModal.value = true
-}
-
-const saveRole = async () => {
-  if (!roleForm.value.name.trim()) {
-    toast.error('Role name is required')
-    return
-  }
-  
   loading.value = true
   try {
-    if (isEditing.value) {
-      await api.put(`/roles/${roleForm.value.id}`, roleForm.value)
-      toast.success('Role updated successfully')
-    } else {
-      await api.post('/roles', roleForm.value)
-      toast.success('Role created successfully')
-    }
-    closeRoleModal()
-    await loadRoles()
+    const response = await api.get('/admin/roles')
+    roles.value = response.data || []
   } catch (error) {
-    console.error('Error saving role:', error)
-    toast.error(error.response?.data?.error || 'Failed to save role')
+    toast.error('Failed to load roles')
   } finally {
     loading.value = false
   }
 }
 
-const deleteRole = async (role) => {
-  if (role.is_system) {
-    toast.error('Cannot delete system role')
+const loadComponents = async () => {
+  try {
+    const response = await api.get('/admin/permissions/resources')
+    allComponents.value = response.data || []
+  } catch (error) {
+    toast.error('Failed to load components')
+  }
+}
+
+const loadUsers = async () => {
+  try {
+    const response = await api.get('/admin/users')
+    users.value = response.data || []
+  } catch (error) {
+    users.value = []
+  }
+}
+
+const openCreateModal = () => {
+  editingRole.value = null
+  form.value = {
+    name: '',
+    description: '',
+    component_ids: []
+  }
+  selectedTemplate.value = ''
+  showModal.value = true
+}
+
+const editRole = (role) => {
+  editingRole.value = role
+  form.value = {
+    name: role.name,
+    description: role.description || '',
+    component_ids: role.components?.map(c => c.id) || []
+  }
+  showModal.value = true
+}
+
+const isComponentSelected = (componentId) => {
+  return form.value.component_ids.includes(componentId)
+}
+
+const toggleComponent = (componentId) => {
+  const index = form.value.component_ids.indexOf(componentId)
+  if (index > -1) {
+    form.value.component_ids.splice(index, 1)
+  } else {
+    form.value.component_ids.push(componentId)
+  }
+}
+
+const selectAllComponents = () => {
+  form.value.component_ids = allComponents.value.map(c => c.id)
+}
+
+const deselectAllComponents = () => {
+  form.value.component_ids = []
+}
+
+const applyTemplate = (template) => {
+  selectedTemplate.value = template.name
+  const componentKeys = template.components
+  const compIds = allComponents.value
+    .filter(c => componentKeys.includes(c.key))
+    .map(c => c.id)
+  form.value.component_ids = compIds
+  
+  // Auto-fill name if empty
+  if (!form.value.name) {
+    form.value.name = template.label
+  }
+}
+
+const saveRole = async () => {
+  if (!form.value.name) {
+    toast.error('Role name is required')
     return
   }
-  
-  if (!confirm(`Are you sure you want to delete the "${role.name}" role?`)) return
-  
+
+  saving.value = true
   try {
-    await api.delete(`/roles/${role.id}`)
+    const data = {
+      name: form.value.name,
+      description: form.value.description,
+      component_ids: form.value.component_ids
+    }
+
+    if (editingRole.value) {
+      await api.put(`/admin/roles/${editingRole.value.id}`, data)
+      toast.success('Role updated successfully')
+    } else {
+      await api.post('/admin/roles', data)
+      toast.success('Role created successfully')
+    }
+
+    closeModal()
+    await loadRoles()
+  } catch (error) {
+    toast.error(error.response?.data?.error || 'Failed to save role')
+  } finally {
+    saving.value = false
+  }
+}
+
+const deleteRole = async (roleId) => {
+  if (!confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
+    return
+  }
+
+  try {
+    await api.delete(`/admin/roles/${roleId}`)
     toast.success('Role deleted successfully')
     await loadRoles()
   } catch (error) {
-    console.error('Error deleting role:', error)
     toast.error(error.response?.data?.error || 'Failed to delete role')
   }
 }
 
-const closeRoleModal = () => {
-  showRoleModal.value = false
-  isEditing.value = false
-}
-
-// ========== COMPONENT ASSIGNMENT ==========
-const manageComponents = async (role) => {
-
-  if (role.is_system) {
-    toast.warning('System roles cannot be modified')
-    return
-  }
-  
+const assignUsers = (role) => {
   selectedRole.value = role
-  
-  selectedComponentIds.value = role.components?.map(c => c.id) || []
-  console.log('📋 Current component IDs for role:', selectedComponentIds.value)
-  showComponentModal.value = true
+  selectedUserIds.value = []
+  showAssignModal.value = true
 }
 
-const toggleComponent = (componentId) => {
-  const index = selectedComponentIds.value.indexOf(componentId)
-  if (index > -1) {
-    selectedComponentIds.value.splice(index, 1)
-  } else {
-    selectedComponentIds.value.push(componentId)
+const assignUsersToRole = async () => {
+  if (selectedUserIds.value.length === 0) {
+    toast.error('Please select at least one user')
+    return
   }
-  console.log('📋 Selected component IDs:', selectedComponentIds.value)
-}
 
-const saveComponentAssignments = async () => {
-  if (!selectedRole.value) {
-    toast.error('No role selected')
-    return
-  }
-  
-  // ✅ Check again before saving
-  if (selectedRole.value.is_system) {
-    toast.error('Cannot modify system role')
-    closeComponentModal()
-    return
-  }
-  
+  saving.value = true
   try {
-    // ✅ Convert proxy array to regular array
-    const componentIds = Array.isArray(selectedComponentIds.value) 
-      ? selectedComponentIds.value 
-      : [...selectedComponentIds.value]
-    
-    const payload = {
-      component_ids: componentIds
+    // Assign each user to the role
+    for (const userId of selectedUserIds.value) {
+      await api.put(`/admin/users/${userId}`, {
+        role_id: selectedRole.value.id
+      })
     }
     
-    console.log('📤 Assigning components to role:', selectedRole.value.id)
-    console.log('📤 Component IDs:', payload)
-    
-    await api.put(`/roles/${selectedRole.value.id}/components`, payload)
-    toast.success('Components assigned successfully')
-    closeComponentModal()
+    toast.success(`${selectedUserIds.value.length} users assigned to ${selectedRole.value.name}`)
+    closeAssignModal()
     await loadRoles()
   } catch (error) {
-    console.error('Error assigning components:', error)
-    console.error('Response:', error.response?.data)
-    
-    // ✅ Better error message
-    const errorMsg = error.response?.data?.error || 'Failed to assign components'
-    toast.error(errorMsg)
+    toast.error('Failed to assign users')
+  } finally {
+    saving.value = false
   }
 }
 
-const closeComponentModal = () => {
-  showComponentModal.value = false
+const closeModal = () => {
+  showModal.value = false
+  editingRole.value = null
+  form.value = {
+    name: '',
+    description: '',
+    component_ids: []
+  }
+  selectedTemplate.value = ''
+}
+
+const closeAssignModal = () => {
+  showAssignModal.value = false
   selectedRole.value = null
-  selectedComponentIds.value = []
+  selectedUserIds.value = []
 }
 
-// ========== USER MANAGEMENT ==========
-const viewUsers = async (role) => {
-  selectedRole.value = role
-  try {
-    const response = await api.get(`/roles/${role.id}/users`)
-    roleUsers.value = response.data
-    showUsersModal.value = true
-  } catch (error) {
-    console.error('Error loading users:', error)
-    toast.error('Failed to load users')
-  }
-}
+const users = ref([])
 
-const removeUserFromRole = async (user) => {
-  if (!confirm(`Remove ${user.full_name} from ${selectedRole.value.name}?`)) return
-  
-  try {
-    await api.put(`/users/${user.id}/role`, { role_id: null })
-    toast.success('User removed from role')
-    await viewUsers(selectedRole.value)
-  } catch (error) {
-    console.error('Error removing user:', error)
-    toast.error('Failed to remove user')
-  }
-}
-
-const closeUsersModal = () => {
-  showUsersModal.value = false
-  selectedRole.value = null
-  roleUsers.value = []
-}
-
-// ========== LIFECYCLE ==========
 onMounted(() => {
   loadRoles()
   loadComponents()
+  loadUsers()
 })
 </script>
 
-
-
-
-
 <style scoped>
-
-
-.role-card.system-role {
-  border-color: #d1d5db;
-  background: #f9fafb;
-}
-
-.role-card.system-role .role-header h3 {
-  color: #6b7280;
-}
-
-.btn-icon.components.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #f3f4f6;
-  color: #9ca3af;
-}
-
-.btn-icon.components.disabled:hover {
-  background: #f3f4f6;
-}
-
-
 .role-manager {
-  padding: 1.5rem;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.page-header h2 {
-  margin: 0;
-  color: #1e3a8a;
-}
-
-.page-header p {
-  margin: 0;
-  color: #6b7280;
-}
-
-.btn-primary {
-  background: #1e3a8a;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover {
-  background: #1a2e6b;
-  transform: translateY(-1px);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.2rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.2rem;
-}
-
-.stat-icon.blue { background: #1e3a8a; }
-.stat-icon.green { background: #059669; }
-.stat-icon.purple { background: #7c3aed; }
-
-.stat-info h3 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: #1e293b;
-}
-
-.stat-info p {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.85rem;
-}
-
-.roles-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-}
-
-.role-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid #e5e7eb;
-  transition: all 0.3s;
-}
-
-.role-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transform: translateY(-2px);
+  padding: 24px;
 }
 
 .role-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.5rem;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.role-header h3 {
+.role-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
+}
+
+.role-header h1 i {
+  color: #2563eb;
+  margin-right: 8px;
+}
+
+.role-header p {
+  color: #64748b;
   margin: 0;
-  color: #1e3a8a;
 }
 
-.role-badge {
-  font-size: 0.7rem;
-  padding: 0.2rem 0.6rem;
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-box {
+  background: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.stat-number {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.role-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s;
+}
+
+.role-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.role-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.role-info h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.system-badge {
+  font-size: 11px;
+  background: #dbeafe;
+  color: #2563eb;
+  padding: 2px 10px;
   border-radius: 12px;
   font-weight: 500;
 }
 
-.role-badge.system {
-  background: #dbeafe;
-  color: #1e3a8a;
+.role-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  color: #64748b;
 }
 
-.role-badge.custom {
-  background: #fef3c7;
-  color: #92400e;
+.role-stats i {
+  margin-right: 4px;
 }
 
-.user-count {
-  font-size: 0.85rem;
-  color: #6b7280;
+.role-card-body {
+  margin-bottom: 12px;
 }
 
-.role-description {
-  color: #6b7280;
-  margin-bottom: 1rem;
+.assigned-components {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.component-list {
-  margin-bottom: 1rem;
-}
-
-.component-count {
-  font-size: 0.85rem;
-  color: #6b7280;
-  display: block;
-  margin-bottom: 0.5rem;
+.assigned-components .label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  padding-top: 4px;
 }
 
 .component-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 6px;
 }
 
 .component-tag {
-  background: #f3f4f6;
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  color: #374151;
+  gap: 4px;
+  padding: 2px 10px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  font-size: 12px;
+  color: #1a1a2e;
 }
 
-.role-actions {
+.component-tag i {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.no-components {
+  font-size: 13px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.role-card-footer {
   display: flex;
-  gap: 0.5rem;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 1rem;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
 }
 
-.btn-icon {
-  width: 36px;
-  height: 36px;
+.btn-edit, .btn-delete, .btn-users {
+  padding: 6px 14px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
+  font-size: 13px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
   transition: all 0.2s;
 }
 
-.btn-icon.edit {
+.btn-edit {
   background: #dbeafe;
-  color: #1e3a8a;
+  color: #2563eb;
 }
 
-.btn-icon.edit:hover {
+.btn-edit:hover {
   background: #bfdbfe;
 }
 
-.btn-icon.components {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.btn-icon.components:hover {
-  background: #fde68a;
-}
-
-.btn-icon.users {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.btn-icon.users:hover {
-  background: #a7f3d0;
-}
-
-.btn-icon.delete {
+.btn-delete {
   background: #fee2e2;
-  color: #991b1b;
+  color: #dc2626;
 }
 
-.btn-icon.delete:hover:not(:disabled) {
+.btn-delete:hover {
   background: #fecaca;
 }
 
-.btn-icon.delete:disabled {
-  opacity: 0.5;
+.btn-users {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.btn-users:hover {
+  background: #e2e8f0;
+}
+
+.btn-primary {
+  padding: 8px 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-cancel {
+  padding: 8px 20px;
+  background: #f1f5f9;
+  color: #1a1a2e;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-cancel:hover {
+  background: #e2e8f0;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-outline:hover {
+  background: #f1f5f9;
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 13px;
 }
 
 /* Modal Styles */
@@ -700,258 +828,368 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .modal-container {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
+  max-width: 800px;
+  width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
-  animation: slideUp 0.3s ease;
+  overflow: hidden;
 }
 
-.modal-lg {
-  max-width: 700px;
-  width: 95%;
-}
-
-.modal-container {
-  max-width: 500px;
-  width: 95%;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+.modal-container.large {
+  max-width: 900px;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.modal-header h3 {
+.modal-header h2 {
   margin: 0;
-  color: #1e3a8a;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 1.5rem;
-  color: #6b7280;
+  font-size: 28px;
+  color: #94a3b8;
   cursor: pointer;
+  padding: 0 8px;
+}
+
+.close-btn:hover {
+  color: #1a1a2e;
 }
 
 .modal-body {
-  padding: 1.5rem;
+  padding: 24px;
+  max-height: calc(90vh - 140px);
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 4px 0;
+}
+
+.form-section .hint {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0 0 12px 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .form-group label {
-  display: block;
+  font-size: 14px;
   font-weight: 500;
-  margin-bottom: 0.25rem;
+  color: #1a1a2e;
 }
 
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+.form-group input {
+  padding: 8px 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
 }
 
-.form-group input:disabled {
-  background: #f3f4f6;
+.form-group input:focus {
+  outline: none;
+  border-color: #2563eb;
 }
 
-.checkbox-group {
-  margin: 1rem 0;
+/* Component Toolbar */
+.component-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
-.checkbox {
+.search-box {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 0 12px;
+  flex: 1;
+  min-width: 200px;
 }
 
-.form-actions {
+.search-box i {
+  color: #94a3b8;
+}
+
+.search-box input {
+  border: none;
+  background: transparent;
+  padding: 8px 8px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.search-box input:focus {
+  outline: none;
+}
+
+.toolbar-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
+  gap: 8px;
 }
 
-.btn-cancel {
-  background: #e5e7eb;
-  color: #374151;
-  border: none;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.btn-submit {
-  background: #1e3a8a;
-  color: white;
-  border: none;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
+/* Component Grid */
 .component-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.75rem;
-  margin: 1rem 0;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
 }
 
-.component-select-item {
-  border: 2px solid #e5e7eb;
+.component-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 2px solid #f1f5f9;
   border-radius: 8px;
-  padding: 1rem;
   cursor: pointer;
   transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
 }
 
-.component-select-item:hover {
-  border-color: #1e3a8a;
-}
-
-.component-select-item.selected {
-  border-color: #1e3a8a;
-  background: #dbeafe;
-}
-
-.component-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  color: #1e3a8a;
-  flex-shrink: 0;
-}
-
-.component-info {
-  flex: 1;
-}
-
-.component-info h4 {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #1e293b;
-}
-
-.component-info p {
-  margin: 0;
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.component-check {
-  color: #1e3a8a;
-  font-size: 1.2rem;
-}
-
-.help-text {
-  color: #6b7280;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem;
-  color: #6b7280;
-}
-
-.empty-state i {
-  font-size: 2rem;
-  display: block;
-  margin-bottom: 0.5rem;
-}
-
-.user-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.user-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 8px;
+.component-item:hover {
+  border-color: #dbeafe;
   background: #f8fafc;
 }
 
-.user-avatar {
-  font-size: 1.5rem;
-  color: #1e3a8a;
+.component-item.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.component-check {
+  font-size: 18px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.component-item.selected .component-check {
+  color: #2563eb;
+}
+
+.component-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.component-info i {
+  color: #64748b;
+}
+
+.component-key {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+/* Templates */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid #f1f5f9;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.template-item:hover {
+  border-color: #dbeafe;
+  background: #f8fafc;
+}
+
+.template-item.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.template-item i {
+  font-size: 20px;
+  color: #2563eb;
+}
+
+.template-item strong {
+  display: block;
+  font-size: 14px;
+  color: #1a1a2e;
+}
+
+.template-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* User List */
+.user-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.user-item {
+  padding: 8px 4px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.user-item:last-child {
+  border-bottom: none;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.checkbox-label:hover {
+  background: #f8fafc;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  flex-shrink: 0;
 }
 
 .user-info {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .user-name {
   font-weight: 500;
-  display: block;
+  color: #1a1a2e;
 }
 
 .user-email {
-  font-size: 0.85rem;
-  color: #6b7280;
+  font-size: 13px;
+  color: #64748b;
 }
 
-.btn-remove {
-  background: #fee2e2;
-  border: none;
-  color: #991b1b;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  cursor: pointer;
+.user-role-badge {
+  font-size: 11px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 10px;
+  border-radius: 12px;
 }
 
-.btn-remove:hover {
-  background: #fecaca;
+.selected-count {
+  font-size: 14px;
+  color: #64748b;
+  margin-right: auto;
+}
+
+.no-roles, .no-components {
+  text-align: center;
+  padding: 40px;
+  color: #94a3b8;
+}
+
+.no-roles i, .no-components i {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.no-roles h3 {
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+}
+
+.no-roles p {
+  margin: 0 0 16px 0;
 }
 
 @media (max-width: 768px) {
-  .roles-grid {
+  .form-row {
     grid-template-columns: 1fr;
   }
   
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .role-card-header {
+    flex-direction: column;
+  }
+  
+  .role-stats {
+    justify-content: flex-start;
   }
   
   .component-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .template-grid {
     grid-template-columns: 1fr;
   }
 }

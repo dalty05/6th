@@ -11,29 +11,80 @@ const api = axios.create({
 })
 
 
-// Response interceptor
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('user')
-      window.location.href = '/admin/login'
+// frontend/src/services/api.js
+
+// ✅ Add request caching
+const cache = new Map()
+const CACHE_TTL = 300000 // 5 minutes
+
+api.interceptors.request.use(config => {
+  // Cache GET requests
+  if (config.method === 'get') {
+    const cacheKey = `${config.url}${JSON.stringify(config.params || {})}`
+    const cached = cache.get(cacheKey)
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return Promise.resolve({
+        ...config,
+        adapter: () => Promise.resolve({
+          data: cached.data,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config: config
+        })
+      })
     }
-    
-    const message = error.response?.data?.error || error.message || 'An error occurred'
-    toast.error(message, {
-      autoClose: 3000,
-      position: 'top-right'
+  }
+  return config
+})
+
+api.interceptors.response.use(response => {
+  // Cache GET responses
+  if (response.config.method === 'get' && response.status === 200) {
+    const cacheKey = `${response.config.url}${JSON.stringify(response.config.params || {})}`
+    cache.set(cacheKey, {
+      data: response.data,
+      timestamp: Date.now()
     })
-    
+  }
+  return response
+})
+
+// ✅ Add request deduplication
+const pendingRequests = new Map()
+
+api.interceptors.request.use(config => {
+  const key = `${config.method}:${config.url}`
+  if (pendingRequests.has(key)) {
+    return pendingRequests.get(key)
+  }
+  
+  const promise = new Promise((resolve, reject) => {
+    config._resolve = resolve
+    config._reject = reject
+  })
+  pendingRequests.set(key, promise)
+  return config
+})
+
+api.interceptors.response.use(
+  response => {
+    const key = `${response.config.method}:${response.config.url}`
+    pendingRequests.delete(key)
+    if (response.config._resolve) {
+      response.config._resolve(response)
+    }
+    return response
+  },
+  error => {
+    const key = `${error.config.method}:${error.config.url}`
+    pendingRequests.delete(key)
+    if (error.config._reject) {
+      error.config._reject(error)
+    }
     return Promise.reject(error)
   }
-
-
-
-
 )
-
 
 // Referral Links
 export const referralApi = {

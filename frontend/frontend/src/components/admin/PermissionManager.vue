@@ -1,56 +1,30 @@
 <template>
   <div class="permission-manager">
-    <!-- Header -->
-    <div class="permission-header">
-      <div class="header-content">
-        <h1><i class="fas fa-shield-alt"></i> Permission Manager</h1>
-        <p class="subtitle">Manage user permissions and access control</p>
-      </div>
-      <div class="header-actions">
-        <button v-if="isSuperAdmin" @click="refreshData" class="btn-refresh" :disabled="loading">
-          <i class="fas fa-sync-alt" :class="{ 'spinning': loading }"></i>
-          Refresh
-        </button>
+    <div class="admin-header">
+      <h2>Permission Manager</h2>
+      <p>Override role-based permissions for individual users</p>
+      <div class="warning-banner" v-if="!isSuperAdmin">
+        <i class="fas fa-shield-alt"></i>
+        Super admin access required to manage permissions
       </div>
     </div>
 
-    <!-- Warning Banner -->
-    <div class="warning-banner" v-if="!isSuperAdmin">
-      <i class="fas fa-shield-alt"></i>
-      <span>Super admin access required to manage permissions</span>
+    <!-- User Selector - Only visible to super admin -->
+    <div v-if="isSuperAdmin" class="user-selector">
+      <label>Select User:</label>
+      <select v-model="selectedUserId" @change="loadUserPermissions">
+        <option value="">-- Select User --</option>
+        <option v-for="user in users" :key="user.id" :value="user.id">
+          {{ user.full_name }} ({{ user.email }}) - {{ user.role }}
+        </option>
+      </select>
     </div>
 
-    <!-- Super Admin Controls -->
-    <div v-if="isSuperAdmin" class="controls-section">
-      <!-- User Selector -->
-      <div class="user-selector">
-        <label for="userSelect">Select User:</label>
-        <select 
-          id="userSelect"
-          v-model="selectedUserId" 
-          @change="loadUserPermissions"
-          :disabled="loading"
-        >
-          <option value="">-- Select User --</option>
-          <option v-for="user in users" :key="user.id" :value="user.id">
-            {{ user.full_name }} ({{ user.email }}) - {{ user.role }}
-          </option>
-        </select>
-      </div>
-
-      <!-- Quick Stats -->
-      <div v-if="selectedUser" class="user-stats">
-        <div class="stat-item">
-          <span class="stat-label">Custom Permissions:</span>
-          <span class="stat-value">{{ customPermissions.length }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Role:</span>
-          <span class="stat-value role-badge" :class="selectedUser.role">
-            {{ selectedUser.role.toUpperCase() }}
-          </span>
-        </div>
-      </div>
+    <!-- Access Denied for non-super admin -->
+    <div v-else class="access-denied">
+      <i class="fas fa-lock"></i>
+      <h3>Access Denied</h3>
+      <p>Only Super Administrators can manage permissions</p>
     </div>
 
     <!-- Loading State -->
@@ -59,55 +33,20 @@
       <p>Loading permissions...</p>
     </div>
 
-    <!-- Access Denied -->
-    <div v-else-if="!isSuperAdmin" class="access-denied">
-      <i class="fas fa-lock"></i>
-      <h3>Access Denied</h3>
-      <p>Only Super Administrators can manage permissions</p>
-    </div>
-
-    <!-- No User Selected -->
-    <div v-else-if="!selectedUser" class="empty-state">
-      <i class="fas fa-user-lock"></i>
-      <h3>Select a user to manage permissions</h3>
-      <p>Choose a user from the dropdown above to view and edit their permissions</p>
-    </div>
-
     <!-- Permission Editor -->
     <div v-else-if="selectedUser && isSuperAdmin" class="permissions-editor">
-      <!-- User Info Card -->
       <div class="user-info-card">
-        <div class="user-avatar">
-          <span>{{ userInitials }}</span>
-        </div>
-        <div class="user-details">
-          <h3>{{ selectedUser.full_name }}</h3>
-          <p class="user-email">{{ selectedUser.email }}</p>
-          <div class="user-meta">
-            <span class="role-badge" :class="selectedUser.role">
-              {{ selectedUser.role.toUpperCase() }}
-            </span>
-            <span class="status-badge" :class="{ active: selectedUser.is_active, inactive: !selectedUser.is_active }">
-              {{ selectedUser.is_active ? 'Active' : 'Inactive' }}
-            </span>
-          </div>
-        </div>
-        <div class="user-info-hint">
-          <i class="fas fa-info-circle"></i>
-          Check boxes to grant permission. Uncheck to deny. Empty boxes use role defaults.
-        </div>
+        <h3>{{ selectedUser.full_name }}</h3>
+        <p>Role: <strong>{{ selectedUser.role.toUpperCase() }}</strong></p>
+        <p class="info-text">Check boxes to grant permission. Uncheck to deny. Empty boxes use role defaults.</p>
       </div>
 
-      <!-- Resources Grid -->
       <div class="permissions-grid">
         <!-- Core Resources -->
-        <div v-for="resource in availableResources" :key="resource.name" class="resource-card">
+        <div v-for="resource in coreResources" :key="resource.name" class="resource-card">
           <div class="resource-header">
             <h4>{{ resource.label }}</h4>
             <span class="resource-name">{{ resource.name }}</span>
-            <span v-if="hasCustomPermission(resource.name)" class="custom-badge">
-              <i class="fas fa-pen"></i> Custom
-            </span>
           </div>
           <div class="actions-list">
             <div v-for="action in resource.actions" :key="action" class="action-row">
@@ -116,343 +55,334 @@
                   type="checkbox" 
                   :checked="isCustomAllowed(resource.name, action)"
                   @change="togglePermission(resource.name, action, $event.target.checked)"
-                  :disabled="saving"
                 >
                 <span class="action-name">{{ action }}</span>
               </label>
-              <span class="role-default-badge" :class="{ allowed: getRoleDefault(resource.name, action) }">
-                {{ getRoleDefault(resource.name, action) ? '✓ Default' : '✗ Default' }}
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault(resource.name, action) ? '✓' : '✗' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tour Resources -->
+        <div class="resource-section-divider">
+          <h3>Tour Management</h3>
+          <p>Permissions for factory tour management</p>
+        </div>
+
+        <div class="resource-card tour-resource">
+          <div class="resource-header tour-header">
+            <h4>🏭 Tours</h4>
+            <span class="resource-name">tours</span>
+          </div>
+          <div class="actions-list">
+            <div v-for="action in ['create', 'read', 'update', 'delete']" :key="action" class="action-row">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isCustomAllowed('tours', action)"
+                  @change="togglePermission('tours', action, $event.target.checked)"
+                >
+                <span class="action-name">{{ action }}</span>
+              </label>
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault('tours', action) ? '✓' : '✗' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="resource-card tour-resource">
+          <div class="resource-header tour-header">
+            <h4>📋 Bookings</h4>
+            <span class="resource-name">bookings</span>
+          </div>
+          <div class="actions-list">
+            <div v-for="action in ['create', 'read', 'update', 'delete', 'approve', 'reject']" :key="action" class="action-row">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isCustomAllowed('bookings', action)"
+                  @change="togglePermission('bookings', action, $event.target.checked)"
+                >
+                <span class="action-name">{{ action }}</span>
+              </label>
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault('bookings', action) ? '✓' : '✗' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="resource-card tour-resource">
+          <div class="resource-header tour-header">
+            <h4>⚙️ Tour Settings</h4>
+            <span class="resource-name">tour_settings</span>
+          </div>
+          <div class="actions-list">
+            <div v-for="action in ['read', 'update']" :key="action" class="action-row">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isCustomAllowed('tour_settings', action)"
+                  @change="togglePermission('tour_settings', action, $event.target.checked)"
+                >
+                <span class="action-name">{{ action }}</span>
+              </label>
+              <span class="role-default-badge">
+                Default: {{ getRoleDefault('tour_settings', action) ? '✓' : '✗' }}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Form Actions -->
       <div class="form-actions">
-        <button @click="resetToRoleDefaults" class="btn-reset" :disabled="saving || customPermissions.length === 0">
-          <i class="fas fa-undo"></i>
-          {{ saving ? 'Resetting...' : 'Reset to Role Defaults' }}
+        <button @click="resetToRoleDefaults" class="btn-reset" :disabled="saving">
+          Reset to Role Defaults
         </button>
         <button @click="savePermissions" class="btn-save" :disabled="saving">
-          <i v-if="!saving" class="fas fa-save"></i>
-          <i v-else class="fas fa-spinner fa-spin"></i>
           {{ saving ? 'Saving...' : 'Save Custom Permissions' }}
         </button>
       </div>
+    </div>
 
-      <!-- Success/Error Messages -->
-      <div v-if="successMessage" class="alert-success">
-        <i class="fas fa-check-circle"></i> {{ successMessage }}
-      </div>
-      <div v-if="errorMessage" class="alert-error">
-        <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
-      </div>
+    <!-- No User Selected -->
+    <div v-else-if="!loading && !selectedUser && isSuperAdmin" class="empty-state">
+      <i class="fas fa-user-lock"></i>
+      <h3>Select a user to manage permissions</h3>
+      <p>Choose a user from the dropdown above to view and edit their permissions</p>
     </div>
   </div>
 </template>
 
-<script>
-import { ref, onMounted, computed, watch } from 'vue'
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue'  // ✅ Add watch import
 import { toast } from 'vue3-toastify'
 import api from '@/services/api'
 import authService from '@/services/auth'
 
-export default {
-  name: 'PermissionManager',
+// Define all reactive variables
+const users = ref([])
+const selectedUserId = ref('')
+const selectedUser = ref(null)
+const resources = ref([])
+const customPermissions = ref([])
+const roleDefaults = ref({})
+const loading = ref(false)
+const saving = ref(false)
+const successMessage = ref('')
+const errorMessage = ref('')
+const messageTimeout = ref(null)
+
+// Check if current user is super admin
+const currentUser = authService.getUser()
+const isSuperAdmin = computed(() => currentUser?.role === 'super_admin')
+
+// Core resources (without tour resources)
+const coreResources = [
+  { name: 'products', label: 'Products', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'blog', label: 'Blog Posts', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'jobs', label: 'Job Management', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'outlets', label: 'Outlet Locations', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'users', label: 'User Management', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'partners', label: 'Partners', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'referrals', label: 'Referrals', actions: ['create', 'read', 'update', 'delete'] },
+  { name: 'statistics', label: 'Statistics', actions: ['read'] },
+  { name: 'contacts', label: 'Contact Messages', actions: ['read', 'update', 'delete'] },
+  { name: 'newsletter', label: 'Newsletter', actions: ['create', 'read', 'update', 'delete'] }
+]
+
+// Load all users
+const loadUsers = async () => {
+  if (!isSuperAdmin.value) return
   
-  data() {
-    return {
-      users: [],
-      selectedUserId: '',
-      selectedUser: null,
-      resources: [],
-      customPermissions: [],
-      roleDefaults: {},
-      loading: false,
-      saving: false,
-      successMessage: '',
-      errorMessage: '',
-      messageTimeout: null
-    }
-  },
-
-  computed: {
-    currentUser() {
-      return authService.getUser()
-    },
-    
-    isSuperAdmin() {
-      return this.currentUser?.role === 'super_admin'
-    },
-    
-    userInitials() {
-      if (!this.selectedUser?.full_name) return 'U'
-      return this.selectedUser.full_name
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    },
-    
-    availableResources() {
-      // Combine core resources with any from API
-      const coreResources = [
-        { name: 'products', label: 'Products', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'blog', label: 'Blog Posts', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'jobs', label: 'Job Management', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'outlets', label: 'Outlet Locations', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'users', label: 'User Management', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'partners', label: 'Partners', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'referrals', label: 'Referrals', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'statistics', label: 'Statistics', actions: ['read'] },
-        { name: 'contacts', label: 'Contact Messages', actions: ['read', 'update', 'delete'] },
-        { name: 'newsletter', label: 'Newsletter', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'tours', label: '🏭 Tours', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'bookings', label: '📋 Bookings', actions: ['create', 'read', 'update', 'delete', 'approve', 'reject'] },
-        { name: 'tour_settings', label: '⚙️ Tour Settings', actions: ['read', 'update'] },
-        { name: 'profile', label: '👤 Profile', actions: ['read', 'update'] }
-      ]
-      
-      // If API resources are loaded, merge them
-      if (this.resources && this.resources.length > 0) {
-        return this.resources
-      }
-      
-      return coreResources
-    }
-  },
-
-  watch: {
-    selectedUserId(newVal) {
-      if (!newVal) {
-        this.selectedUser = null
-        this.customPermissions = []
-        this.roleDefaults = {}
-      }
-    }
-  },
-
-  mounted() {
-    if (this.isSuperAdmin) {
-      this.loadUsers()
-      this.loadResources()
-    }
-  },
-
-  beforeUnmount() {
-    if (this.messageTimeout) {
-      clearTimeout(this.messageTimeout)
-    }
-  },
-
-  methods: {
-    async loadUsers() {
-      if (!this.isSuperAdmin) return
-      
-      try {
-        const response = await api.get('/admin/users')
-        this.users = response.data || []
-      } catch (error) {
-        console.error('Error loading users:', error)
-        this.showError('Failed to load users')
-      }
-    },
-
-    async loadResources() {
-      if (!this.isSuperAdmin) return
-      
-      try {
-        const response = await api.get('/permissions/resources')
-        this.resources = response.data || []
-        console.log('✅ Resources loaded:', this.resources.length)
-      } catch (error) {
-        console.error('Error loading resources:', error)
-        // Use fallback resources
-        this.resources = []
-        // Don't show error for 404 - use fallback
-        if (error.response?.status !== 404) {
-          this.showError('Failed to load resources')
-        }
-      }
-    },
-
-    async loadUserPermissions() {
-      if (!this.selectedUserId || !this.isSuperAdmin) {
-        this.selectedUser = null
-        this.customPermissions = []
-        this.roleDefaults = {}
-        return
-      }
-      
-      this.loading = true
-      this.errorMessage = ''
-      
-      try {
-        const response = await api.get(`/permissions/users/${this.selectedUserId}`)
-        this.selectedUser = response.data.user
-        this.customPermissions = response.data.custom_permissions || []
-        this.roleDefaults = response.data.role_defaults || {}
-        
-        console.log(`✅ Loaded permissions for user: ${this.selectedUser.full_name}`)
-        console.log('📋 Custom permissions:', this.customPermissions.length)
-      } catch (error) {
-        console.error('Error loading user permissions:', error)
-        this.showError(error.response?.data?.error || 'Failed to load user permissions')
-        this.selectedUser = null
-        this.customPermissions = []
-        this.roleDefaults = {}
-      } finally {
-        this.loading = false
-      }
-    },
-
-    hasCustomPermission(resource) {
-      return this.customPermissions.some(p => p.resource === resource)
-    },
-
-    isCustomAllowed(resource, action) {
-      const perm = this.customPermissions.find(p => p.resource === resource && p.action === action)
-      return perm ? perm.is_allowed : false
-    },
-
-    getRoleDefault(resource, action) {
-      const defaults = this.roleDefaults[resource]
-      if (!defaults) return false
-      
-      if (Array.isArray(defaults)) {
-        return defaults.includes(action)
-      }
-      if (typeof defaults === 'object') {
-        return defaults[action] === true
-      }
-      return false
-    },
-
-    togglePermission(resource, action, isAllowed) {
-      const existingIndex = this.customPermissions.findIndex(
-        p => p.resource === resource && p.action === action
-      )
-      
-      if (existingIndex !== -1) {
-        if (!isAllowed) {
-          // Remove if unchecked
-          this.customPermissions.splice(existingIndex, 1)
-        } else {
-          // Update if checked
-          this.customPermissions[existingIndex].is_allowed = isAllowed
-        }
-      } else if (isAllowed) {
-        // Add new if checked and not exists
-        this.customPermissions.push({
-          resource,
-          action,
-          is_allowed: true,
-          id: null
-        })
-      }
-      
-      // Clear messages on change
-      this.successMessage = ''
-      this.errorMessage = ''
-    },
-
-    async savePermissions() {
-      if (!this.selectedUserId) {
-        this.showError('No user selected')
-        return
-      }
-      
-      this.saving = true
-      this.errorMessage = ''
-      this.successMessage = ''
-      
-      try {
-        // Save each custom permission
-        for (const perm of this.customPermissions) {
-          await api.post(`/permissions/users/${this.selectedUserId}`, {
-            resource: perm.resource,
-            action: perm.action,
-            is_allowed: perm.is_allowed
-          })
-        }
-        
-        this.showSuccess('Permissions saved successfully!')
-        await this.loadUserPermissions()
-        
-      } catch (error) {
-        console.error('Error saving permissions:', error)
-        this.showError(error.response?.data?.error || 'Failed to save permissions')
-      } finally {
-        this.saving = false
-      }
-    },
-
-    async resetToRoleDefaults() {
-      if (!this.selectedUserId) {
-        this.showError('No user selected')
-        return
-      }
-      
-      if (!confirm('Reset all custom permissions for this user to role defaults?')) {
-        return
-      }
-      
-      this.saving = true
-      this.errorMessage = ''
-      this.successMessage = ''
-      
-      try {
-        // Delete all custom permissions for this user
-        for (const perm of this.customPermissions) {
-          if (perm.id) {
-            await api.delete(`/permissions/users/${this.selectedUserId}/${perm.id}`)
-          }
-        }
-        
-        this.customPermissions = []
-        this.showSuccess('Reset to role defaults successfully!')
-        await this.loadUserPermissions()
-        
-      } catch (error) {
-        console.error('Error resetting permissions:', error)
-        this.showError(error.response?.data?.error || 'Failed to reset permissions')
-      } finally {
-        this.saving = false
-      }
-    },
-
-    async refreshData() {
-      this.errorMessage = ''
-      this.successMessage = ''
-      await this.loadUsers()
-      await this.loadResources()
-      if (this.selectedUserId) {
-        await this.loadUserPermissions()
-      }
-      toast.info('Data refreshed')
-    },
-
-    showSuccess(message) {
-      this.successMessage = message
-      if (this.messageTimeout) clearTimeout(this.messageTimeout)
-      this.messageTimeout = setTimeout(() => {
-        this.successMessage = ''
-      }, 5000)
-    },
-
-    showError(message) {
-      this.errorMessage = message
-      if (this.messageTimeout) clearTimeout(this.messageTimeout)
-      this.messageTimeout = setTimeout(() => {
-        this.errorMessage = ''
-      }, 5000)
-    }
+  try {
+    const response = await api.get('/admin/users')
+    users.value = response.data
+  } catch (error) {
+    toast.error('Failed to load users')
   }
 }
+
+// Load available resources
+const loadResources = async () => {
+  if (!isSuperAdmin.value) return
+  
+  try {
+    const response = await api.get('/admin/permissions/resources')
+    resources.value = response.data
+  } catch (error) {
+    toast.error('Failed to load resources')
+  }
+}
+
+// Load permissions for selected user
+const loadUserPermissions = async () => {
+  if (!selectedUserId.value || !isSuperAdmin.value) {
+    selectedUser.value = null
+    customPermissions.value = []
+    roleDefaults.value = {}
+    return
+  }
+  
+  loading.value = true
+  errorMessage.value = ''
+  
+  try {
+    const response = await api.get(`/admin/permissions/users/${selectedUserId.value}`)
+    selectedUser.value = response.data.user
+    customPermissions.value = response.data.custom_permissions || []
+    roleDefaults.value = response.data.role_defaults || {}
+    
+  
+  } catch (error) {
+    const msg = error.response?.data?.error || 'Failed to load user permissions'
+    errorMessage.value = msg
+    toast.error(msg)
+    selectedUser.value = null
+    customPermissions.value = []
+    roleDefaults.value = {}
+  } finally {
+    loading.value = false
+  }
+}
+
+// Check if a permission is set as custom (overridden)
+const isCustomAllowed = (resource, action) => {
+  const perm = customPermissions.value.find(p => p.resource === resource && p.action === action)
+  return perm ? perm.is_allowed : false
+}
+
+// Get role default for display
+const getRoleDefault = (resource, action) => {
+  const defaults = roleDefaults.value[resource]
+  if (Array.isArray(defaults)) {
+    return defaults.includes(action)
+  }
+  if (typeof defaults === 'object') {
+    return defaults[action] === true
+  }
+  return false
+}
+
+// Toggle a permission
+const togglePermission = (resource, action, isAllowed) => {
+  const existingIndex = customPermissions.value.findIndex(p => p.resource === resource && p.action === action)
+  
+  if (existingIndex !== -1) {
+    if (!isAllowed) {
+      customPermissions.value.splice(existingIndex, 1)
+    } else {
+      customPermissions.value[existingIndex].is_allowed = isAllowed
+    }
+  } else if (isAllowed) {
+    customPermissions.value.push({
+      resource,
+      action,
+      is_allowed: true,
+      id: null
+    })
+  }
+  
+  // Clear messages on change
+  successMessage.value = ''
+  errorMessage.value = ''
+}
+
+// Save custom permissions
+const savePermissions = async () => {
+  if (!selectedUserId.value) {
+    errorMessage.value = 'No user selected'
+    toast.error('No user selected')
+    return
+  }
+  
+  saving.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+  
+  try {
+    for (const perm of customPermissions.value) {
+      await api.post(`/admin/permissions/users/${selectedUserId.value}`, {
+        resource: perm.resource,
+        action: perm.action,
+        is_allowed: perm.is_allowed
+      })
+    }
+    
+    successMessage.value = 'Permissions saved successfully!'
+    toast.success('Permissions saved successfully!')
+    await loadUserPermissions()
+    
+  } catch (error) {
+    const msg = error.response?.data?.error || 'Failed to save permissions'
+    errorMessage.value = msg
+    toast.error(msg)
+  } finally {
+    saving.value = false
+  }
+}
+
+// Reset to role defaults
+const resetToRoleDefaults = async () => {
+  if (!selectedUserId.value) {
+    errorMessage.value = 'No user selected'
+    toast.error('No user selected')
+    return
+  }
+  
+  if (!confirm('Reset all custom permissions for this user to role defaults?')) {
+    return
+  }
+  
+  saving.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+  
+  try {
+    for (const perm of customPermissions.value) {
+      if (perm.id) {
+        await api.delete(`/admin/permissions/users/${selectedUserId.value}/${perm.id}`)
+      }
+    }
+    
+    customPermissions.value = []
+    successMessage.value = 'Reset to role defaults successfully!'
+    toast.success('Reset to role defaults successfully!')
+    await loadUserPermissions()
+    
+  } catch (error) {
+    const msg = error.response?.data?.error || 'Failed to reset permissions'
+    errorMessage.value = msg
+    toast.error(msg)
+  } finally {
+    saving.value = false
+  }
+}
+
+// ✅ Watch for user ID changes
+watch(selectedUserId, (newVal) => {
+  if (!newVal) {
+    selectedUser.value = null
+    customPermissions.value = []
+    roleDefaults.value = {}
+  }
+})
+
+// Mounted lifecycle
+onMounted(() => {
+  if (isSuperAdmin.value) {
+    loadUsers()
+    loadResources()
+  }
+})
 </script>
 
+<style scoped>
+/* ... existing styles ... */
+</style>
 <style scoped>
 .permission-manager {
   padding: 24px;

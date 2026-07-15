@@ -269,7 +269,6 @@ const loadJobs = async () => {
     const response = await api.get('/jobs', { params: { per_page: 20 } })
     jobs.value = response.data.data || []
   } catch (error) {
-    console.error('Error loading jobs:', error)
     toast.error('Failed to load job opportunities')
   } finally {
     loading.value = false
@@ -369,7 +368,6 @@ const submitApplication = async () => {
     showApplicationForm.value = false
     showSuccess.value = true
   } catch (error) {
-    console.error('Application error:', error)
     toast.error(error.response?.data?.error || 'Failed to submit application. Please try again.')
   } finally {
     submitting.value = false

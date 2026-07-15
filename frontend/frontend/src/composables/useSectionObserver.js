@@ -1,4 +1,3 @@
-// src/composables/useSectionObserver.js
 import { ref, onMounted, onUnmounted } from 'vue'
 
 export function useSectionObserver(sections, options = {}) {

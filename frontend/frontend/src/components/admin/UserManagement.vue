@@ -450,10 +450,9 @@ const paginatedUsers = computed(() => {
 // ========== METHODS ==========
 const loadRoles = async () => {
   try {
-    const response = await api.get('/roles')
+    const response = await api.get('/admin/roles')
     roles.value = response.data.filter(r => r.is_active)
   } catch (error) {
-    console.error('Error loading roles:', error)
     toast.error('Failed to load roles')
   }
 }
@@ -464,7 +463,6 @@ const loadUsers = async () => {
     const response = await api.get('/admin/users')
     users.value = response.data
   } catch (error) {
-    console.error('Error loading users:', error)
     toast.error('Failed to load users')
   } finally {
     loading.value = false
@@ -611,7 +609,6 @@ const confirmResetPassword = async () => {
     newPassword.value = response.data.new_password
     toast.success('Password reset successfully')
   } catch (error) {
-    console.error('Error resetting password:', error)
     toast.error(error.response?.data?.error || 'Failed to reset password')
     resetting.value = false
   }
@@ -660,7 +657,6 @@ const confirmDelete = async () => {
     closeDeleteModal()
     await loadUsers()
   } catch (error) {
-    console.error('Error deleting user:', error)
     toast.error(error.response?.data?.error || 'Failed to delete user')
   } finally {
     deleting.value = false

@@ -115,9 +115,7 @@ export default {
       try {
         const response = await api.get(`/admin/activities?limit=${this.limit}`)
         this.activities = response.data.activities || []
-        console.log(`✅ Loaded ${this.activities.length} activities`)
       } catch (error) {
-        console.error('Error loading activities:', error)
         if (error.response?.status === 403) {
           alert('You do not have permission to view activities')
         } else {

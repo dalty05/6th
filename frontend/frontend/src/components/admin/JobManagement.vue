@@ -601,7 +601,7 @@ const loadJobs = async () => {
     const response = await adminJobApi.getJobs()
     jobs.value = response.data
   } catch (error) {
-    console.error('Error loading jobs:', error)
+    
   }
 }
 
@@ -614,7 +614,7 @@ const loadApplications = async (jobId = null) => {
     applications.value = response.data
     currentPage.value = 1
   } catch (error) {
-    console.error('Error loading applications:', error)
+    
   }
 }
 
@@ -623,7 +623,7 @@ const loadCategories = async () => {
     const response = await adminJobCategoryApi.getCategories()
     categories.value = response.data
   } catch (error) {
-    console.error('Error loading categories:', error)
+    
   }
 }
 

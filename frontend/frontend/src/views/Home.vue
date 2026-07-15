@@ -816,7 +816,7 @@ export default {
           this.allProducts = reset ? newProducts : [...this.allProducts, ...newProducts]
         }
       } catch (error) {
-        console.error('Error fetching products:', error)
+        throw (error)
       } finally {
         this.productsLoading = false
         this.productsLoadingMore = false
@@ -869,9 +869,7 @@ export default {
           this.totalBlogs = response.data.pagination?.total_items || 0
           this.hasMoreBlogs = response.data.pagination?.has_next || false
         }
-      } catch (error) {
-        console.error('Error fetching blogs:', error)
-      } finally {
+      }  finally {
         this.blogsLoading = false
         this.blogsLoadingMore = false
         this.isFetchingBlogs = false
@@ -927,8 +925,6 @@ export default {
         if (this.tourPackages.length > 0) {
           this.featuredTourPackage = this.tourPackages[0]
         }
-      } catch (error) {
-        console.error('Error fetching tour packages:', error)
       } finally {
         this.isFetchingTourPackages = false
       }
@@ -961,7 +957,6 @@ export default {
           }, 5000)
         }
       } catch (error) {
-        console.error('Error sending message:', error)
         this.errorMessage = error.response?.data?.error || 'Failed to send message. Please try again later.'
         setTimeout(() => {
           this.errorMessage = ''

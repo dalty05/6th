@@ -161,7 +161,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
   padding: 1rem;
 }
 

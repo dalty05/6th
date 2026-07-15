@@ -880,49 +880,123 @@ class ContactMessage(db.Model):
         }
 
 
+# ============================================================
+# JOB MODELS
+# ============================================================
+
 class JobCategory(db.Model):
+    """Job categories for organizing job listings"""
     __tablename__ = 'job_categories'
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    slug = db.Column(db.String(100), unique=True, nullable=False)
+    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)
     icon = db.Column(db.String(50))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    jobs = db.relationship('Job', backref='category', lazy=True)
+    # Relationships
+    jobs = db.relationship('Job', back_populates='category', lazy='dynamic')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'slug': self.slug,
+            'description': self.description,
+            'icon': self.icon,
+            'is_active': self.is_active,
+            'job_count': self.jobs.count() if self.jobs else 0,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+    
+    def __repr__(self):
+        return f'<JobCategory {self.name}>'
 
 
 class Job(db.Model):
+    """Job listings with full details"""
     __tablename__ = 'jobs'
     
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    slug = db.Column(db.String(200), unique=True, nullable=False)
-    category_id = db.Column(db.Integer, db.ForeignKey('job_categories.id'))
+    slug = db.Column(db.String(200), unique=True, nullable=False, index=True)
+    
+    category_id = db.Column(db.Integer, db.ForeignKey('job_categories.id'), nullable=True)
+    
     location = db.Column(db.String(200))
     type = db.Column(db.String(50))
     experience_level = db.Column(db.String(50))
     salary_range = db.Column(db.String(100))
+    
     description = db.Column(db.Text, nullable=False)
     requirements = db.Column(db.Text, nullable=False)
     responsibilities = db.Column(db.Text)
     benefits = db.Column(db.Text)
-    application_deadline = db.Column(db.DateTime)
+    
+    application_deadline = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     is_featured = db.Column(db.Boolean, default=False)
+    
     views_count = db.Column(db.Integer, default=0)
     applications_count = db.Column(db.Integer, default=0)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    created_by_user = db.relationship('User', backref='jobs_created')
-    applications = db.relationship('JobApplication', backref='job', lazy=True, cascade='all, delete-orphan')
+    # Relationships
+    category = db.relationship('JobCategory', back_populates='jobs', foreign_keys=[category_id])
+    created_by_user = db.relationship('User', backref='jobs_created', foreign_keys=[created_by])
+    applications = db.relationship('JobApplication', back_populates='job', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def to_dict(self, include_applications=False):
+        data = {
+            'id': self.id,
+            'title': self.title,
+            'slug': self.slug,
+            'category_id': self.category_id,
+            'category': self.category.name if self.category else None,
+            'location': self.location,
+            'type': self.type,
+            'experience_level': self.experience_level,
+            'salary_range': self.salary_range,
+            'description': self.description,
+            'requirements': self.requirements,
+            'responsibilities': self.responsibilities,
+            'benefits': self.benefits,
+            'application_deadline': self.application_deadline.isoformat() if self.application_deadline else None,
+            'is_active': self.is_active,
+            'is_featured': self.is_featured,
+            'views_count': self.views_count,
+            'applications_count': self.applications_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+        
+        if include_applications:
+            data['applications'] = [app.to_dict() for app in self.applications]
+        
+        return data
+    
+    def increment_views(self):
+        self.views_count += 1
+        db.session.commit()
+    
+    def increment_applications(self):
+        self.applications_count += 1
+        db.session.commit()
+    
+    def __repr__(self):
+        return f'<Job {self.title}>'
 
 
 class JobApplication(db.Model):
+    """Job applications from candidates"""
     __tablename__ = 'job_applications'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -930,8 +1004,9 @@ class JobApplication(db.Model):
     
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=False, index=True)
     phone = db.Column(db.String(20))
+    
     cover_letter = db.Column(db.Text, nullable=False)
     cv_url = db.Column(db.String(500), nullable=False)
     portfolio_url = db.Column(db.String(500))
@@ -947,13 +1022,45 @@ class JobApplication(db.Model):
     
     ip_address = db.Column(db.String(50))
     user_agent = db.Column(db.String(500))
+    
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    replied_by_user = db.relationship('User', backref='job_replies')
+    # Relationships
+    job = db.relationship('Job', back_populates='applications', foreign_keys=[job_id])
+    replied_by_user = db.relationship('User', backref='job_replies', foreign_keys=[replied_by])
     
     def get_full_name(self):
-        return f"{self.first_name} {self.last_name}"
+        return f"{self.first_name} {self.last_name}".strip()
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'job_id': self.job_id,
+            'job_title': self.job.title if self.job else None,
+            'first_name': self.first_name,
+            'last_name': self.last_name,
+            'full_name': self.get_full_name(),
+            'email': self.email,
+            'phone': self.phone,
+            'cover_letter': self.cover_letter,
+            'cv_url': self.cv_url,
+            'portfolio_url': self.portfolio_url,
+            'linkedin_url': self.linkedin_url,
+            'status': self.status,
+            'admin_notes': self.admin_notes,
+            'rating': self.rating,
+            'admin_reply': self.admin_reply,
+            'replied_at': self.replied_at.isoformat() if self.replied_at else None,
+            'replied_by': self.replied_by,
+            'applied_at': self.applied_at.isoformat() if self.applied_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+    
+    def __repr__(self):
+        return f'<JobApplication {self.get_full_name()} for job {self.job_id}>'
+
+
 
 
 class Outlet(db.Model):
@@ -1121,8 +1228,8 @@ class DashboardComponent(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     order = db.Column(db.Integer, default=0)
     
-    # Permissions mapping (optional - links to existing permission system)
-    required_permissions = db.Column(db.JSON, default=list)  # ['products:read', 'tours:write']
+    # Permissions mapping 
+    required_permissions = db.Column(db.JSON, default=list)
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -26,7 +26,6 @@ const copyLink = async () => {
       isCopied.value = false
     }, 2000)
   } catch (err) {
-    console.error('Failed to copy:', err)
     alert('Failed to copy link. Please copy manually.')
   }
 }

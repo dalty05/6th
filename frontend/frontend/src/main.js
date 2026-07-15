@@ -63,17 +63,14 @@ if (user) {
   // ✅ Verify session with backend
   authService.checkAuth().then((valid) => {
     if (!valid) {
-      console.log('ℹ️ Session expired, redirecting to login')
       localStorage.removeItem('user')
       localStorage.removeItem('token')
       if (router.currentRoute.value.path.startsWith('/admin') || router.currentRoute.value.path.startsWith('/partner')) {
         router.replace('/admin/login')
       }
     } else {
-      console.log('✅ Session verified, permissions loaded')
     }
   }).catch(() => {
-    console.log('ℹ️ Session expired, redirecting to login')
     localStorage.removeItem('user')
     localStorage.removeItem('token')
     if (router.currentRoute.value.path.startsWith('/admin') || router.currentRoute.value.path.startsWith('/partner')) {
@@ -81,7 +78,6 @@ if (user) {
     }
   })
 } else {
-  console.log('ℹ️ No active session')
   if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/partner')) {
     router.replace('/admin/login')
   }

@@ -1,6 +1,3 @@
-
-
-
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -22,11 +19,9 @@ class EmailService:
     def _send_email(self, to_email, subject, html_content, text_content=None):
         """Send email using SMTP with proper error handling"""
         if not self.enabled:
-            print(f"📧 [MOCK] Email to {to_email}: {subject}")
             return True
         
         if not self.smtp_username or not self.smtp_password:
-            print(f"⚠️ Email credentials not configured. Skipping email to {to_email}")
             return False
         
         try:
@@ -52,11 +47,11 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
             
-            print(f"✅ Email sent successfully to {to_email}")
             return True
             
         except Exception as e:
-            print(f"❌ Email sending failed to {to_email}: {str(e)}")
+            
+
             return False
     
     # ========== EXISTING METHODS ==========
@@ -633,11 +628,9 @@ class EmailService:
     def send_email_via_smtp(self, to_email, subject, html_content, text_content=None):
         """Send email directly via SMTP with proper formatting"""
         if not self.enabled:
-            print(f"📧 [MOCK] Email to {to_email}: {subject}")
             return True
         
         if not self.smtp_username or not self.smtp_password:
-            print(f"⚠️ Email credentials not configured. Skipping email to {to_email}")
             return False
         
         try:
@@ -663,11 +656,9 @@ class EmailService:
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
             
-            print(f"✅ Email sent successfully to {to_email}")
             return True
             
         except Exception as e:
-            print(f"❌ Email sending failed to {to_email}: {str(e)}")
             return False
 
 

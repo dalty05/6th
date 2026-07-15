@@ -168,7 +168,6 @@ const loadProfile = async () => {
     const response = await api.get('/admin/profile')
     profile.value = response.data
   } catch (error) {
-    console.error('Error loading profile:', error)
     showNotification('Failed to load profile', 'error')
   }
 }

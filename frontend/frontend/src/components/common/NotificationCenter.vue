@@ -83,8 +83,6 @@ const loadNotifications = async () => {
     const data = await notificationService.fetchNotifications(10)
     notifications.value = data
     unreadCount.value = notificationService.unreadCount.value
-  } catch (error) {
-    console.error('Error loading notifications:', error)
   } finally {
     loading.value = false
   }

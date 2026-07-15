@@ -42,12 +42,6 @@ export function initReferralTracking() {
   const sessionId = getSessionId()
   const startTime = Date.now()
   
-  console.log('📊 Referral tracking active:', {
-    code: finalReferralCode,
-    sessionId: sessionId
-  })
-
-  // Track page view
   trackAction({
     referralCode: finalReferralCode,
     sessionId: sessionId,
@@ -88,13 +82,9 @@ export function initReferralTracking() {
       timeSpent: Math.floor((Date.now() - startTime) / 1000)
     }
 
-    console.log('📊 Referral navigation tracked:', trackingData.linkText)
-
-    // Send to backend
     sendTrackingData(trackingData)
   })
 
-  // Track when user leaves the page
   window.addEventListener('beforeunload', function() {
     const timeSpent = Math.floor((Date.now() - startTime) / 1000)
     
@@ -109,10 +99,7 @@ export function initReferralTracking() {
         pageTitle: document.title,
         screenSize: getScreenSize()
       }
-      
-      console.log('📊 User exit tracked:', timeSpent + 's')
-      
-      // Use sendBeacon for reliable exit tracking
+  
       if (navigator.sendBeacon) {
         navigator.sendBeacon(
           '/api/referral/track-nav',
@@ -198,10 +185,9 @@ async function sendTrackingData(data) {
     })
     
     if (!response.ok) {
-      console.warn('⚠️ Failed to send tracking data:', response.status)
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
   } catch (error) {
-    // Silently fail - don't break user experience
-    console.warn('⚠️ Tracking error:', error.message)
+    
   }
 }

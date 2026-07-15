@@ -145,9 +145,9 @@ def register():
     db.session.commit()
     
     # Send verification email
-    frontend_url = current_app.config.get('FRONTEND_URL', 'https://propeller-outclass-parsnip.ngrok-free.dev')
+    frontend_url = current_app.config.get('FRONTEND_URL', 'localhost:5173')
     if not email_service.send_verification_email(user, token_obj.token, frontend_url):
-        print(f"Failed to send registration verification email to {user.email}")
+        
         return jsonify({'error': 'Registration succeeded, but verification email could not be sent. Please check SMTP settings.'}), 500
     
     return jsonify({

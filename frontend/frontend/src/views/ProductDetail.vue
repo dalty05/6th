@@ -205,7 +205,6 @@ export default {
         
         await loadRelatedProducts()
       } catch (error) {
-        console.error('Error loading product:', error)
         product.value = null
       } finally {
         loading.value = false
@@ -220,7 +219,6 @@ export default {
           .filter(p => p.id !== product.value.id && p.category === product.value.category)
           .slice(0, 4)
       } catch (error) {
-        console.error('Error loading related products:', error)
         relatedProducts.value = []
       }
     }
@@ -697,7 +695,7 @@ export default {
   color: #64748b;
   margin: 0 12px 12px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  /* -webkit-line-clamp: 2; */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

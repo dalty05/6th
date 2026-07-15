@@ -470,7 +470,7 @@ const loadPartners = async () => {
     partners.value = partnersData
     totalPartners.value = partnersData.length
   } catch (error) {
-    console.error('Error loading partners:', error)
+  
   }
 }
 
@@ -511,7 +511,7 @@ const loadAnalytics = async () => {
     }
     
   } catch (error) {
-    console.error('Error loading analytics:', error)
+    
     showNotification('Failed to load analytics', 'error')
   } finally {
     loading.value = false
@@ -529,7 +529,7 @@ const viewPartnerDetails = async (partner) => {
     selectedPartner.value = partner
     showDetailsModal.value = true
   } catch (error) {
-    console.error('Error loading partner details:', error)
+    
     showNotification('Failed to load partner details', 'error')
   }
 }
@@ -671,7 +671,7 @@ const generateExcelExport = async () => {
     showNotification('Report exported successfully')
     closeExportModal()
   } catch (error) {
-    console.error('Error exporting:', error)
+    
     showNotification('Failed to export report', 'error')
   } finally {
     exporting.value = false

@@ -94,7 +94,6 @@ const loadOutlets = async () => {
     const response = await api.get('/outlets')
     outlets.value = response.data
   } catch (error) {
-    console.error('Error loading outlets:', error)
   } finally {
     loading.value = false
   }
@@ -105,8 +104,6 @@ const loadCategories = async () => {
     const response = await api.get('/outlets/categories')
     categories.value = [{ value: 'all', label: 'All Locations', count: outlets.value.length }, ...response.data]
   } catch (error) {
-    console.error('Error loading categories:', error)
-    // Fallback categories
     categories.value = [
       { value: 'all', label: 'All Locations', count: outlets.value.length },
       { value: 'office_branch', label: '🏢 Office Branch', count: 0 },

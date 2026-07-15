@@ -5,7 +5,6 @@ export const scrollToSection = (sectionId, offset = 80) => {
   const element = document.getElementById(cleanId)
   
   if (!element) {
-    console.warn(`Section "${cleanId}" not found`)
     return false
   }
   

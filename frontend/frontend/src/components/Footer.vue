@@ -283,7 +283,6 @@ export default {
     }, 5000)
     
   } catch (error) {
-    console.error('Newsletter error:', error)
     this.newsletterErrorMessage = error.response?.data?.error || 'Failed to subscribe. Please try again.'
     this.showNewsletterError = true
     

@@ -256,8 +256,8 @@ const loadStats = async () => {
     const response = await api.get('/admin/newsletter/subscribers/stats')
     stats.value = response.data || { total: 0, active: 0, inactive: 0, new_last_30_days: 0 }
   } catch (error) {
-    console.error('Error loading stats:', error)
-    // Set default values on error
+    
+    
     stats.value = { total: 0, active: 0, inactive: 0, new_last_30_days: 0 }
   }
 }
@@ -282,7 +282,6 @@ const loadSubscribers = async () => {
       has_prev: false
     }
   } catch (error) {
-    console.error('Error loading subscribers:', error)
     subscribers.value = []
     showNotification('Failed to load subscribers', 'error')
   } finally {

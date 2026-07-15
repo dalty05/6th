@@ -1,3 +1,4 @@
+
 <template>
   <div v-if="isOpen" class="tour-modal-overlay" @click.self="closeModal">
     <div class="tour-modal">
@@ -107,7 +108,6 @@
                   <span v-for="day in weekDays" :key="day" class="day-header">{{ day }}</span>
                 </div>
                 <div class="calendar-body">
-                  <!-- ✅ FIX: Check if date exists before accessing properties -->
                   <div 
                     v-for="(date, index) in calendarDays" 
                     :key="index"
@@ -194,7 +194,7 @@
                   :max="selectedPackageData?.max_people || 300"
                   @input="calculatePrice"
                 >
-                <small class="input-hint">Min: 1, Max: {{ selectedPackageData?.max_people || 300 }}</small>
+                <small class="input-hint">Min: {{ selectedPackageData?.min_people || 1 }}, Max: {{ selectedPackageData?.max_people || 300 }}</small>
               </div>
             </div>
 
@@ -342,7 +342,7 @@
 
 <script>
 import axios from 'axios'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from 'date-fns'
+import { format, isSameDay, isToday } from 'date-fns'
 
 export default {
   name: 'TourBookingModal',
@@ -490,48 +490,65 @@ export default {
       return text.length > length ? text.substring(0, length) + '...' : text
     },
     setImagePlaceholder(event) {
-      event.target.src = '/images/tour-placeholder.jpg'
+      event.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150"><rect width="200" height="150" fill="%23f1f5f9"/><text x="100" y="75" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%2394a3b8">No Image</text></svg>'
     },
     async fetchPackages() {
       try {
         const response = await axios.get('/api/tour/packages')
-        this.packages = response.data.packages || []
+        
+        if (Array.isArray(response.data)) {
+          this.packages = response.data
+        } else if (response.data.packages) {
+          this.packages = response.data.packages
+        } else {
+          this.packages = []
+        }
+        
         if (this.packages.length > 0) {
           this.selectedPackage = this.packages[0].id
           this.selectedPackageData = this.packages[0]
+          // ✅ Wait for calendar to render before loading availability
+          await this.$nextTick()
+          await this.loadMonthAvailability()
         }
       } catch (error) {
-        console.error('Failed to fetch packages:', error)
-        // Fallback packages
-        this.packages = [
-          {
-            id: 1,
-            name: 'Standard Factory Tour',
-            description: 'Experience the complete dairy production process',
-            short_description: '2-hour guided tour',
-            base_price: 1500,
-            duration_hours: 2,
-            includes: ['Factory tour guide', 'Product tasting', 'Safety gear', 'Certificate'],
-            is_featured: true,
-            image_url: '/images/tour-placeholder.jpg',
-            commitment_percentage: 30
-          },
-          {
-            id: 2,
-            name: 'Premium Farm-to-Table Experience',
-            description: 'Full day experience with farm visit and gourmet lunch',
-            short_description: '6-hour complete experience',
-            base_price: 3500,
-            duration_hours: 6,
-            includes: ['Farm visit', 'Factory tour', 'Gourmet lunch', 'Certificate'],
-            is_featured: true,
-            image_url: '/images/tour-placeholder.jpg',
-            commitment_percentage: 30
-          }
-        ]
+        console.error('Error fetching packages:', error)
+        this.packages = this.getFallbackPackages()
         this.selectedPackage = this.packages[0].id
         this.selectedPackageData = this.packages[0]
+        await this.$nextTick()
+        await this.loadMonthAvailability()
       }
+    },
+    getFallbackPackages() {
+      return [
+        {
+          id: 1,
+          name: 'Standard Factory Tour',
+          description: 'Experience the complete dairy production process',
+          short_description: '2-hour guided tour',
+          base_price: 1500,
+          duration_hours: 2,
+          includes: ['Factory tour guide', 'Product tasting', 'Safety gear', 'Certificate'],
+          is_featured: true,
+          commitment_percentage: 30,
+          max_people: 300,
+          min_people: 1
+        },
+        {
+          id: 2,
+          name: 'Premium Farm-to-Table Experience',
+          description: 'Full day experience with farm visit and gourmet lunch',
+          short_description: '6-hour complete experience',
+          base_price: 3500,
+          duration_hours: 6,
+          includes: ['Farm visit', 'Factory tour', 'Gourmet lunch', 'Certificate'],
+          is_featured: true,
+          commitment_percentage: 30,
+          max_people: 300,
+          min_people: 2
+        }
+      ]
     },
     async fetchAvailability(date) {
       if (!date) return
@@ -549,16 +566,27 @@ export default {
         this.availabilityCache[dateKey] = response.data
         this.$forceUpdate()
       } catch (error) {
-        console.error('Failed to fetch availability:', error)
         this.availabilityCache[dateKey] = { is_available: true, is_blocked: false }
       }
     },
     async loadMonthAvailability() {
+      // ✅ Check if selectedPackage exists
       if (!this.selectedPackage) return
       
-      const days = this.calendarDays.filter(d => d.isCurrentMonth)
-      for (const day of days) {
-        await this.fetchAvailability(day.date)
+      // ✅ Ensure calendarDays is available
+      const days = this.calendarDays || []
+      if (days.length === 0) {
+        // Try again after a short delay
+        await new Promise(resolve => setTimeout(resolve, 100))
+        return this.loadMonthAvailability()
+      }
+      
+      const currentMonthDays = days.filter(d => d && d.isCurrentMonth)
+      
+      for (const day of currentMonthDays) {
+        if (day && day.date) {
+          await this.fetchAvailability(day.date)
+        }
       }
     },
     selectPackage(packageId) {
@@ -567,8 +595,9 @@ export default {
       this.selectedDate = null
       this.priceBreakdown = null
       this.availabilityCache = {}
-      // Load availability for current month
-      this.loadMonthAvailability()
+      this.$nextTick(() => {
+        this.loadMonthAvailability()
+      })
     },
     selectDate(date) {
       if (!date || !date.isCurrentMonth || !date.isAvailable) return
@@ -577,11 +606,13 @@ export default {
     async prevMonth() {
       this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() - 1, 1)
       this.availabilityCache = {}
+      await this.$nextTick()
       await this.loadMonthAvailability()
     },
     async nextMonth() {
       this.currentDate = new Date(this.currentDate.getFullYear(), this.currentDate.getMonth() + 1, 1)
       this.availabilityCache = {}
+      await this.$nextTick()
       await this.loadMonthAvailability()
     },
     calculatePrice() {
@@ -657,8 +688,6 @@ export default {
           special_requirements: this.bookingForm.special_requirements?.trim() || null
         }
         
-        console.log('📤 Sending booking payload:', payload)
-        
         const response = await axios.post('/api/tour/booking', payload)
         
         if (response.data.success) {
@@ -667,8 +696,6 @@ export default {
           this.priceBreakdown = response.data.price_breakdown
         }
       } catch (error) {
-        console.error('❌ Booking error:', error)
-        console.error('❌ Error response:', error.response?.data)
         this.error = error.response?.data?.error || 'Failed to submit booking. Please try again.'
         alert(this.error)
       } finally {
@@ -718,6 +745,8 @@ export default {
   }
 }
 </script>
+
+
 
 
 <style scoped>

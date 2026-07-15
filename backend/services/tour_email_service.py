@@ -1,9 +1,3 @@
-# backend/services/tour_email_service.py
-"""
-Tour Email Service - Handles all tour-related email notifications
-Uses direct SMTP (same as email_service.py)
-"""
-
 import smtplib
 import os
 from email.mime.text import MIMEText

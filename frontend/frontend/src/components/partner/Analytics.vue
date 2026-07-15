@@ -469,7 +469,7 @@ const loadPartners = async () => {
     partners.value = partnersData
     totalPartners.value = partnersData.length
   } catch (error) {
-    console.error('Error loading partners:', error)
+    toast.error('Failed to load partners')
   }
 }
 
@@ -493,7 +493,7 @@ const loadAnalytics = async () => {
           referral_links: stats.links || []
         }
       } catch (error) {
-        console.warn(`Could not load stats for partner ${partner.id}:`, error)
+        toast.error(`Failed to load stats for ${partner.full_name}`)  
         return {
           ...partner,
           link_count: 0,
@@ -513,7 +513,6 @@ const loadAnalytics = async () => {
     uniqueVisitors.value = links.reduce((sum, l) => sum + (l.unique_clicks || 0), 0)
     
   } catch (error) {
-    console.error('Error loading analytics:', error)
     showNotification('Failed to load analytics', 'error')
   } finally {
     loading.value = false
@@ -534,7 +533,6 @@ const viewPartnerDetails = async (partner) => {
     selectedPartner.value = updatedPartner
     showDetailsModal.value = true
   } catch (error) {
-    console.error('Error loading partner details:', error)
     showNotification('Failed to load partner details', 'error')
   }
 }
@@ -659,7 +657,6 @@ const generateCSVExport = async () => {
     showNotification('Report exported successfully')
     closeExportModal()
   } catch (error) {
-    console.error('Error exporting:', error)
     showNotification('Failed to export report', 'error')
   } finally {
     exporting.value = false

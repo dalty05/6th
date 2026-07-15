@@ -1,5 +1,3 @@
-# backend/services/component_registry.py
-
 from models import DashboardComponent, RoleComponent, Role, User
 from flask import current_app
 import json

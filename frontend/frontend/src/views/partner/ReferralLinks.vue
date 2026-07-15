@@ -298,7 +298,6 @@ const loadLinks = async () => {
     const response = await referralService.getLinks()
     links.value = Array.isArray(response) ? response : []
   } catch (error) {
-    console.error('Error loading links:', error)
     toast.error('Failed to load referral links')
     links.value = []
   } finally {
@@ -352,7 +351,6 @@ const saveLink = async () => {
     closeModal()
     await loadLinks()
   } catch (error) {
-    console.error('Error saving link:', error)
     toast.error(error.response?.data?.error || 'Failed to save link')
   } finally {
     saving.value = false
@@ -365,7 +363,6 @@ const toggleLinkStatus = async (link) => {
     toast.success(`Link ${link.is_active ? 'deactivated' : 'activated'} successfully`)
     await loadLinks()
   } catch (error) {
-    console.error('Error toggling link status:', error)
     toast.error('Failed to update link status')
   }
 }
@@ -377,7 +374,6 @@ const deleteLink = async (linkId) => {
       toast.success('Link deleted successfully')
       await loadLinks()
     } catch (error) {
-      console.error('Error deleting link:', error)
       toast.error('Failed to delete link')
     }
   }

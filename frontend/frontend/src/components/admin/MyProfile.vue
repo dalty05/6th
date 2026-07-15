@@ -377,7 +377,7 @@ export default {
         await this.loadActivities()
         
       } catch (error) {
-        console.error('Error loading profile:', error)
+        
         this.errorMessage = error.response?.data?.error || 'Failed to load profile'
       } finally {
         this.loading = false
@@ -389,7 +389,6 @@ export default {
         const response = await api.get('/admin/activities?limit=10')
         this.activities = response.data.activities || []
       } catch (error) {
-        console.warn('Could not load activities:', error)
         this.activities = []
       }
     },
@@ -467,7 +466,7 @@ export default {
         await navigator.clipboard.writeText(this.user.referral_code)
         this.showSuccess('Referral code copied!')
       } catch (error) {
-        console.warn('Could not copy:', error)
+        
         // Fallback
         const input = document.createElement('input')
         input.value = this.user.referral_code

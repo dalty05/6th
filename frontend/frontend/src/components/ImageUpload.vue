@@ -113,7 +113,6 @@ export default {
         this.previewUrl = URL.createObjectURL(file)
         this.$emit('image-uploaded', this.imageUrl)
       } catch (error) {
-        console.error('Upload error:', error)
         alert('Failed to upload image')
       } finally {
         this.uploading = false

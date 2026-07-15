@@ -113,8 +113,6 @@ const loadActivities = async () => {
       }
     })
     activities.value = response.data
-  } catch (error) {
-    console.error('Error loading activities:', error)
   } finally {
     loading.value = false
   }
